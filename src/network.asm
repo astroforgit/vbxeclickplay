@@ -10,7 +10,7 @@ NET_MODEM   = 1
 ; ----------------------------------------------------------------------------
 ; net_open - Open connection / send request
 ; For FujiNet: SIO open to N: device
-; For 850: send GET request to proxy over serial
+; For 850: send GET request over serial
 ; ----------------------------------------------------------------------------
 .proc net_open
         lda zp_net_device

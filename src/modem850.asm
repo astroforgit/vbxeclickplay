@@ -3,7 +3,7 @@
 ; Uses standard CIO calls (no concurrent mode, no direct handler vectors)
 ; Compatible with Altirra Networked serial port device
 ;
-; Protocol: Browser sends "GET <url>\r\n", proxy relays HTML + EOT ($04)
+; Protocol: Browser sends "GET <url>\r\n", server relays HTML + EOT ($04)
 ; ============================================================================
 
 ; CIO equates (CIOV, ICCOM, ICBAL, ICBAH, ICBLL, ICBLH, ICAX1, ICAX2,
@@ -31,7 +31,7 @@ BAUD_19200 = 15
 M850_DEF_BAUD  = BAUD_19200
 M850_STOPBITS1 = 0
 
-; Proxy protocol
+; Serial protocol
 M850_EOT   = $04
 
 ; Config variables
@@ -212,7 +212,7 @@ m850_txbyte     dta b(0)
 .endp
 
 ; ----------------------------------------------------------------------------
-; m850_open - Send URL request to proxy (called by net_open)
+; m850_open - Send URL request via serial (called by net_open)
 ; Output: C=0 ok, C=1 error
 ; ----------------------------------------------------------------------------
 .proc m850_open

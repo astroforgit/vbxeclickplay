@@ -1,0 +1,2411 @@
+ERR LINE  ADDR  B1 B2 B3 B4                      6500 ASSEMBLER VER 1.0MR                     PAGE    1
+
+       1                                  LIST     X 
+       2  0000                      
+       3  0000                      
+       4  0000                      
+       5  0000                      
+       6  0000                      
+       7  0000                      
+       8  0000                      
+       9  0000                      
+      10  0000                      
+      11                          ;================================================================ 
+      12  0000                      
+      13                                  .TITLE  'RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN' 
+      14  0000                      
+      15                          ;================================================================ 
+      16                          ; 
+      17                          ; TANDEM FILENAME: R850CS1 
+      18                          ; 
+      19                          ; 
+      20                          ; REVISION HISTORY: 
+      21                          ;       VERSION 0 
+      22                          ;       VERSION 1     14 OCT 1980 ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE    2
+
+      23                                  .PAGE           ; 
+      24                          ;================================================================ 
+      25                          ;       GLOBAL DEFINITIONS:  CONSTANTS, EQUATES, MACROS, RAM LOCATIONS 
+      26                          ;================================================================ 
+      27                          ; 
+      28  0001                    YES     =       1 
+      29  0000                    NO      =       0 
+      30  0001                    NOT     =       1 
+      31                          ; 
+      32                          ; ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE    3
+
+      33                                  .PAGE           ; 
+      34                          ;       QUICK SUMMARY OF I/O: 
+      35                          ; 
+      36                          ; 
+      37                          ;       PRINTER: 
+      38                          ;               STATUS  (AUX BYTES CONTAIN NOTHING) 
+      39                          ;                       RETURNS FLAGS (10000XYZ) 
+      40                          ;                                       (X=BUSY,Y=DATA ERR,Z=CMD ERR) 
+      41                          ;                               MOST PREVIOUS AUX1 
+      42                          ;                               TIMEOUT IN SECONDS (TWO BYTES) 
+      43                          ;               WRITE   (AUX1 CONTAINS 'N' FOR NORMAL) 
+      44                          ;                               (COMPUTER SENDS 40 BYTES; 
+      45                          ;                                DATA FOLLOWING AN EOL IS IGNORED) 
+      46                          ; 
+      47                          ; 
+      48                          ;       RS232 PORTS: 
+      49                          ; 
+      50                          ;               STATUS (AUX CONTAINS NOTHING) 
+      51                          ;                       RETURNS ERRORS (F000BNDC) 
+      52                          ;                                       N=NOT READY ERROR (DSR,CTS,CRX) 
+      53                          ;                                       F=FRAME ERROR 
+      54                          ;                                       D=SERIAL DATA ERROR 
+      55                          ;                                       B=ILLEGAL OPTION COMBINATION ON 
+      56                          ;                                       C=ILLEGAL COMMAND ERROR 
+      57                          ;                               SENSE (RSCDXY0Z) 
+      58                          ;                                       R=DSR 
+      59                          ;                                       S=DSR SINCE PREV STATUS 
+      60                          ;                                       C=CTS 
+      61                          ;                                       D=CTS SINCE PREV STATUS 
+      62                          ;                                       X=CRX (CARRIER) 
+      63                          ;                                       Y=CRX SINCE PREV STATUS 
+      64                          ;                                       Z=RCV (DATA NOW) 
+      65                          ; 
+      66                          ;               WRITE (AUX1=LLLLLLLL) 
+      67                          ;                       LLLLLLLL=TRANSMISSION LENGTH (MAY BE 0) 
+      68                          ;                               WILL RECEIVE 64 BYTES, THEN WRITE LLLLLL
+      69                          ; 
+      70                          ;               BAUD (AUX1=T*NNBBBB,AUX2=*****RCX) 
+      71                          ;                       T=2 STOP BITS 
+      72                          ;                       NN=WORD SIZE (00=8,11=5,10=6,01=7) 
+      73                          ;                       BBBB=BAUD SELECT 
+      74                          ;                       R=WATCH READY LINE 
+      75                          ;                       C=WATCH CLEAR TO SEND 
+      76                          ;                       X=WATCH CARRIER 
+      77                          ; 
+      78                          ;               CONTROL (AUX1=RSCD**AB) 
+      79                          ;                       R=ENABLE SETTING DTR 
+      80                          ;                       S=DTR 
+      81                          ;                       C=ENBALE SETTING RTS 
+      82                          ;                       D=RTS 
+      83                          ;                       A=ENABLE SETTING XMT 
+      84                          ;                       B=XMT 
+      85                          ; 
+      86                          ;               STREAM (AUX1=****WR**) ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE    4
+
+      87                          ;                       W=OUT, R=IN 
+      88                          ; 
+      89                          ;       MISC I/O: 
+      90                          ; 
+      91                          ;               TEST (RS232 PORT 1 ADDRESS; AUX1=LLLLLLLL) 
+      92                          ;                       LLLLLLLL=BYTE COUNT 
+      93                          ;                               WILL RECEIVE LLLLLLLL BYTES THEN JUMP TO
+      94                          ;                               IN BUFFER AS TEST CODE 
+      95                          ; 
+      96                          ;               DISK STATUS REQUEST (AUX NOTHING) 
+      97                          ;                       RETURNS FLAGS,0,TIMEOUT (2 BYTES?????) 
+      98                          ;                       FLAGS=00001000 (WRITE PROTECTED) 
+      99                          ; 
+     100                          ;               DISK READ (AUX1,AUX2=SECTOR LSB,MSB) 
+     101                          ;                       RETURNS 128 DATA BYTES 
+     102                          ; 
+     103                          ;       NOTES ON PSEUDO-DISK BOOT:  BOOT STARTS WITH READ FROM SECTOR 1 
+     104                          ;               DATA:  FLAGS 
+     105                          ;               NUMBER OF SECTORS (INCLUDING FIRST) 
+     106                          ;               LOAD ADDRESS (TWO BYTES) 
+     107                          ;               DOSINI ADDRESS (TWO BYTES) 
+     108                          ;               DATA 
+     109                          ; 
+     110                          ;               THE BOOT WILL LOAD INFO 
+     111                          ;               STARTING AT THE LOAD ADDRESS. 
+     112                          ;               SUBSEQUENT SECTORS WILL BE READ IN ASCENDING ORDER FROM 
+     113                          ;               AFTER THE READS ARE DONE, THE OS WILL JSR TO THE 
+     114                          ;               LOAD ADDRESS+6.  THE ROUTINE SHOULD RTS WITH CARRY 
+     115                          ;               CLEAR TO INDICATE NO ERROR.  THE OS THEN JSR'S TO 
+     116                          ;               THE DOSINI ROUTINE.  THIS LATTER ENTRY IS CALLED ON 
+     117                          ;               ANY SUBSEQUENT WARM STARTS. ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE    5
+
+     118                                  .PAGE   ; 
+     119                          ;       PORT DEFINITIONS: 
+     120                          ; 
+     121                          ;       PORTD=DATA OUT PORT 
+     122                          ;               7       IN      RCV 3   + 
+     123                          ;               6       IN      FAULT   1=NO PRINTER 
+     124                          ;               5       OUT     DATA-TO + 
+     125                          ;               4       OUT     SEND 4  + 
+     126                          ;               3       OUT     SEND 3  + 
+     127                          ;               2       OUT     SEND 2  + 
+     128                          ;               1       OUT     SEND 1  + 
+     129                          ;               0       IN      DATA-FR - 
+     130                          ;       PORTR=READY OUT PORT 
+     131                          ;               7       IN      RCV 2   + 
+     132                          ;               6       IN      BUSY    0=BUSY 
+     133                          ;               5       OUT     STROBE  1=STROBE 
+     134                          ;               4       OUT     RTS 1   - 
+     135                          ;               3       OUT     DTR 3   - 
+     136                          ;               2       OUT     DTR 2   - 
+     137                          ;               1       OUT     DTR 1   - 
+     138                          ;               0       IN      RCV 4   + 
+     139                          ;       PORT1=MODEM IN PORT 
+     140                          ;               7       IN      COMMAND 1=COMMAND 
+     141                          ;               6       ---     ---     --- 
+     142                          ;               5       IN      CTS 1   - 
+     143                          ;               4       IN      CARRIER - 
+     144                          ;               3       IN      DSR 3   - 
+     145                          ;               2       IN      DSR 2   - 
+     146                          ;               1       IN      DSR 1   - 
+     147                          ;               0       IN      RCV 1   + 
+     148                          ;       PORTP=PRINTER OUT PORT, ALL - LOGIC 
+     149                          ; 
+     150  0000                    PIA1    =       $0000 
+     151  0180                    PIA2    =       $0180 
+     152  0000                    PORTD   =       PIA1+0  ; DATA-OUT PORT 
+     153  0001                    DPORTD  =       PIA1+1 
+     154  0002                    PORTR   =       PIA1+2  ; READY-OUT PORT 
+     155  0003                    DPORTR  =       PIA1+3 
+     156  0180                    PORT1   =       PIA2+0  ; MODEM-IN PORT 
+     157  0181                    DPORT1  =       PIA2+1 
+     158  0182                    PORTP   =       PIA2+2  ; PRINTER-OUT PORT 
+     159  0183                    DPORTP  =       PIA2+3 
+     160                          ; 
+     161                          ; 
+     162  0185                    INTS2   =       PIA2+5          ; PIA2 INTERRUPT FLAGS 
+     163  0184                    COMLO   =       PIA2+4          ; CONFIG PIA2 TO DETECT COMMAND END 
+     164  0185                    COMHI   =       PIA2+5          ; CONFIG TO DETECT COMMAND START 
+     165  0194                    TIMO1   =       PIA2+20         ; TIMEOUT AT 1X CLOCK 
+     166  0195                    TIMO8   =       PIA2+21         ; TIMEOUT AT 8X CLOCK 
+     167  0196                    TIMO64  =       PIA2+22         ; TIMEOUT AT 64X CLOCK 
+     168  0197                    TIMO1K  =       PIA2+23         ; TIMEOUT AT 1024X CLOCK 
+     169                          ; 
+     170  0014                    TIMR1   =       PIA1+20         ; BAUD TIMER AT 1X CLOCK 
+     171  0005                    INTS1   =       PIA1+5          ; PIA1 INTERRUPT FLAGS ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE    6
+
+     172                          ; 
+     173  001E                    WRITIM  =       30              ; 30 SEC PRINTER TIMEOUT (50 MAX) ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE    7
+
+     174                                  .PAGE           ; 
+     175                          ;---------------------------------------------------------------- 
+     176                          ;       MACROS 
+     177                          ;---------------------------------------------------------------- 
+     178                          ; 
+     179                          ; 
+     180                          ;RES    .MACRO  LEN 
+     181                          ;*      =       *+LEN 
+     182                          ;       .ENDM 
+     183                          ; 
+     184                          ; 
+     185                          NPAGE   .MACRO 
+     186                                  *=      +(*+255)/256*256 
+     187                                  .ENDM 
+     188                          ; 
+     189                          ; 
+     190                          ACKACK  .MACRO 
+     191                                  JSR     SNDACK 
+     192                                  .ENDM 
+     193                          ; 
+     194                          ; 
+     195                          DONDON  .MACRO 
+     196                                  JSR     SNDDON 
+     197                                  .ENDM 
+     198                          ; 
+     199                          ; 
+     200                          LASTAT  .MACRO 
+     201                                  BRK 
+     202                                  NOP 
+     203                                  .ENDM 
+     204                          ; 
+     205                          ; 
+     206                          LSTATL  .MACRO 
+     207                                  LDA     PORT1 
+     208                                  ORA     LOHIST 
+     209                                  STA     LOHIST 
+     210                                  .ENDM 
+     211                          ; 
+     212                          ; 
+     213                          LSTATH  .MACRO 
+     214                                  LDA     PORT1 
+     215                                  AND     HILOST 
+     216                                  STA     HILOST 
+     217                                  .ENDM ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE    8
+
+     218                                  .PAGE           ; 
+     219                          ;---------------------------------------------------------------- 
+     220                          ;       RAM DEFINITIONS: 
+     221                          ;---------------------------------------------------------------- 
+     222                          ; 
+     223                          ; 
+     224                          ;       PAGE 0: 
+     225                          ; 
+     226                          ; 
+     227                                  *=      $0080 
+     228                          ; 
+     229                          ;               **********NOTE: THE FIRST 16 RAM LOCATIONS MAY BE USED 
+     230                          ;                       BY THE LOAD-AND-TEST FUNCTION.  THEREFORE, IN AN
+     231                          ;                       FUTURE RELEASE OF THIS CODE, THESE BYTES SHOULD 
+     232                          ;                       BE USED ONLY AS LOCAL (TEMP) VARIABLES OF ANY 
+     233                          ;                       FUNCTION IMPLEMENTED HEREIN. ********** 
+     234                          ; 
+     235  0080                    FDXDAT  RES     4               ; DATA BYTES FOR FULL DUPLEX STREAM 
+     236                          ; 
+     237  0080                    OUT0M   =       FDXDAT          ; PORTD SPACE FOR BLKOUT ROUTINE 
+     238  0081                    OUT1M   =       FDXDAT+1        ; MARK FOR BLKOUT 
+     239  0082                    OUTTL   =       FDXDAT+2        ; BLKOUT TIMER RELOAD VALUE 
+     240  0083                    OUTTH   =       FDXDAT+3        ; BLKOUT OUTER LOOP TIMER RELOAD VALUE 
+     241                          ; 
+     242  0084                    INTL    RES     1               ; ODD WORDSIZE STREAM IN INNER TIMER VAL
+     243                          ; 
+     244  0085                    INTH    RES     1               ; DITTO OUTER TIMER VAL 
+     245                          ; 
+     246  0086                    INHIT   =       *               ; ODD WORD STREAM OUTERLOOP TIMER 
+     247  0086                    OUTHIT  RES     1               ; BLKOUT OUTER LOOP TIMER 
+     248                          ; 
+     249  0087                    INBIT   =       *               ; ODD WORD STREAM BIT COUNTER 
+     250  0087                    BITOUT  RES     1               ; BLKOUT BIT COUNTER 
+     251                          ; 
+     252  0088                    INBITS  RES     1               ; ODD WORD STREAM BIT CTR RESET 
+     253                          ; 
+     254  0089                    INBYTE  RES     1               ; ODD WORD STREAM INPUT DATA WORK 
+     255                          ; 
+     256  008A                    INOUT   RES     1               ; ODD WORD STREAM DATA-TO WORK AREA 
+     257                          ; 
+     258  008B                    DISKW   = *                     ; VECTOR FOR BOOT ROUTINES 
+     259  008B                            RES     2               ; (TOTAL OF 4 BYTES FOR DISKW) 
+     260  008D                    INPORT  RES     2               ; JUMP VECTOR TO ODD STREAM PROPER PORT 
+     261                          ; 
+     262  008F                    RTEST   =       *               ; LOAD AND XEQ TEST FLAG 
+     263                          ; 
+     264  008F                    INSTAR  RES     1               ; ODD WORD START BIT TEST MASK 
+     265                          ; 
+     266  0090                    PORTN   RES     1               ; PORT NUMBER OF CURRENT RS232 OP 
+     267                          ; 
+     268  0091                    STBAUX  = * 
+     269  0091                    BAUDS   = * 
+     270  0091                    BAUD1   RES     1               ; PORTS 1 THRU 4 BAUD RATES 
+     271  0092                    BAUD2   RES     1 ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE    9
+
+     272  0093                    BAUD3   RES     1 
+     273  0094                    BAUD4   RES     1 
+     274                          ; 
+     275  0095                    HANDS   = * 
+     276  0095                    HAND1   RES     1               ; PORTS 1 THRU 4 HANDSHAKE MODE FLAGS 
+     277  0096                    HAND2   RES     1 
+     278  0097                    HAND3   RES     1 
+     279  0098                    HAND4   RES     1 
+     280                          ; 
+     281  0099                    PORT1S  RES     1               ; PORTS 1 THRU 4 ERROR STATUS 
+     282  009A                    PORT2S  RES     1 
+     283  009B                    PORT3S  RES     1 
+     284  009C                    PORT4S  RES     1 
+     285                          ; 
+     286  009D                    PRIAX1  RES     1               ; OLD AUX1 FOR PRINTER STATUS REQ 
+     287                          ; 
+     288  009E                    POLLF   RES     1               ; FLAG INDICATING POLL HAS BEEN ANSWERED
+     289                          ; 
+     290  009F                    PRIFLG  RES     1               ; PRINTER STATUS FLAGS 
+     291                          ; 
+     292  00A0                    LOHIST  RES     1               ; LOW-TO-HIGH STATUS LATCH 
+     293                          ; 
+     294  00A1                    HILOST  RES     1               ; HIGGH-TO-LOW STATUS LATCH 
+     295                          ; 
+     296  00A2                    OPORTD  RES     1               ; SAVED VALUE OF PORTD DURING STREAMING 
+     297                          ; 
+     298  00A3                    BOOTFL  RES     1               ; DISK BOOT FLAG 
+     299                          ; 
+     300  00A4                    POLLCT  RES     1               ; POLL COUNTER 
+     301                          ; 
+     302  00A5                    RSTEMP  = *                     ; TEMPORARY FOR RS232 STATUS REQ 
+     303                          ; 
+     304  00A5                    TOCOM   RES     1               ; TEMP FOR TOCOMB ROUTINE 
+     305                          ; 
+     306  00A6                    RDYMSK  RES     1               ; PORT READINESS TEST MASK 
+     307                          ; 
+     308  00A7                    LPRINT  RES     1               ; LATEST CHAR SENT TO PRINTER 
+     309                          ; 
+     310  00A8                    OPRINT  RES     1               ; ATASCII OF LATEST PRINTED CHAR 
+     311                          ; 
+     312  00A9                    TIMOUT  RES     1               ; HIGH BYTE OF TIMEOUT COUNTER (LOWER IN
+     313                          ; 
+     314  00AA                    BUFUSE  RES     1               ; CURRENT BUFFER LENGTH <<EXCLUDING CHEC
+     315                          ; 
+     316  00AB                    BUFSIG  RES     1               ; # OF SIGNIFICANT BYTES IN BUFFER 
+     317                          ; 
+     318  0080                    BUFLEN  =       128 
+     319  00AC                    CHEK    RES     1               ; CHECKSUM PART OF BUFFER 
+     320  02AC                    CHECK   =       CHEK+$0200      ; IMAGE IN PAGE 2 
+     321                          ; 
+     322  00AD                    BUFE    RES     BUFLEN          ; BUFFER (STORED BACKWARDS!) 
+     323  02AD                    BUFFE   =       BUFE+$0200      ; BUFFER END IMAGE IN PAGE 2 
+     324                          ; 
+     325  012D                    BUFB    =       *               ; BUFFER 'BEGINNING', PAGE 1 ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   10
+
+     326  032D                    BUFFB   =       BUFB+$0200      ; BUF BEGIN IMAGE IN PAGE 3 
+     327                          ; 
+     328                          ; ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   11
+
+     329                                  .PAGE   ; 
+     330                          ;================================================================ 
+     331                          ;       SUBROUTINES 
+     332                          ;================================================================ 
+     333                          ; 
+     334                          ; 
+     335                                  *=      $F000   ; CODE ORIGIN 
+     336                          ; 
+     337                          ; 
+     338                          ;---------------------------------------------------------------- 
+     339                          ;       19.2 KBAUD ASYNCH READ ROUTINE: 
+     340                          ;               READS FROM SERIAL PORT 
+     341                          ;               TWO ENTRIES--AST19C READS COMMANDS, RESETS IF COM RISES 
+     342                          ;                       AST19 READS DATA, RESETS IF COM FALLS 
+     343                          ;               ERROR RETURN (C SET) ON DATA READ ERROR, 
+     344                          ;                  TIMEOUT, OR TOO MANY BYTES 
+     345                          ;               TIMEOUT INITIALLY SET EXTERNALLY, PIA2 CLOCK AND 'TIMOUT
+     346                          ;---------------------------------------------------------------- 
+     347                          ; 
+     348                          ; 
+     349                          ; 
+     350  F000                    AST19C  =       * 
+     351  F000  8D 84 01                  STA     COMLO           ; SET UP DETECT COMMAND RISE 
+     352  F003  4C 09 F0                  JMP     AST19S          ; GO FINISH SETUP 
+     353  F006                    AST19   =       * 
+     354  F006  8D 85 01                  STA     COMHI           ; SET UP DETECT COMMAND FALL 
+     355                          ; 
+     356  F009                    AST19S  = * 
+     357  F009  AE 85 01                  LDX     INTS2           ; RESET INTERRUPT FLAG BITS 
+     358  F00C  A6 AA                     LDX     BUFUSE          ; BUFFER SIZE INTO X 
+     359  F00E  E8                        INX                     ; INCLUDE CHECKSUM BYTE 
+     360                          ; 
+     361  F00F                    AST19L  =       * 
+     362  F00F  A9 01                     LDA     #$01            ;2 TEST FOR START BIT 
+     363  F011  24 00                     BIT     PORTD           ;3 
+     364  F013  F0 02                     BEQ     *+4             ;3 BRANCH IF NOT 
+     365  F015  D0 43                     BNE     ASY19           ;3 GO IF SO 
+     366  F017  AD 80 01                  LDA     PORT1           ;4 LATCH 1/2 STATUS 
+     367  F01A  25 A1                     AND     HILOST          ;3 
+     368  F01C  85 A1                     STA     HILOST          ;3 
+     369  F01E  A9 01                     LDA     #$01            ;2 TEST FOR START BIT 
+     370  F020  24 00                     BIT     PORTD           ;3 
+     371  F022  F0 02                     BEQ     *+4             ;3 BRANCH IF NOT START 
+     372  F024  D0 34                     BNE     ASY19           ;3 GO IF SO 
+     373  F026  AD 80 01                  LDA     PORT1           ;4 LATCH OTHER 1/2 STATUS 
+     374  F029  05 A0                     ORA     LOHIST          ;3 
+     375  F02B  85 A0                     STA     LOHIST          ;3 
+     376  F02D  A9 01                     LDA     #$01            ;2 TEST FOR START BIT 
+     377  F02F  24 00                     BIT     PORTD           ;3 
+     378  F031  F0 02                     BEQ     *+4             ;3 BRANCH IF NOT START 
+     379  F033  D0 25                     BNE     ASY19           ;3 BRANCH IF START 
+     380  F035  8A                        TXA                     ;2 TEST END-BUFFER 
+     381  F036  F0 50                     BEQ     AST19X          ;2 BR IF END 
+     382  F038  2C 85 01                  BIT     INTS2           ;4 TEST COMMAND CHANGE OR TIMEOUT ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   12
+
+     383  F03B  70 48                     BVS     AST19R          ;2 BRANCH IF COMMAND LINE CHANGED 
+     384  F03D  10 D0                     BPL     AST19L          ;2 BRANCH IF NOT LOW-ORDER TIMEOUT 
+     385  F03F  A9 01                     LDA     #$01            ;2 TEST FOR START BIT 
+     386  F041  24 00                     BIT     PORTD           ;3 
+     387  F043  F0 02                     BEQ     *+4             ;3 BRANCH IF NOT START 
+     388  F045  D0 13                     BNE     ASY19           ;3 BRANCH IF START 
+     389  F047  C6 A9                     DEC     TIMOUT          ;5 HIGH-ORDER TIMEOUT 
+     390  F049  F0 38                     BEQ     AST19E          ;2 BRANCH IF TIMEOUT 
+     391  F04B  A9 01                     LDA     #$01            ;2 TEST FOR START BIT 
+     392  F04D  24 00                     BIT     PORTD           ;3 
+     393  F04F  F0 02                     BEQ     *+4             ;3 BRANCH IF NOT 
+     394  F051  D0 07                     BNE     ASY19           ;3 GO IF SO 
+     395  F053  A9 6D                     LDA     #109            ;2 RESET TIMER .1 SEC 
+     396  F055  8D 97 01                  STA     TIMO1K          ;4 
+     397  F058  D0 B5                     BNE     AST19L          ;3 (UNCONDITIONAL) 
+     398                          ; 
+     399  F05A                    ASY19   = * 
+     400  F05A  EA                        NOP                     ;2 
+     401  F05B  EA                        NOP                     ;2 
+     402  F05C  4C 5F F0                  JMP     *+3             ;3 (NOP) 
+     403  F05F  24 00                     BIT     PORTD           ;3 TEST IF STILL START BIT 
+     404  F061  F0 20                     BEQ     AST19E          ;2 BRANCH ERROR IF NOT 
+     405                          ; 
+     406  F063                    ASIN19  = * 
+     407  F063  A5 00                     LDA     PORTD           ;3 SAMPLE THE BIT STREAM 
+     408  F065  6A                        ROR     A               ;2 SHIFT IN NEW BIT 
+     409  F066  7E AB 02                  ROR     CHECK-1,X       ;7 
+     410  F069  B0 0C                     BCS     ASST19          ;2 BRANCH IF START BIT JUST OUT 
+     411  F06B  8A                        TXA                     ;2 TEST FOR BUFFER FULL 
+     412  F06C  F0 15                     BEQ     AST19E          ;2 IF SO, BRANCH--TOO MANY BYTES 
+     413  F06E  EA                        NOP                     ;2 
+     414  F06F  4C 72 F0                  JMP     *+3             ;3 
+     415  F072                            LASTAT                  ;32 CALL LATCHSTATUS 
+     416  F072  00               +        BRK 
+     417  F073  EA               +        NOP 
+     418  F074  4C 63 F0                  JMP     ASIN19          ;3 LOOP BACK 
+     419                          ; 
+     420  F077                    ASST19  = * 
+     421  F077  CA                        DEX                     ;2 BUMP BUFFER POINTER 
+     422  F078  EA                        NOP                     ;2 
+     423  F079  EA                        NOP                     ;2 
+     424  F07A  EA                        NOP                     ;2 
+     425  F07B                            LASTAT                  ;33 CALL LATCHSTATUS 
+     426  F07B  00               +        BRK 
+     427  F07C  EA               +        NOP 
+     428  F07D  A9 01                     LDA     #$01            ;2 
+     429  F07F  24 00                     BIT     PORTD           ;3 TEST STOP BIT 
+     430  F081  F0 8C                     BEQ     AST19L          ;3 BRANCH IF OK STOP 
+     431                          ;                               ; FALL TRHOUGH TO ERROR IF NOT 
+     432                          ; 
+     433  F083                    AST19E  = * 
+     434  F083  38                        SEC                     ; SET ERROR CODE 
+     435  F084  60                        RTS                     ; AND RETURN 
+     436                          ; ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   13
+
+     437  F085                    AST19R  = * 
+     438  F085  4C BA F8                  JMP     MAIN            ; ERROR EXIT--RESET! 
+     439                          ; 
+     440  F088                    AST19X  = * 
+     441  F088  18                        CLC                     ; SET NO ERROR (NORMAL EXIT) 
+     442  F089  60                        RTS                     ; AND RETURN 
+     443                          ; 
+     444                          ; ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   14
+
+     445                                  .PAGE   ; 
+     446                          ;---------------------------------------------------------------- 
+     447                          ;       SEND A BYTE TO THE COMPUTER 
+     448                          ;               RETURNS ERROR FLAG (C BIT) IF COMMAND LINE LOW 
+     449                          ;---------------------------------------------------------------- 
+     450                          ; 
+     451  F08A                    TOCOMB  = * 
+     452  F08A  2C 80 01                  BIT     PORT1           ; CHECK COMMAND LINE 
+     453  F08D  10 02                     BPL     *+4             ; AROUND IF OK 
+     454  F08F  38                        SEC                     ; OTHERWISE, SET ERROR 
+     455  F090  60                        RTS                     ; AND RETURN 
+     456  F091  85 A5                     STA     TOCOM           ; SAVE BYTE IN TEMP AREA 
+     457                          ; 
+     458  F093  A0 09                     LDY     #9              ; BIT SEND COUNTER 
+     459  F095  A5 00                     LDA     PORTD           ; SEND START BIT 
+     460  F097  29 DF                     AND     #$FF-$20 
+     461  F099  85 00                     STA     PORTD 
+     462  F09B  4C 9E F0                  JMP     *+3             ;3 
+     463                          ; 
+     464  F09E                    TOCOML  = * 
+     465  F09E  AD 80 01                  LDA     PORT1           ;4 DO LATCH STATUS INLINE 
+     466  F0A1  25 A1                     AND     HILOST          ;3 
+     467  F0A3  85 A1                     STA     HILOST          ;3 
+     468  F0A5  AD 80 01                  LDA     PORT1           ;4 
+     469  F0A8  05 A0                     ORA     LOHIST          ;3 
+     470  F0AA  85 A0                     STA     LOHIST          ;3 
+     471  F0AC  EA                        NOP                     ;2 
+     472  F0AD  EA                        NOP                     ;2 
+     473  F0AE  EA                        NOP                     ;2 
+     474  F0AF  EA                        NOP                     ;2 
+     475  F0B0  EA                        NOP                     ;2 
+     476  F0B1  EA                        NOP                     ;2 
+     477  F0B2  88                        DEY                     ;2 BUMP BIT COUNTER 
+     478  F0B3  30 13                     BMI     TOCOMD          ;2 BRANCH IF NEG, WE'RE DONE 
+     479  F0B5  A5 00                     LDA     PORTD           ;3 READY TO SEND NEXT BIT 
+     480  F0B7  38                        SEC                     ;2 MAKE SURE SHIFT IN STOP BIT 
+     481  F0B8  66 A5                     ROR     TOCOM           ;5 NEXT BIT INTO CARRY 
+     482  F0BA  B0 04                     BCS     TO1             ;2 
+     483  F0BC                    TO0     = * 
+     484  F0BC  29 DF                     AND     #$FF-$20        ;2 ZERO 
+     485  F0BE  90 03                     BCC     TO01            ;3 
+     486  F0C0                    TO1     = * 
+     487  F0C0  09 20                     ORA     #$20            ;2 ONE 
+     488  F0C2  EA                        NOP                     ;2 
+     489  F0C3                    TO01    = * 
+     490  F0C3  85 00                     STA     PORTD           ;3 SEND BIT 
+     491  F0C5  4C 9E F0                  JMP     TOCOML          ;3 LOOP FOR NEXT BIT 
+     492                          ; 
+     493  F0C8                    TOCOMD  = * 
+     494  F0C8  18                        CLC                     ; NO ERROR RETURNED 
+     495  F0C9  60                        RTS                     ; RETURN, WE'RE DONE ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   15
+
+     496                                  .PAGE           ; 
+     497                          ;---------------------------------------------------------------- 
+     498                          ;       STATUS LATCH ROUTINE--CALLED VIA LASTAT 
+     499                          ;---------------------------------------------------------------- 
+     500                          ; 
+     501  F0CA                    LSTAT   = * 
+     502  F0CA                    LSTHI   = * 
+     503  F0CA  AD 80 01                  LDA     PORT1 
+     504  F0CD  25 A1                     AND     HILOST          ; CHECK FOR HIGH-TO-LOW CHANGE 
+     505  F0CF  85 A1                     STA     HILOST 
+     506  F0D1                    LSTLO   = * 
+     507  F0D1  AD 80 01                  LDA     PORT1 
+     508  F0D4  05 A0                     ORA     LOHIST          ; CHECK LOW-TO-HIGH CHANGE 
+     509  F0D6  85 A0                     STA     LOHIST 
+     510  F0D8  40                        RTI                     ; RETURN -- 33 CYCLES EXECUTION ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   16
+
+     511                                  .PAGE                   ; 
+     512  F0D9                      
+     513                          ;---------------------------------------------------------------- 
+     514                          ;       INVERT BUFFER ROUTINE 
+     515                          ;---------------------------------------------------------------- 
+     516                          ; 
+     517                          ; 
+     518  F0D9                    INVBUF  = * 
+     519  F0D9  A6 AA                     LDX     BUFUSE          ; CURRENT BUFFER LENGTH 
+     520  F0DB  E8                        INX                     ; INCLUDE CHECKSUM 
+     521  F0DC                    INVBL   = * 
+     522  F0DC  BD AB 02                  LDA     CHECK-1,X       ; GET BYTE 
+     523  F0DF  49 FF                     EOR     #$FF            ; INVERT 
+     524  F0E1  9D AB 02                  STA     CHECK-1,X       ; STORE BACK 
+     525  F0E4  CA                        DEX                     ; BUMP POINTER 
+     526  F0E5  D0 F5                     BNE     INVBL           ; LOOP TIL DONE 
+     527  F0E7  60                        RTS                     ; THEN RETURN 
+     528                          ; 
+     529                          ;---------------------------------------------------------------- 
+     530                          ;       CHECKSUM ADD ROUTINE 
+     531                          ;---------------------------------------------------------------- 
+     532                          ; 
+     533                          ; 
+     534  F0E8                    CHECKS  = * 
+     535  F0E8  A6 AA                     LDX     BUFUSE          ; CURRENT BUFFER LENGTH 
+     536  F0EA  A9 00                     LDA     #0              ; CLEAR THE SUM 
+     537  F0EC  18                        CLC                     ; CLEAR THE CARRY 
+     538  F0ED                    CHEKSL  = * 
+     539  F0ED  7D AC 02                  ADC     BUFFE-1,X       ; ADD A BYTE (WITH END-CARRY) 
+     540  F0F0  CA                        DEX                     ; BUMP BUF POINTER 
+     541  F0F1  D0 FA                     BNE     CHEKSL          ; LOOP TIL DONE 
+     542  F0F3  69 00                     ADC     #$00            ; ADD LAST END-CARRY 
+     543  F0F5  60                        RTS                     ; THEN RETURN 
+     544                          ; 
+     545                          ; 
+     546                          ;---------------------------------------------------------------- 
+     547                          ;       FILL BUFFER WITH ZEROS 
+     548                          ;---------------------------------------------------------------- 
+     549                          ; 
+     550  F0F6                    FILL0   = * 
+     551  F0F6  A6 AA                     LDX     BUFUSE 
+     552  F0F8  E8                        INX                     ; INCLUDE CHECKSUM 
+     553  F0F9  A9 00                     LDA     #0              ; VALUE TO FILL 
+     554  F0FB                    FILL0L  = * 
+     555  F0FB  9D AB 02                  STA     CHECK-1,X 
+     556  F0FE  CA                        DEX                     ; BUMP POINTER 
+     557  F0FF  D0 FA                     BNE     FILL0L          ; LOOP TILL DONE 
+     558  F101  60                        RTS                     ; THEN LEAVE ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   17
+
+     559                                  .PAGE           ; 
+     560                          ;---------------------------------------------------------------- 
+     561                          ;       ACK/NAK/DONE/ERROR SEND TO COMPUTER ROUTINES 
+     562                          ;---------------------------------------------------------------- 
+     563                          ; 
+     564  F102                    SNDDON  = * 
+     565  F102  A9 43                     LDA     #'C             ; COMPLETE 
+     566  F104  D0 02                     BNE     SNDWX 
+     567                          ; 
+     568  F106                    SNDACK  = * 
+     569  F106  A9 41                     LDA     #'A             ; ACKNOWLEDGE 
+     570                          ; 
+     571  F108                    SNDWX   = * 
+     572  F108  48                        PHA                     ; SAVE THE BYTE TO BE SENT 
+     573  F109  A0 10                     LDY     #16             ; WAIT A WHILE BEFORE SENDING = 1/2 MS 
+     574  F10B                    SNDWXL  = * 
+     575  F10B                            LASTAT                  ; LATCHSTATUS 
+     576  F10B  00               +        BRK 
+     577  F10C  EA               +        NOP 
+     578  F10D  88                        DEY 
+     579  F10E  D0 FB                     BNE     SNDWXL          ; LOOP ON COUNTER 
+     580                          ; 
+     581  F110  A9 FF                     LDA     #$FF            ; SET UP TIMEOUT = .23 SEC 
+     582  F112  8D 97 01                  STA     TIMO1K 
+     583  F115                    SNDXX   = * 
+     584  F115  68                        PLA                     ; GET BYTE TO BE SENT 
+     585  F116  48                        PHA                     ; AND SAVE IT TOO 
+     586  F117  20 8A F0                  JSR     TOCOMB          ; SEND BYTE TO COMPUTER 
+     587  F11A  B0 02                     BCS     *+4             ; BRANCH 'ROUND RETURN IF COMMAND SET 
+     588  F11C  68                        PLA                     ; LEAVE STACK RIGHT 
+     589  F11D  60                        RTS                     ; ALL DONE 
+     590  F11E                            LASTAT                  ; LATCHSTATUS 
+     591  F11E  00               +        BRK 
+     592  F11F  EA               +        NOP 
+     593  F120  2C 85 01                  BIT     INTS2           ; CHECK TIMEOUT 
+     594  F123  10 F0                     BPL     SNDXX           ; LOOP IF NOT TIMED OUT 
+     595  F125  4C BA F8                  JMP     MAIN            ; ERROR EXIT--GOTO MAIN ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   18
+
+     596                                  .PAGE           ; 
+     597                          ;---------------------------------------------------------------- 
+     598                          ;       BLOCK OUTPUT ROUUTINE 
+     599                          ;               SENDS BUFUSE CHARS OUT TO PORTN WITH 
+     600                          ;               PROPER WORD LENGTH, ETC. 
+     601                          ;               ERRORS--GOES STRES ON COMMAND; IF PORT GOES NOT READY, 
+     602                          ;                       SETS ERROR AND CARRY THEN RETURNS 
+     603                          ;---------------------------------------------------------------- 
+     604                          ; 
+     605                          ; 
+     606  F128                    BLKOUT  = * 
+     607  F128  A5 00                     LDA     PORTD 
+     608  F12A  85 A2                     STA     OPORTD          ; STASH PORTD FOR ERROR EXIT RESTORE 
+     609  F12C  A6 AB                     LDX     BUFSIG 
+     610  F12E  C9 40                     CMP     #64 
+     611  F130  F0 5F                     BEQ     ALLOUT          ; ALL DONE IF BUFFER EMPTY! 
+     612  F132  20 FA F2                  JSR     GETRDY          ; GO FIND OUT IF READY AND SET RDYMSK 
+     613  F135  D0 58                     BNE     ERROUT          ; BR IF NOT READY 
+     614  F137  B9 91 00                  LDA     BAUDS,Y         ; BAUD RATE 
+     615  F13A  29 0F                     AND     #$0F 
+     616  F13C  AA                        TAX 
+     617  F13D  BD E4 F1                  LDA     OUTBTL,X        ; GET TIMER VALUE FROM TABLE 
+     618  F140  85 82                     STA     OUTTL 
+     619  F142  BD F4 F1                  LDA     OUTBTH,X        ; AND LOOP COUNTER VALUE 
+     620  F145  85 83                     STA     OUTTH 
+     621  F147  B9 91 00                  LDA     BAUDS,Y 
+     622  F14A  29 30                     AND     #$30            ; DETERMINE BITS-PER-WORD 
+     623  F14C  4A                        LSR     A 
+     624  F14D  4A                        LSR     A 
+     625  F14E  4A                        LSR     A 
+     626  F14F  4A                        LSR     A 
+     627  F150  49 03                     EOR     #$03            ; FLIP SENSE OF BITS 
+     628  F152  69 06                     ADC     #6              ; 7+00 -> 7; ...; 7+03 -> 10 
+     629  F154  AA                        TAX 
+     630  F155  86 87                     STX     BITOUT          ; BITS-PER-WORD COUNT 
+     631  F157  B9 91 00                  LDA     BAUDS,Y         ; ONE OR TWO STOP BITS? 
+     632  F15A  10 02                     BPL     *+4 
+     633  F15C  E6 87                     INC     BITOUT          ; ALLOW EXTRA STOP BIT 
+     634  F15E  BC FE F1                  LDY     OUTFIL-6,X      ; SETUP TO MASK OFF HIGH-ORDER BITS 
+     635  F161  A2 40                     LDX     #64 
+     636  F163                    OUTFL   = * 
+     637  F163  98                        TYA 
+     638  F164  1D AC 02                  ORA     BUFFE-1,X       ; MASK OFF HIGH BITS 
+     639  F167  9D AC 02                  STA     BUFFE-1,X 
+     640  F16A  CA                        DEX 
+     641  F16B  D0 F6                     BNE     OUTFL           ; LOOP THRU BUFFER 
+     642                          ; 
+     643  F16D  A4 90                     LDY     PORTN 
+     644  F16F  A9 01                     LDA     #$01 
+     645  F171  A2 40                     LDX     #64 
+     646  F173  E8                        INX 
+     647  F174                    OUTSL   = * 
+     648  F174  0A                        ASL     A               ; HERE PUT TOGETHER VALUES 
+     649  F175  88                        DEY                     ; FOR PORTD TO SET PORT 0 OR 1 ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   19
+
+     650  F176  10 FC                     BPL     OUTSL 
+     651  F178  A8                        TAY                     ; SAVE BIT POS 
+     652  F179  05 00                     ORA     PORTD 
+     653  F17B  85 81                     STA     OUT1M           ; THIS WILL TURN XMT BIT TO MARK 
+     654  F17D  98                        TYA 
+     655  F17E  49 FF                     EOR     #$FF 
+     656  F180  85 14                     STA     TIMR1           ; START TIMER NOW! 
+     657  F182  9D AC 02                  STA     BUFFE-1,X       ; AND PUT DUMMY FILL AT BUFFER BEGIN 
+     658  F185  25 81                     AND     OUT1M 
+     659  F187  85 80                     STA     OUT0M           ; THIS WILL XMT SPACE 
+     660  F189  A0 00                     LDY     #00             ; INITIAL BIT COUNTER VALUE 
+     661  F18B  84 86                     STY     OUTHIT          ; INITIAL OUTER LOOP TIMER VALUE 
+     662  F18D  F0 04                     BEQ     OUTL 
+     663                          ; 
+     664                          ;                                 JUMP THROUGH TO OUTL:  IF COMMAND OR 
+     665                          ;                                       NOT READY, WON'T OUTPUT; 
+     666                          ;                                       OTHERWISE, WHEN TIMER RUNS OUT, 
+     667                          ;                                       WILL THEN START NEXT (IE, FIRST)
+     668                          ; 
+     669  F18F                    ERROUT  = * 
+     670  F18F  38                        SEC                     ; SET ERROR RETURN 
+     671  F190  60                        RTS 
+     672  F191                    ALLOUT  = * 
+     673  F191  18                        CLC                     ; SET NO ERROR 
+     674  F192  60                        RTS 
+     675                          ; 
+     676                          ; 
+     677  F193                    OUTL    = * 
+     678  F193  AD 80 01                  LDA     PORT1           ; LATCHSTATUS INLINE AND COMMAND CHECK 
+     679  F196  30 49                     BMI     NOTOUT          ; EXIT IF COMMAND FOUND 
+     680  F198  05 A0                     ORA     LOHIST 
+     681  F19A  85 A0                     STA     LOHIST 
+     682  F19C  AD 80 01                  LDA     PORT1 
+     683  F19F  25 A1                     AND     HILOST 
+     684  F1A1  85 A1                     STA     HILOST 
+     685  F1A3  24 05                     BIT     INTS1           ; WAIT FOR TIMER TO RUN DOWN 
+     686  F1A5  10 FC                     BPL     *-2 
+     687                          ; 
+     688  F1A7  C6 86                     DEC     OUTHIT          ; COUNT DOWN OUTER LOOP TIMER 
+     689  F1A9  D0 16                     BNE     OUTTM1          ; IF NOT TIMED OUT, GO RESET TIMER 
+     690                          ; 
+     691  F1AB  38                        SEC                     ; THIS WILL SET UP FOR STOP BIT(S) 
+     692  F1AC  7E AC 02                  ROR     BUFFE-1,X       ; OUTPUT NEXT BIT 
+     693  F1AF  B0 04                     BCS     OUT1 
+     694  F1B1                    OUT0    = * 
+     695  F1B1  A5 80                     LDA     OUT0M           ; OUTPUT SPACE 
+     696  F1B3  90 03                     BCC     OUT01 
+     697  F1B5                    OUT1    = * 
+     698  F1B5  A5 81                     LDA     OUT1M           ; OUTPUT MARK 
+     699  F1B7  EA                        NOP                     ;2 
+     700  F1B8                    OUT01   = * 
+     701  F1B8  85 00                     STA     PORTD 
+     702  F1BA  88                        DEY                     ; BIT COUNT 
+     703  F1BB  30 0E                     BMI     NEXOUT          ; IF WORD DONE, GO START NEXT ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   20
+
+     704                          ; 
+     705  F1BD  A5 83                     LDA     OUTTH 
+     706  F1BF  85 86                     STA     OUTHIT          ; RESET OUTER LOOP TIMER 
+     707                          ; 
+     708  F1C1                    OUTTM1  = * 
+     709  F1C1  A5 82                     LDA     OUTTL           ; READY TO RESET TIMER 
+     710  F1C3                    OUTTM2  = * 
+     711  F1C3  18                        CLC 
+     712  F1C4  65 14                     ADC     TIMR1           ; CORRECT RESET VALUE BY CURRENT TIME 
+     713  F1C6  85 14                     STA     TIMR1           ; AND RESET TIMER 
+     714  F1C8  4C 93 F1                  JMP     OUTL            ; LOOP 
+     715                          ; 
+     716  F1CB                    NEXOUT  = * 
+     717  F1CB  CA                        DEX                     ; NEXT BYTE 
+     718  F1CC  E4 AB                     CPX     BUFSIG 
+     719  F1CE  F0 C1                     BEQ     ALLOUT          ; GO EXIT IF DONE 
+     720                          ; 
+     721  F1D0  A5 80                     LDA     OUT0M 
+     722  F1D2  85 00                     STA     PORTD           ; START BIT 
+     723                          ; 
+     724  F1D4  A4 87                     LDY     BITOUT          ; RESET BIT COUNTER 
+     725  F1D6  A5 83                     LDA     OUTTH 
+     726  F1D8  85 86                     STA     OUTHIT          ; RESET OUTER LOOP TIMER 
+     727  F1DA  A5 82                     LDA     OUTTL 
+     728  F1DC  69 12                     ADC     #18             ; ADJUST TIMER VALUE FOR START BIT COMPU
+     729  F1DE  4C C3 F1                  JMP     OUTTM2          ; AND REENTER XMIT LOOP AT RELOAD TIMER 
+     730                          ; 
+     731  F1E1                    NOTOUT  = * 
+     732  F1E1  4C 90 F2                  JMP     STRES           ; FOUND COMMAND LINE--GOTO STRES 
+     733                          ; 
+     734  F1E4                    OUTBTL  = * 
+     735  F1E4  97 AB A0 A5               .BYTE   151,171,160,165,194,226,120,129 
+     736  F1E8  C2 E2 78 81       
+     737  F1EC  97 E4 97 97               .BYTE   151,228,151,151,228,228,112,112 
+     738  F1F0  E4 E4 70 70       
+     739  F1F4                    OUTBTH  = * 
+     740  F1F4  18 8C 88 74               .BYTE   024,140,136,116,075,044,067,056 
+     741  F1F8  4B 2C 43 38       
+     742  F1FC  18 08 06 04               .BYTE   024,008,006,004,002,001,001,001 
+     743  F200  02 01 01 01       
+     744  F204                    OUTFIL  = * 
+     745  F204  E0 C0 80 00               .BYTE   $E0,$C0,$80,$00 ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   21
+
+     746                          
+     747                          ;---------------------------------------------------------------- 
+     748                          ;       ODD WORDSIZE STREAM INPUT ROUTINE 
+     749                          ;               ASSUMES ALL SETUP DONE EXTERNALLY 
+     750                          ;               (TIMER VALUES INTL,INTH; # BITS INBITS; INOUT=FF; 
+     751                          ;               IN ROUTINE VECTOR INPORT; RDYMSK; INSTAR START MASK) 
+     752                          ;               RETURNS THROUGH STREST, WITH APPROP ERROR RETURNS, 
+     753                          ;               FRAME AND NOT READY 
+     754                          ;               RETURNS TO MAIN THROUGH STREST (SETS FRAME ERROR IF NEED
+     755                          ;                       IF COMMAND SENSED 
+     756                          ;               SUBROUTINE INTIME INCLUDED HERE 
+     757                          ;---------------------------------------------------------------- 
+     758                          ; 
+     759                          ; 
+     760  F208                    INSTRM  = * 
+     761  F208  A0 00                     LDY     #0              ; NO FRAME ERROR FLAG 
+     762                          ; 
+     763  F20A                    INNONE  = * 
+     764  F20A  A2 00                     LDX     #0 
+     765  F20C  20 47 F2                  JSR     INTIME          ; GO MARK 1/16 BIT TIME 
+     766  F20F  B0 F9                     BCS     INNONE          ; BRANCH IF STILL IN STOP BIT 
+     767                          ; 
+     768  F211  A2 07                     LDX     #7 
+     769  F213  20 47 F2                  JSR     INTIME          ; MARK OFF ????? BIT TIME 
+     770  F216  B0 F2                     BCS     INNONE          ; IF NOT STILL START, GO BACK TO STOP 
+     771                          ; 
+     772  F218  66 89                     ROR     INBYTE          ; SHIFT IN START BIT 
+     773                          ; 
+     774  F21A  A5 88                     LDA     INBITS 
+     775  F21C  85 87                     STA     INBIT           ; START BIT COUNTER 
+     776                          ; 
+     777  F21E                    INSHIF  = * 
+     778  F21E  A2 0F                     LDX     #15 
+     779  F220  20 47 F2                  JSR     INTIME          ; MARK OFF ONE BIT 
+     780  F223  C6 87                     DEC     INBIT 
+     781  F225  30 05                     BMI     INSTOP          ; GO CHECK STOP IF ALL BITS MAYBE IN 
+     782  F227  66 89                     ROR     INBYTE          ; ELSE BRING IN THIS BIT 
+     783  F229  4C 1E F2                  JMP     INSHIF          ; AND GO GET NEXT ONE 
+     784                          ; 
+     785  F22C                    INSTOP  = * 
+     786  F22C  B0 08                     BCS     INSTOK          ; BRANCH IF THIS IS A STOP BIT 
+     787  F22E                    INSTKO  = * 
+     788  F22E  66 89                     ROR     INBYTE          ; IF NOT STOP, BRING IN ANYWAY 
+     789  F230  A0 80                     LDY     #$80            ; FLAG FRAMING ERROR 
+     790  F232  E6 87                     INC     INBIT 
+     791  F234  10 E8                     BPL     INSHIF          ; GO GET ANOTHER BIT 
+     792                          ; 
+     793  F236                    INSTOK  = * 
+     794  F236  A5 89                     LDA     INBYTE 
+     795  F238  25 8F                     AND     INSTAR          ; CHECK START BIT 
+     796  F23A  D0 F2                     BNE     INSTKO          ; GO IF NOT START 
+     797                          ; 
+     798  F23C  A5 8F                     LDA     INSTAR 
+     799  F23E  69 FE                     ADC     #-2 ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   22
+
+     800  F240  05 89                     ORA     INBYTE          ; SET BITS BELOW START TO 1 
+     801  F242  85 8A                     STA     INOUT           ; AND SETUP TO SEND TO COMPUTER 
+     802  F244  4C 0A F2                  JMP     INNONE          ; GO BACK LOOKING FOR START BIT ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   23
+
+     803                                  .PAGE           ; 
+     804  F247                    INTIME  = * 
+     805  F247                            LASTAT                  ; LATCH STATUS 
+     806  F247  00               +        BRK 
+     807  F248  EA               +        NOP 
+     808  F249  2C 80 01                  BIT     PORT1 
+     809  F24C  30 3C                     BMI     NOTIN           ; GO IF COMMAND SENSED 
+     810  F24E  24 05                     BIT     INTS1 
+     811  F250  10 FC                     BPL     *-2             ; LOOP ON INNER TIMER 
+     812  F252  E8                        INX 
+     813  F253  C6 86                     DEC     INHIT           ; OUTER TIMER 
+     814  F255  10 15                     BPL     INTM            ; GO IF OUTER TIMER NOT DONE 
+     815                          ; 
+     816  F257  CA                        DEX 
+     817  F258  A5 00                     LDA     PORTD           ; PREPARE TO SEND BIT OF INOUT TO COMPUT
+     818  F25A  38                        SEC 
+     819  F25B  66 8A                     ROR     INOUT 
+     820  F25D  B0 04                     BCS     INOUT1 
+     821  F25F                    INOUT0  = * 
+     822  F25F  29 DF                     AND     #$FF-$20        ; SEND 0 
+     823  F261  90 03                     BCC     INOT01 
+     824  F263                    INOUT1  = * 
+     825  F263  09 20                     ORA     #$20            ; SEND 1 
+     826  F265  EA                        NOP 
+     827  F266                    INOT01  = * 
+     828  F266  85 00                     STA     PORTD           ; SEND 
+     829                          ; 
+     830  F268  A5 85                     LDA     INTH 
+     831  F26A  85 86                     STA     INHIT           ; RESET OUTER TIMER 
+     832  F26C                    INTM    = * 
+     833  F26C  18                        CLC 
+     834  F26D  A5 84                     LDA     INTL 
+     835  F26F  65 14                     ADC     TIMR1 
+     836  F271  85 14                     STA     TIMR1           ; STORE ADJUSTED INNER TIMER VALUE 
+     837                          ; 
+     838  F273  CA                        DEX                     ; X1, X8, X16 (PART OF BIT) COUNTER 
+     839  F274  10 D1                     BPL     INTIME          ; LOOP IF STILL MORE 
+     840  F276  6C 8D 00                  JMP     (INPORT)        ; ELSE GO SAMPLE INPUT PORT 
+     841                          ; 
+     842  F279                    INPOR1  = * 
+     843  F279  AD 80 01                  LDA     PORT1 
+     844  F27C  6A                        ROR     A 
+     845  F27D  60                        RTS 
+     846  F27E                    INPOR2  = * 
+     847  F27E  A5 02                     LDA     PORTR 
+     848  F280  2A                        ROL     A 
+     849  F281  60                        RTS 
+     850  F282                    INPOR3  = * 
+     851  F282  A5 00                     LDA     PORTD 
+     852  F284  2A                        ROL     A 
+     853  F285  60                        RTS 
+     854  F286                    INPOR4  = * 
+     855  F286  A5 02                     LDA     PORTR 
+     856  F288  6A                        ROR     A ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   24
+
+     857  F289  60                        RTS 
+     858                          ; 
+     859  F28A                    NOTIN   = * 
+     860  F28A  98                        TYA                     ; FRAME ERROR 
+     861                          ;       JMP     STREST ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   25
+
+     862                                  .PAGE           ; 
+     863                          ;---------------------------------------------------------------- 
+     864                          ;       END OF ANY STREAM MODE RESET ROUTINE 
+     865                          ;---------------------------------------------------------------- 
+     866                          ; 
+     867  F28B                    STREST  = * 
+     868  F28B  A4 90                     LDY     PORTN 
+     869  F28D  99 99 00                  STA     PORT1S,Y        ; STASH ERROR FLAG(S) 
+     870  F290                    STRES   = * 
+     871  F290  A5 A2                     LDA     OPORTD          ; RESTORE VALUE OF PORTD (BEFORE STREAM)
+     872  F292  85 00                     STA     PORTD 
+     873  F294  4C BA F8                  JMP     MAIN            ; GO RESET ALL ELSE 
+     874                          ; 
+     875                          ; 
+     876                          ;---------------------------------------------------------------- 
+     877                          ;       SENSE BYTE BUILDING SUBROUTINE 
+     878                          ;               ON ENTRY, Y CONTAINS MASK TO SELECT PROPER 
+     879                          ;                  BIT FROM PORT1.  ON EXIT, A CONTAINS SELECTED 
+     880                          ;                  BIT FROM PORT1 AND NEXT LOWER BIT IS 1 IF 
+     881                          ;                  PORT1 IS ONE AND HILOST AND LOHIST SHOW THAT 
+     882                          ;                  BIT TO HAVE BEEN ALWAYS 1 SINCE LAST RSSENS, 
+     883                          ;                  OR IF PORT1 IS ZERO AND HILOST AND LOHIST SHOW 
+     884                          ;                  THAT IT WAS 1 SOMETIME SINCE LAST RSSENS; 
+     885                          ;                  ELSE THE NEXT LOWER BIT IS ZERO. 
+     886                          ;---------------------------------------------------------------- 
+     887                          ; 
+     888                          ; 
+     889  F297                    RSSENS  = * 
+     890  F297  AE 80 01                  LDX     PORT1           ; CURRENT VALUE OF PORT1 
+     891  F29A  8A                        TXA 
+     892  F29B  25 A1                     AND     HILOST          ; 1/2 LASTAT 
+     893  F29D  85 A1                     STA     HILOST 
+     894  F29F  8A                        TXA 
+     895  F2A0  05 A0                     ORA     LOHIST          ; OTHER 1/2 
+     896  F2A2  85 A0                     STA     LOHIST 
+     897  F2A4  86 A5                     STX     RSTEMP          ; RSTEMP <- PORT1 
+     898  F2A6  45 A1                     EOR     HILOST 
+     899  F2A8  45 A5                     EOR     RSTEMP          ; A <- 'SINCE LAST STATUS' 
+     900  F2AA  84 A5                     STY     RSTEMP          ; RSTEMP <- MASK 
+     901  F2AC  25 A5                     AND     RSTEMP          ; MASK BIT IN A REG 
+     902  F2AE  4A                        LSR     A               ; AND PUT IT IN ITS PLACE 
+     903  F2AF  86 A5                     STX     RSTEMP          ; RSTEMP <- PORT1 
+     904  F2B1  AA                        TAX                     ; X <- MASKED SHIFTED 'SINCE' BIT 
+     905  F2B2  98                        TYA 
+     906  F2B3  25 A5                     AND     RSTEMP          ; MASK PORT1 
+     907  F2B5  86 A5                     STX     RSTEMP 
+     908  F2B7  05 A5                     ORA     RSTEMP          ; PUT IT ALL TOGETHER 
+     909  F2B9  60                        RTS ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   26
+
+     910                                  .PAGE           ; 
+     911                          ;---------------------------------------------------------------- 
+     912                          ;       TWO ROUTINES TO SET/CLEAR DTR,RTS, AND XMT 
+     913                          ;               CALLED FROM RSCON (CONTROL) WITH A=MASK 
+     914                          ;               OF WHAT BIT IN AUX1 TO CHECK, AND Y=MASK 
+     915                          ;               OF WHAT BIT TO SET/CLEAR.  RSRDY SETS/CLEARS 
+     916                          ;               BITS IN PORTR; RSXMT SETS/CLEARS PORTD 
+     917                          ;---------------------------------------------------------------- 
+     918                          ; 
+     919  F2BA                    RSRDY   = * 
+     920  F2BA  24 AE                     BIT     BUFE-1+2                ; AUX1 
+     921  F2BC  F0 11                     BEQ     RSREX           ; GO RETURN IF NO ACTION OK'D 
+     922  F2BE  4A                        LSR     A               ; LINE UP MASK 
+     923  F2BF  24 AE                     BIT     BUFE-1+2 
+     924  F2C1  D0 05                     BNE     RSRDYS          ; BRANCH=GO SET; ELSE CLEAR 
+     925  F2C3  98                        TYA 
+     926  F2C4  05 02                     ORA     PORTR 
+     927  F2C6  D0 05                     BNE     RSRDYD          ; GO FINISH 
+     928  F2C8                    RSRDYS  = * 
+     929  F2C8  98                        TYA 
+     930  F2C9  49 FF                     EOR     #$FF            ; FLIP MASK 
+     931  F2CB  25 02                     AND     PORTR 
+     932  F2CD                    RSRDYD  = * 
+     933  F2CD  85 02                     STA     PORTR           ; STORE NEW VALUE WITH SET/CLEAR BIT 
+     934  F2CF                    RSREX   = * 
+     935  F2CF  60                        RTS 
+     936                          ; 
+     937                          ; 
+     938  F2D0                    RSXMT   = * 
+     939  F2D0  A9 02                     LDA     #$02            ; IN MASK (NOT PASSED FROM CALLER) 
+     940  F2D2  24 AE                     BIT     BUFE-1+2        ; AUX1 
+     941  F2D4  F0 F9                     BEQ     RSREX           ; GO RETURN IF NO ACTION ALLOWED 
+     942  F2D6  4A                        LSR     A               ; SHIFT MASK 
+     943  F2D7  24 AE                     BIT     BUFE-1+2 
+     944  F2D9  F0 05                     BEQ     RSXMTC          ; BRANCH=CLEAR BIT; ELSE SET 
+     945  F2DB  98                        TYA 
+     946  F2DC  05 00                     ORA     PORTD           ; SET BIT 
+     947  F2DE  D0 05                     BNE     RSXMTD          ; GO FINISH 
+     948  F2E0                    RSXMTC  = * 
+     949  F2E0  98                        TYA 
+     950  F2E1  49 FF                     EOR     #$FF            ; FLIP MASK 
+     951  F2E3  25 00                     AND     PORTD           ; CLEAR BIT 
+     952  F2E5                    RSXMTD  = * 
+     953  F2E5  85 00                     STA     PORTD           ; STORE WITH SET/CLEAR BIT 
+     954  F2E7  60                        RTS ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   27
+
+     955                                  .PAGE   ; 
+     956                          ;---------------------------------------------------------------- 
+     957                          ;       ROUTINE TO SEND BUFFER TO COMPUTER <<INCLUDING CHECKSUM>> 
+     958                          ;               PERFORMS ERROR RESET IF COMMAND LINE FALLS 
+     959                          ;---------------------------------------------------------------- 
+     960                          ; 
+     961  F2E8                    TOCOMP  = * 
+     962  F2E8  A6 AA                     LDX     BUFUSE          ; BUFFER SIZE 
+     963  F2EA  E8                        INX                     ; PLUS CHECKSUM 
+     964  F2EB                    TOCMPL  = * 
+     965  F2EB  BD AB 02                  LDA     CHECK-1,X       ; NEXT BYTE 
+     966  F2EE  20 8A F0                  JSR     TOCOMB          ; SEND IT 
+     967  F2F1  B0 04                     BCS     TOCMPR          ; IF COMMAND ERROR RETURNED, ERROR RESET
+     968  F2F3  CA                        DEX                     ; BUMP POINTER 
+     969  F2F4  D0 F5                     BNE     TOCMPL          ; LOOP IF MORE IN BUFFER 
+     970  F2F6  60                        RTS                     ; RETURN WHEN DONE 
+     971                          ; 
+     972  F2F7                    TOCMPR  = * 
+     973  F2F7  4C BA F8                  JMP     MAIN            ; ERROR--RESET 
+     974                          ; 
+     975                          ; 
+     976                          ;---------------------------------------------------------------- 
+     977                          ;       SUBROUTINE TO SET RDYMSK FOR QUICK CHECK OF PORT READINESS 
+     978                          ;               ALSO PERFORMS THE CHECK AND LEAVES PORTN IN Y-REG 
+     979                          ;---------------------------------------------------------------- 
+     980                          ; 
+     981                          ; 
+     982  F2FA                    GETRDY  = * 
+     983  F2FA  A4 90                     LDY     PORTN 
+     984  F2FC  B6 95                     LDX     HANDS,Y         ; HANDSHAKE FOR THIS PORT 
+     985  F2FE  BD 0D F3                  LDA     GETMSK,X        ; TURN HANDSHAKE INTO MASK 
+     986  F301  39 0A F3                  AND     GETTST,Y        ; PUT TOGETHER FOR THIS PORT 
+     987  F304  85 A6                     STA     RDYMSK 
+     988  F306  2C 80 01                  BIT     PORT1           ; PERFORM READINESS TEST 
+     989  F309  60                        RTS 
+     990                          ; 
+     991  F30A  32 04 08          GETTST  .BYTE   $32,$04,$08 
+     992  F30D  00 10 20 30       GETMSK  .BYTE   $00,$10,$20,$30,$0E,$1E,$2E,$3E 
+     993  F311  0E 1E 2E 3E       ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   28
+
+     994                          
+     995                          ;---------------------------------------------------------------- 
+     996                          ;       COMMAND INTERPRETER! 
+     997                          ;               ON ENTRY, BUFUSE=4, FILL0 DONE, COMMAND EDGE SENSED 
+     998                          ;               NO ERRORS RETURNED;  WILL DO RESET EXIT ON SOME ERRORS 
+     999                          ;               *****NOTE THIS IS MOSTLY ALL DUMMY CODE RIGHT NOW!!!!! 
+    1000                          ;---------------------------------------------------------------- 
+    1001                          ; 
+    1002  F315                    COMAND  = * 
+    1003  F315  A9 01                     LDA     #1              ; SET UP SERIAL READ TIMEOUT = 3 MS 
+    1004  F317  85 A9                     STA     TIMOUT 
+    1005  F319  85 8F                     STA     RTEST           ; CLEAR TEST FLAG 
+    1006  F31B  A9 34                     LDA     #52 
+    1007  F31D  8D 96 01                  STA     TIMO64 
+    1008  F320  20 00 F0                  JSR     AST19C          ; GO READ COMMAND 
+    1009  F323  B0 1D                     BCS     NOPOL           ; GO SIMPLY RETURN TO MAIN IF ERROR 
+    1010  F325  2C 80 01                  BIT     PORT1           ; CHECK COMMAND STILL LOW 
+    1011  F328  10 18                     BPL     NOPOL           ; SIMPLY RETURN IF COMMAND LINE'S HIGH 
+    1012                          ; 
+    1013  F32A  20 D9 F0                  JSR     INVBUF          ; INVERT BUFFER 
+    1014  F32D  20 E8 F0                  JSR     CHECKS          ; COMPUTE CHECKSUM 
+    1015  F330  C5 AC                     CMP     CHEK            ; SAME? 
+    1016  F332  D0 0E                     BNE     NOPOL           ; BRANCH IF SO 
+    1017  F334  A5 AF                     LDA     BUFE-1+3        ; COMMAND BYTE 
+    1018  F336  C9 3F                     CMP     #'?             ; POLL COMMAND? 
+    1019  F338  D0 18                     BNE     NOPOLL 
+    1020  F33A  A5 AE                     LDA     BUFE-1+2        ; AUX1 
+    1021  F33C  F0 05                     BEQ     QPOLL 
+    1022  F33E  C9 01                     CMP     #1              ; IF AUX1=1, THIS POLL IS FOR RS232 
+    1023  F340  F0 05                     BEQ     APOLL 
+    1024  F342                    NOPOL   = * 
+    1025  F342  60                        RTS 
+    1026  F343                    QPOLL   = * 
+    1027  F343  C6 A4                     DEC     POLLCT          ; COUNT CONSECUTIVE RETRIES 
+    1028  F345  D0 FB                     BNE     NOPOL           ; IF THIS ISN'T 26TH RETRY, DON'T ANSWER
+    1029  F347                    APOLL   = * 
+    1030  F347  A4 9E                     LDY     POLLF           ; HAVE WE ANSWERED POLL ONCE? 
+    1031  F349  30 F7                     BMI     NOPOL 
+    1032  F34B  A9 FF                     LDA     #$FF            ; FLAG ANSWERED 
+    1033  F34D  85 9E                     STA     POLLF 
+    1034  F34F  4C B2 F7                  JMP     RSPOLL 
+    1035  F352                    NOPOLL  = * 
+    1036  F352  A9 1A                     LDA     #26             ; RESET POLL RETRY COUNTER 
+    1037  F354  85 A4                     STA     POLLCT 
+    1038  F356  A5 B0                     LDA     BUFE-1+4        ; GET DEVICE ID 
+    1039  F358  A8                        TAY                     ; SAVE FOR LATER 
+    1040  F359  24 A3                     BIT     BOOTFL          ; TEST BOOT FLAG 
+    1041  F35B  30 07                     BMI     NOBOOT          ; IF MINUS, DON'T PRETEND WE'RE DISK 
+    1042  F35D                      
+    1043  F35D  C9 31                     CMP     #$31            ; DISK 1? 
+    1044  F35F  D0 03                     BNE     NOBOOT 
+    1045  F361  4C C4 F7                  JMP     DISKB           ; GO PRETEND DISK 
+    1046  F364                    NOBOOT  = * 
+    1047  F364  A2 FF                     LDX     #$FF            ; FLAG FOR NO BOOT ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   29
+
+    1048  F366  86 A3                     STX     BOOTFL 
+    1049  F368  C9 40                     CMP     #$40            ; PRINTER ID? 
+    1050  F36A  F0 0B                     BEQ     PRICOM 
+    1051  F36C  C9 41                     CMP     #$41            ; PRINTER 2 ID? 
+    1052  F36E  F0 07                     BEQ     PRICOM 
+    1053  F370  29 FC                     AND     #$FC 
+    1054  F372  C9 50                     CMP     #$50            ; RS232 ID? 
+    1055  F374  F0 0C                     BEQ     RSCOM           ; BRANCH IF MAYBE SO 
+    1056  F376  60                        RTS                     ; ELSE RETURN--NO ACTION 
+    1057                          ; 
+    1058  F377                    PRICOM  = * 
+    1059  F377  24 00                     BIT     PORTD           ; CHECK FOR PRINTER FAULT 
+    1060  F379  70 C7                     BVS     NOPOL           ; IF NO OK, GO RETURN 
+    1061  F37B  A4 AE                     LDY     BUFE-1+2        ; PUT AUX1 IN Y FOR LATER SAVING 
+    1062  F37D  A5 AF                     LDA     BUFE-1+3        ; COMMAND BYTE 
+    1063  F37F  4C 94 F6                  JMP     PRIST           ; GO CHECK OUT COMMAND 
+    1064                          ; 
+    1065  F382                    RSCOM   = * 
+    1066  F382  98                        TYA 
+    1067  F383  29 03                     AND     #$03            ; DEVELOP PORT NUMBER 
+    1068  F385  85 90                     STA     PORTN           ; STASH PORT NUMBER FOR LATER 
+    1069  F387  A8                        TAY                     ; STASH IN Y, TOO 
+    1070  F388  A2 00                     LDX     #0              ; STATUS = NO ERRORS 
+    1071  F38A  A5 AF                     LDA     BUFE-1+3        ; LOOK AT COMMAND 
+    1072                          ;                                 FALL THROUGH FOR TESTING COMMAND BYTE ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   30
+
+    1073                                  .PAGE           ; 
+    1074  F38C                    RSBAUD  = * 
+    1075  F38C  C9 42                     CMP     #'B             ; IS THIS BAUD SET COMMAND? 
+    1076  F38E  D0 17                     BNE     RSCON           ; BR IF NOT 
+    1077                          ;                                 ***** RS232 BAUD/HANDSHAKE SET ***** 
+    1078  F390  96 99                     STX     PORT1S,Y        ; ZERO STATUS 
+    1079  F392                            ACKACK                  ; SEND ACK 
+    1080  F392  20 06 F1         +        JSR     SNDACK 
+    1081  F395  A4 90                     LDY     PORTN 
+    1082  F397  A5 AE                     LDA     BUFE-1+2        ; AUX1 IS BAUD BYTE 
+    1083  F399  99 91 00                  STA     STBAUX,Y        ; SAVE IT 
+    1084  F39C  A5 AD                     LDA     BUFE-1+1        ; AUX2 = HANDSHAKE 
+    1085  F39E  29 07                     AND     #$07            ; KILL EXTRANEOUS BITS 
+    1086  F3A0  99 95 00                  STA     HANDS,Y 
+    1087  F3A3                            DONDON                  ; SEND DONE 
+    1088  F3A3  20 02 F1         +        JSR     SNDDON 
+    1089  F3A6  60                        RTS ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   31
+
+    1090                                  .PAGE           ; 
+    1091  F3A7                    RSCON   = * 
+    1092  F3A7  C9 41                     CMP     #'A             ; RS232 CONTROL COMMAND? 
+    1093  F3A9  D0 44                     BNE     RSSTAT          ; BR IF NOT 
+    1094                          ;                                 ***** RS232 CONTROL ***** 
+    1095  F3AB  96 99                     STX     PORT1S,Y        ; ZERO STATUS 
+    1096  F3AD                            ACKACK                  ; SEND ACK 
+    1097  F3AD  20 06 F1         +        JSR     SNDACK 
+    1098  F3B0  A9 80                     LDA     #$80            ; SET A-REG WITH MASK FOR RSRDY 
+    1099  F3B2  C6 90                     DEC     PORTN 
+    1100  F3B4  30 08                     BMI     RSCON1          ; GO TO PROPER ROUTINE 
+    1101  F3B6  C6 90                     DEC     PORTN 
+    1102  F3B8  30 16                     BMI     RSCON2 
+    1103  F3BA  F0 1F                     BEQ     RSCON3 
+    1104  F3BC  10 28                     BPL     RSCON4 
+    1105                          ; 
+    1106  F3BE                    RSCON1  = * 
+    1107  F3BE  A0 02                     LDY     #$02            ; PORT 1 RDY/XMT BIT MASK 
+    1108  F3C0  20 BA F2                  JSR     RSRDY 
+    1109  F3C3  20 D0 F2                  JSR     RSXMT 
+    1110  F3C6  A9 20                     LDA     #$20            ; PORT 1 RTS MASK 
+    1111  F3C8  A0 10                     LDY     #$10 
+    1112  F3CA  20 BA F2                  JSR     RSRDY 
+    1113  F3CD  4C EB F3                  JMP     RSCOND          ; ALL DONE 
+    1114                          ; 
+    1115  F3D0                    RSCON2  = * 
+    1116  F3D0  A0 04                     LDY     #$04            ; PORT 2 RDY/XMT BIT MASK 
+    1117  F3D2  20 BA F2                  JSR     RSRDY 
+    1118  F3D5  20 D0 F2                  JSR     RSXMT 
+    1119  F3D8  4C EB F3                  JMP     RSCOND 
+    1120                          ; 
+    1121  F3DB                    RSCON3  = * 
+    1122  F3DB  A0 08                     LDY     #$08            ; PORT 3 RDY/XMT BIT MASK 
+    1123  F3DD  20 BA F2                  JSR     RSRDY 
+    1124  F3E0  20 D0 F2                  JSR     RSXMT 
+    1125  F3E3  4C EB F3                  JMP     RSCOND 
+    1126                          ; 
+    1127  F3E6                    RSCON4  = * 
+    1128  F3E6  A0 10                     LDY     #$10            ; PORT 4 XMT MASK 
+    1129  F3E8  20 D0 F2                  JSR     RSXMT 
+    1130                          ; 
+    1131  F3EB                    RSCOND  = * 
+    1132  F3EB                            DONDON                  ; SEND COMPLETE 
+    1133  F3EB  20 02 F1         +        JSR     SNDDON 
+    1134  F3EE  60                        RTS                     ; EXIT COMMAND INTERPRETER ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   32
+
+    1135                                  .PAGE           ; 
+    1136  F3EF                    RSSTAT  = * 
+    1137  F3EF  C9 53                     CMP     #'S             ; RS232 STATUS? 
+    1138  F3F1  F0 03                     BEQ     *+5             ; SKIP JUMP IF SO 
+    1139  F3F3  4C 82 F4                  JMP     RSWRIT 
+    1140                          ;                                 ***** RS232 STATUS/SENSE REQUEST *****
+    1141  F3F6  B9 99 00                  LDA     PORT1S,Y        ; ERROR STATUS 
+    1142  F3F9  85 AE                     STA     BUFE-1+2        ; FIRST DATA BYTE BACK 
+    1143  F3FB  96 99                     STX     PORT1S,Y        ; SET ERROR STATUS TO NO ERROR 
+    1144  F3FD                            ACKACK                  ; SEND ACK 
+    1145  F3FD  20 06 F1         +        JSR     SNDACK 
+    1146  F400  C6 90                     DEC     PORTN           ; NOW GO TO SENSE ROUTINE FOR PROPER POR
+    1147  F402  30 08                     BMI     RSSTA1 
+    1148  F404  C6 90                     DEC     PORTN 
+    1149  F406  30 30                     BMI     RSSTA2 
+    1150  F408  F0 42                     BEQ     RSSTA3 
+    1151  F40A  10 53                     BPL     RSSTA4 
+    1152                          ; 
+    1153  F40C                    RSSTA1  = * 
+    1154  F40C  A0 02                     LDY     #$02            ; MASK DSR 1 
+    1155  F40E  20 97 F2                  JSR     RSSENS 
+    1156  F411  0A                        ASL     A               ; NOW PUT BITS IN RIGHT PLACE 
+    1157  F412  0A                        ASL     A 
+    1158  F413  0A                        ASL     A 
+    1159  F414  0A                        ASL     A 
+    1160  F415  0A                        ASL     A 
+    1161  F416  0A                        ASL     A 
+    1162  F417  85 AD                     STA     BUFE-1+1        ; SECOND DATA BYTE 
+    1163  F419  A0 20                     LDY     #$20            ; MASK CTS 1 
+    1164  F41B  20 97 F2                  JSR     RSSENS 
+    1165  F41E  05 AD                     ORA     BUFE-1+1        ; ADD TO SECOND DATA BYTE 
+    1166  F420  85 AD                     STA     BUFE-1+1 
+    1167  F422  A0 10                     LDY     #$10            ; MASK CRX 1 
+    1168  F424  20 97 F2                  JSR     RSSENS 
+    1169  F427  4A                        LSR     A 
+    1170  F428  05 AD                     ORA     BUFE-1+1        ; ADD TO DATA 
+    1171  F42A  85 AD                     STA     BUFE-1+1 
+    1172  F42C  AD 80 01                  LDA     PORT1           ; GET RCV NOW 
+    1173  F42F  29 01                     AND     #$01 
+    1174  F431  05 AD                     ORA     BUFE-1+1 
+    1175  F433  85 AD                     STA     BUFE-1+1 
+    1176  F435  4C 65 F4                  JMP     RSSTAX          ; GO COMMON CODE 
+    1177                          ; 
+    1178  F438                    RSSTA2  = * 
+    1179  F438  A0 04                     LDY     #$04            ; MASK DSR 2 
+    1180  F43A  20 97 F2                  JSR     RSSENS 
+    1181  F43D  0A                        ASL     A               ; PUT IN RIGHT PLACE 
+    1182  F43E  0A                        ASL     A 
+    1183  F43F  0A                        ASL     A 
+    1184  F440  0A                        ASL     A 
+    1185  F441  0A                        ASL     A 
+    1186  F442  85 AD                     STA     BUFE-1+1 
+    1187  F444  24 02                     BIT     PORTR           ; GET RCV 2 (NOW) 
+    1188  F446  10 1D                     BPL     RSSTAX ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   33
+
+    1189  F448  E6 AD                     INC     BUFE-1+1 
+    1190  F44A  D0 19                     BNE     RSSTAX 
+    1191                          ; 
+    1192  F44C                    RSSTA3  = * 
+    1193  F44C  A0 08                     LDY     #$08            ; MASK DSR 3 
+    1194  F44E  20 97 F2                  JSR     RSSENS 
+    1195  F451  0A                        ASL     A 
+    1196  F452  0A                        ASL     A 
+    1197  F453  0A                        ASL     A 
+    1198  F454  0A                        ASL     A 
+    1199  F455  85 AD                     STA     BUFE-1+1 
+    1200  F457  24 00                     BIT     PORTD           ; RCV 3 NOW 
+    1201  F459  10 0A                     BPL     RSSTAX 
+    1202  F45B  E6 AD                     INC     BUFE-1+1 
+    1203  F45D  D0 06                     BNE     RSSTAX 
+    1204                          ; 
+    1205  F45F                    RSSTA4  = * 
+    1206  F45F  A5 02                     LDA     PORTR           ; RCV 4 NOW 
+    1207  F461  29 01                     AND     #$01 
+    1208  F463  85 AD                     STA     BUFE-1+1 
+    1209                          ; 
+    1210  F465                    RSSTAX  = * 
+    1211  F465  A5 AD                     LDA     BUFE-1+1 
+    1212  F467  49 FC                     EOR     #$FC            ; REVERSE SENSE OF BITS 
+    1213  F469  85 AD                     STA     BUFE-1+1 
+    1214  F46B  A2 00                     LDX     #$0             ; RESET LOHIST AND HILOST 
+    1215  F46D  86 A0                     STX     LOHIST 
+    1216  F46F  CA                        DEX 
+    1217  F470  86 A1                     STX     HILOST 
+    1218  F472  A9 02                     LDA     #2              ; BUFFER LENGTH 
+    1219  F474                    RSSEND  = * 
+    1220  F474  85 AA                     STA     BUFUSE          ; BUFFER LENGTH 
+    1221  F476                            DONDON                  ; SEND DONE TO COMPUTER 
+    1222  F476  20 02 F1         +        JSR     SNDDON 
+    1223  F479  20 E8 F0                  JSR     CHECKS          ; COMPUTE CHECKSUM 
+    1224  F47C  85 AC                     STA     CHEK            ; BUT IN BUFFER 
+    1225  F47E  20 E8 F2                  JSR     TOCOMP          ; SEND BUFFER TO COMPUTER 
+    1226  F481  60                        RTS                     ; ALL DONE ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   34
+
+    1227                                  .PAGE           ; 
+    1228  F482                    RSWRIT  = * 
+    1229  F482  C9 20                     CMP     #'              ; (BLANK) LOAD & XEQ TEST? 
+    1230  F484  D0 06                     BNE     *+8             ; BR IF NOT 
+    1231  F486  C6 8F                     DEC     RTEST           ; SET TEST FLAG 
+    1232  F488  A5 AE                     LDA     BUFE-1+2        ; AUX1=BUFFER LENGTH 
+    1233  F48A  D0 06                     BNE     RSWRT 
+    1234  F48C  C9 57                     CMP     #'W             ; WRITE COMMAND? 
+    1235  F48E  D0 6C                     BNE     RSSTRE          ; BR IF NOT 
+    1236  F490  A9 40                     LDA     #64             ; LENGTH OF BUFFER TO READ 
+    1237  F492                    RSWRT   = * 
+    1238  F492  85 AA                     STA     BUFUSE 
+    1239                          ;                                 ***** RS232 BLOCK WRITE/LOAD & XEQ TES
+    1240  F494  38                        SEC 
+    1241  F495  A9 40                     LDA     #64 
+    1242  F497  E5 AE                     SBC     BUFE-1+2        ; AUX1 = NUMBER OF BYTES 
+    1243  F499  85 AB                     STA     BUFSIG 
+    1244  F49B  C9 40                     CMP     #64 
+    1245  F49D  F0 2D                     BEQ     RSWNOD          ; SPECIAL IF NO DATA TO BE SENT 
+    1246  F49F  96 99                     STX     PORT1S,Y        ; STATUS TO ZERO (IF BLOCK LENGTH NOT ZE
+    1247  F4A1  20 F6 F0                  JSR     FILL0           ; PREPARE TO READ 
+    1248  F4A4                            ACKACK                  ; ACK 
+    1249  F4A4  20 06 F1         +        JSR     SNDACK 
+    1250  F4A7  A9 0A                     LDA     #10             ; SET UP TIMEOUT = 1 SEC 
+    1251  F4A9  85 A9                     STA     TIMOUT 
+    1252  F4AB  A9 6D                     LDA     #109 
+    1253  F4AD  8D 97 01                  STA     TIMO1K 
+    1254  F4B0  20 06 F0                  JSR     AST19           ; GO READ IN BUFFER 
+    1255  F4B3  B0 0A                     BCS     RSWDER          ; BR IF ERROR RETURNED 
+    1256  F4B5  20 D9 F0                  JSR     INVBUF          ; INVERT BUFFER 
+    1257  F4B8  20 E8 F0                  JSR     CHECKS          ; COMPUTE CHECKSUM 
+    1258  F4BB  C5 AC                     CMP     CHEK            ; CHECK SUM 
+    1259  F4BD  F0 0D                     BEQ     RSWNOD 
+    1260  F4BF                    RSWDER  = * 
+    1261  F4BF  A9 02                     LDA     #$02            ; DATA ERROR 
+    1262  F4C1  A4 90                     LDY     PORTN 
+    1263  F4C3  99 99 00                  STA     PORT1S,Y 
+    1264  F4C6                    RSWDRR  = * 
+    1265  F4C6  A9 01                     LDA     #$01            ; NEW SPECIAL NAK=BAD DATA RECEIVE, TRY 
+    1266  F4C8  20 08 F1                  JSR     SNDWX 
+    1267  F4CB  60                        RTS 
+    1268  F4CC                    RSWNOD  = * 
+    1269  F4CC                            ACKACK                  ; ELSE ACK 
+    1270  F4CC  20 06 F1         +        JSR     SNDACK 
+    1271  F4CF                    GOTEST  = * 
+    1272  F4CF  A5 8F                     LDA     RTEST           ; CHECK TEST FLAG 
+    1273  F4D1  D0 11                     BNE     NOTEST          ; BRANCH IF NOT SET 
+    1274  F4D3                            DONDON                  ; SEND DONE 
+    1275  F4D3  20 02 F1         +        JSR     SNDDON 
+    1276  F4D6  48                        PHA                     ; TO MAKE STACK OK ON RETURN! 
+    1277  F4D7  20 AD 00                  JSR     BUFE            ; ENTER TEST CODE! 
+    1278  F4DA  85 99                     STA     PORT1S          ; STASH TEST RETURNED VALUES 
+    1279  F4DC  86 9A                     STX     PORT2S 
+    1280  F4DE  84 9B                     STY     PORT3S ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   35
+
+    1281  F4E0  68                        PLA                     ; ONE MORE RETURNED VALUE 
+    1282  F4E1  85 9C                     STA     PORT4S 
+    1283  F4E3  60                        RTS                     ; IF TEST RETURNED, DO LIKEWISE 
+    1284  F4E4                    NOTEST  = * 
+    1285  F4E4  20 28 F1                  JSR     BLKOUT          ; GO SEND OUT BLOCK 
+    1286  F4E7  A5 A2                     LDA     OPORTD          ; RESTORE PORTD 
+    1287  F4E9  85 00                     STA     PORTD 
+    1288  F4EB  B0 04                     BCS     RSWERR          ; ERROR RETURNED? 
+    1289  F4ED                            DONDON                  ; SEND DONE 
+    1290  F4ED  20 02 F1         +        JSR     SNDDON 
+    1291  F4F0  60                        RTS                     ; AND EXIT COMINT 
+    1292                          ; 
+    1293  F4F1                    RSWERR  = * 
+    1294  F4F1  A9 04                     LDA     #$04            ; PORT NOT READY ERROR FLAG 
+    1295  F4F3  A4 90                     LDY     PORTN 
+    1296  F4F5  99 99 00                  STA     PORT1S,Y        ; STASH STATUS 
+    1297  F4F8                    RSWRRR  = * 
+    1298                          ;       LDA     #$04            ; *NEW* PORT NOT READY OR PRINTER BUSY, 
+    1299  F4F8  20 08 F1                  JSR     SNDWX 
+    1300  F4FB  60                        RTS ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   36
+
+    1301                                  .PAGE           ; 
+    1302                          ;                                 ***** RS232 STREAM STARTUP ***** 
+    1303                          ; 
+    1304  F4FC                    RSSTRE  = * 
+    1305  F4FC  C9 58                     CMP     #'X             ; START STREAM MODE COMMAND? 
+    1306  F4FE  F0 03                     BEQ     *+5             ; SKIP JUMP IF SO 
+    1307  F500  4C 99 F7                  JMP     RSBOOT 
+    1308                          ; 
+    1309  F503  96 99                     STX     PORT1S,Y        ; ZERO STATUS 
+    1310  F505                            ACKACK                  ; START STREAM BY SENDING ACK 
+    1311  F505  20 06 F1         +        JSR     SNDACK 
+    1312                          ; 
+    1313  F508  A5 00                     LDA     PORTD           ; SAVE PORTD FOR STREAM RESET 
+    1314  F50A  85 A2                     STA     OPORTD 
+    1315  F50C  A4 90                     LDY     PORTN           ; SET UP PORT VALUES... 
+    1316  F50E  A5 AE                     LDA     BUFE-1+2        ;  DEPENDING ON PORT NUMBER 
+    1317  F510  6A                        ROR     A               ;  AND I/O DIRECTION; 
+    1318  F511  6A                        ROR     A               ;  *****WORKS WRONG IF DIR=NONE! ***** 
+    1319  F512  29 03                     AND     #$03 
+    1320  F514  AA                        TAX 
+    1321  F515  B9 89 F6                  LDA     STBITZ,Y 
+    1322  F518  29 DF                     AND     #$FF-$20        ; MASK IN,OUT <=> ZERO,ZERO 
+    1323  F51A  1D 8C F6                  ORA     STBITD-1+0,X    ; DEPENDS ON I/O DIR 
+    1324  F51D  25 00                     AND     PORTD 
+    1325  F51F  85 82                     STA     FDXDAT+2 
+    1326  F521  B9 89 F6                  LDA     STBITZ,Y 
+    1327  F524  49 FF                     EOR     #$FF            ; MASK IN,OUT <=> ZERO,ONE 
+    1328  F526  3D 8E F6                  AND     STBITD-1+2,X    ; DEPENDING ON DIR 
+    1329  F529  05 82                     ORA     FDXDAT+2 
+    1330  F52B  85 80                     STA     FDXDAT+0 
+    1331  F52D  09 20                     ORA     #$20            ; MASK IN,OUT <=> ONE,ONE (DEPENDING) 
+    1332  F52F  85 81                     STA     FDXDAT+1 
+    1333  F531  B9 89 F6                  LDA     STBITZ,Y        ; MASK IN,OUT <=> ONE,ZERO 
+    1334  F534  1D 90 F6                  ORA     STBITD-1+4,X    ; DEPENDING 
+    1335  F537  25 81                     AND     FDXDAT+1 
+    1336  F539  85 83                     STA     FDXDAT+3 
+    1337                          ; 
+    1338  F53B  A4 90                     LDY     PORTN 
+    1339  F53D  A2 00                     LDX     #0              ; NOT ODD WORDSIZE FLAG 
+    1340  F53F  B9 91 00                  LDA     STBAUX,Y 
+    1341  F542  29 30                     AND     #$30            ; ODD WORD SIZE REQUESTED? 
+    1342  F544  F0 1A                     BEQ     STNORM          ; IF NOT, BRANCH 
+    1343  F546  4A                        LSR     A 
+    1344  F547  4A                        LSR     A 
+    1345  F548  4A                        LSR     A 
+    1346  F549  4A                        LSR     A 
+    1347  F54A  49 03                     EOR     #$03            ; FORM BIT COUNT 
+    1348  F54C  69 05                     ADC     #5 
+    1349  F54E  85 88                     STA     INBITS          ; STASH BIT COUNT FOR STREAM ROUTINE 
+    1350  F550  AA                        TAX 
+    1351  F551  BD 67 F6                  LDA     INSTRS-5,X 
+    1352  F554  85 8F                     STA     INSTAR          ; MASK FOR START BIT TEST 
+    1353  F556  A5 AE                     LDA     BUFE-1+2 
+    1354  F558  29 0C                     AND     #$0C            ; CHECK THAT I/O DIRECTION IS LEGAL ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   37
+
+    1355  F55A  C9 04                     CMP     #$04            ; INPUT ONLY! 
+    1356  F55C  D0 66                     BNE     RSCERR 
+    1357  F55E  A2 FF                     LDX     #$FF            ; ODD WORD FLAG 
+    1358  F560                    STNORM  = * 
+    1359  F560  86 8A                     STX     INOUT           ; SAVE ODD WORD FLAG (& INIT INOUT) 
+    1360  F562  B9 91 00                  LDA     STBAUX,Y        ; GET BAUD RATE TO USE 
+    1361  F565  2A                        ROL     A               ; *2 TO INDEX TABLE 
+    1362  F566  29 1E                     AND     #$1E            ; MASK 4 BITS 
+    1363  F568  24 8A                     BIT     INOUT           ; ODD WORDSIZE? 
+    1364  F56A  10 07                     BPL     STBNRM          ; GO IF NOT 
+    1365  F56C  18                        CLC 
+    1366  F56D  69 20                     ADC     #32             ; ADJUST TABLE LOOKUP FOR ODD WORDS 
+    1367  F56F  C9 31                     CMP     #32+17          ; LEGAL BAUD (300 MAX)? 
+    1368  F571  10 51                     BPL     RSCERR          ; GO IF NOT 
+    1369  F573                    STBNRM  = * 
+    1370  F573  A8                        TAY                     ; INDEX REG 
+    1371  F574  B9 57 F6                  LDA     INBT-32,Y 
+    1372  F577  85 84                     STA     INTL            ; INIT ODD COUNTER VALUES (EVEN IF NOT U
+    1373  F579  B9 58 F6                  LDA     INBT-32+1,Y 
+    1374  F57C  85 85                     STA     INTH 
+    1375  F57E  B9 3A F6                  LDA     STBAUD,Y        ; FILL BUFFER WITH INFO FOR POKEY 
+    1376  F581  85 B1                     STA     BUFE-1+5        ; AUDF3 
+    1377  F583  85 B5                     STA     BUFE-1+9        ; AUDF1 (BAUD LOW) 
+    1378  F585  B9 3B F6                  LDA     STBAUD+1,Y 
+    1379  F588  85 AF                     STA     BUFE-1+3        ; AUDF4 
+    1380  F58A  85 B3                     STA     BUFE-1+7        ; AUDF2 (BAUD HIGH) 
+    1381  F58C  A9 A0                     LDA     #$A0 
+    1382  F58E  85 AE                     STA     BUFE-1+2        ; AUDC4 (STRAIGHT COUNT, NO SOUND) 
+    1383  F590  85 B0                     STA     BUFE-1+4        ; AUDC3 
+    1384  F592  85 B2                     STA     BUFE-1+6        ; AUDC2 
+    1385  F594  85 B4                     STA     BUFE-1+8        ; AUDC1 
+    1386  F596  A9 78                     LDA     #$78            ; *****TEMP***** 
+    1387  F598  85 AD                     STA     BUFE-1+1        ; AUDCTL 
+    1388  F59A  A2 09                     LDX     #9 
+    1389  F59C  86 AA                     STX     BUFUSE 
+    1390  F59E  20 E8 F0                  JSR     CHECKS          ; MAKE CHECKSUM 
+    1391  F5A1  85 AC                     STA     CHEK 
+    1392  F5A3  20 FA F2                  JSR     GETRDY          ; GO SEE IF PORT IS READY (AND SETUP RDY
+    1393  F5A6  F0 03                     BEQ     *+5             ; BR AROUND ERROR ACTION IF READY 
+    1394  F5A8  4C F1 F4                  JMP     RSWERR 
+    1395                          ; 
+    1396  F5AB                            DONDON                  ; SEND COMPLETE TO COMPUTER 
+    1397  F5AB  20 02 F1         +        JSR     SNDDON 
+    1398  F5AE  20 E8 F2                  JSR     TOCOMP 
+    1399  F5B1  24 8A                     BIT     INOUT           ; ODD WORDSIZE? 
+    1400  F5B3  10 3E                     BPL     FDXALL          ; GO DO NORMAL STREAM IF NOT 
+    1401                          ; 
+    1402  F5B5                    STODD   = * 
+    1403  F5B5  A6 90                     LDX     PORTN           ; SETUP INPORT VECTOR FOR RIGHT PORT 
+    1404  F5B7  BD 6F F6                  LDA     INPRTL,X 
+    1405  F5BA  85 8D                     STA     INPORT 
+    1406  F5BC  BD 73 F6                  LDA     INPRTH,X 
+    1407  F5BF  85 8E                     STA     INPORT+1 
+    1408  F5C1  4C 08 F2                  JMP     INSTRM          ; GO DO STREAM ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   38
+
+    1409                          ; 
+    1410  F5C4                    RSCERR  = * 
+    1411  F5C4  A9 09                     LDA     #$09            ; COMMAND INVALID 
+    1412  F5C6  A4 90                     LDY     PORTN 
+    1413  F5C8  99 99 00                  STA     PORT1S,Y        ; STASH ERROR FLAGS 
+    1414  F5CB  A9 03                     LDA     #$03            ; *NEW* BAD OPTION SET, DON'T RETRY COMM
+    1415  F5CD  20 08 F1                  JSR     SNDWX 
+    1416  F5D0  60                        RTS                     ; AND RETURN TO MAIN 
+    1417                          ; 
+    1418  F5D1                    FDXCOD  = * 
+    1419  F5D1  AD FF FF                  LDA     $FFFF           ; WILL BE PATCHED TO LOAD PROPER PORT RC
+    1420  F5D4  EA                        NOP                     ; WILL BECOME PROPER ROL OR ROR 
+    1421  F5D5  A5 00                     LDA     PORTD           ; ADD IN SERIAL OUT LINE (DATA-FR) 
+    1422  F5D7  2A                        ROL     A               ; PUT INTO BOTTOM TWO BITS 
+    1423  F5D8  29 03                     AND     #$03 
+    1424  F5DA  AA                        TAX                     ; TURN INTO TABLE INDEX 
+    1425  F5DB  B5 80                     LDA     FDXDAT,X        ; GET BYTE FROM TABLE 
+    1426  F5DD  85 00                     STA     PORTD           ; SEND OUT 
+    1427  000E                    FDXL    =       *-FDXCOD 
+    1428                          ; 
+    1429  0007                    LSTL    =       LSTLO-LSTHI 
+    1430                          ; 
+    1431  F5DF                    FDXCOM  = * 
+    1432  F5DF  2C 80 01                  BIT     PORT1           ; TEST COMMAND FRAME LINE 
+    1433  F5E2  10 C3                     BPL     *-FDXL-FDXL-FDXL-LSTL-LSTL-3 ; *****IF NO COM, GOTO $100
+    1434  F5E4  4C 90 F2                  JMP     STRES 
+    1435  0008                    COML    =       *-FDXCOM 
+    1436                          ; 
+    1437  002A                    ROLA    =       $2A             ; ROL A OPCODE 
+    1438  006A                    RORA    =       $6A             ; ROR A OPCODE 
+    1439  F5E7  80 02 00 02       FDXFA   .BYTE   $80,$02,$00,$02 
+    1440  F5EB  01 00 00 00       FDXFB   .BYTE   $01,$00,$00,$00 
+    1441  F5EF  6A 2A 2A 6A       FDXFC   .BYTE   RORA,ROLA,ROLA,RORA 
+    1442                          ; 
+    1443                          ; 
+    1444  F5F3                    FDXALL  = * 
+    1445                          ;                                 MOVE 'FILLER' ROUTINES INTO RAM 
+    1446  F5F3  A2 07                     LDX     #COML-1 
+    1447  F5F5                    FDXF1   = * 
+    1448  F5F5  BD CA F0                  LDA     LSTHI,X         ; HILO STATUS ROUTINE (7 BYTES) 
+    1449  F5F8  9D 0E 01                  STA     FDXL+$100,X 
+    1450  F5FB  BD D1 F0                  LDA     LSTLO,X         ; LOHI STATUS ROUTINE (7 BYTES) 
+    1451  F5FE  9D 23 01                  STA     2*FDXL+LSTL+$100,X 
+    1452  F601  BD DF F5                  LDA     FDXCOM,X        ; COMMAND WATCHER (8 BYTES) 
+    1453  F604  9D 38 01                  STA     +(FDXL+LSTL)*2+FDXL+$100,X 
+    1454  F607  CA                        DEX 
+    1455  F608  10 EB                     BPL     FDXF1           ; LOOP TILL DONE 
+    1456                          ; 
+    1457                          ;                                 MOVE FIRST COPY OF STREAM ROUTINE 
+    1458  F60A  A2 0D                     LDX     #FDXL-1 
+    1459  F60C                    FDXF2   = * 
+    1460  F60C  BD D1 F5                  LDA     FDXCOD,X        ; FDX STREAM ROUTINE 
+    1461  F60F  9D 00 01                  STA     $100,X 
+    1462  F612  CA                        DEX ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   39
+
+    1463  F613  10 F7                     BPL     FDXF2           ; LOOP TILL DONE 
+    1464                          ; 
+    1465  F615  A4 90                     LDY     PORTN           ; NOW PATCH CODE FOR PROPER PORT 
+    1466  F617  B9 E7 F5                  LDA     FDXFA,Y 
+    1467  F61A  8D 01 01                  STA     $100+1          ; PORT ADDRESS LOW 
+    1468  F61D  B9 EB F5                  LDA     FDXFB,Y 
+    1469  F620  8D 02 01                  STA     $100+2          ; PORT ADDRESS HIGH 
+    1470  F623  B9 EF F5                  LDA     FDXFC,Y 
+    1471  F626  8D 03 01                  STA     $100+3          ; ROTATE A IN PROPER DIRECTION 
+    1472  F629  A2 0D                     LDX     #FDXL-1 
+    1473  F62B                    FDXF3   = * 
+    1474  F62B  BD 00 01                  LDA     $100,X          ; NOW MAKE THREE MORE COPIES 
+    1475  F62E  9D 15 01                  STA     FDXL+LSTL+$100,X ; OF THE FULL DUPLEX STREAMER 
+    1476  F631  9D 2A 01                  STA     +(FDXL+LSTL)*2+$100,X 
+    1477  F634  CA                        DEX 
+    1478  F635  10 F4                     BPL     FDXF3 
+    1479                          ; 
+    1480  F637  4C 00 01                  JMP     $100            ; GO TO IT! ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   40
+
+    1481                                  .PAGE 
+    1482  F63A                    STBAUD  = * 
+    1483  F63A  A0 0B                     .WORD   2976            ; 300 BAUD 
+    1484  F63C  CD 4C                     .WORD   19661           ; 46 BAUD (60 WPM) 
+    1485  F63E  E3 45                     .WORD   17891           ; 50 BAUD (67 WPM) 
+    1486  F640  6F 3D                     .WORD   15727           ; 57 BAUD (75 WPM) 
+    1487  F642  95 2E                     .WORD   11925           ; 75 BAUD (100 WPM) 
+    1488  F644  C0 1F                     .WORD   8128            ; 110 BAUD 
+    1489  F646  F6 19                     .WORD   6646            ; 134.5 BAUD 
+    1490  F648  47 17                     .WORD   5959            ; 150 BAUD 
+    1491  F64A  A0 0B                     .WORD   2976            ; 300 BAUD 
+    1492  F64C  CC 05                     .WORD   1484            ; 600 BAUD 
+    1493  F64E  E3 02                     .WORD   739             ; 1200 BAUD 
+    1494  F650  EA 01                     .WORD   490             ; 1800 BAUD 
+    1495  F652  6E 01                     .WORD   366             ; 2400 BAUD 
+    1496  F654  B3 00                     .WORD   179             ; 4800 BAUD 
+    1497  F656  56 00                     .WORD   86              ; 9600 BAUD 
+    1498  F658  56 00                     .WORD   86              ; 9600 BAUD (*****) 
+    1499                          ; 
+    1500  F65A  B3 00                     .WORD   179             ; 300*16 BAUD 
+    1501  F65C  C6 04                     .WORD   1222            ; 45.5 *16 BAUD 
+    1502  F65E  58 04                     .WORD   1112            ; 50   *16 BAUD 
+    1503  F660  E4 03                     .WORD   996             ; 56.875*16 BAUD 
+    1504  F662  E3 02                     .WORD   739             ; 75   *16 BAUD 
+    1505  F664  F5 01                     .WORD   501             ; 110  *16 BAUD 
+    1506  F666  99 01                     .WORD   409             ; 134.5*16 BAUD 
+    1507  F668  6E 01                     .WORD   366             ; 150  *16 BAUD 
+    1508  F66A  B3 00                     .WORD   179             ; 300  *16 BAUD ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   41
+
+    1509                          
+    1510  F66C  04 02 01          INSTRS  .BYTE   $04,$02,$01 
+    1511                          ; 
+    1512  F66F                    INPRTL  = * 
+    1513  F66F  79                        .BYTE   .LOW.INPOR1 
+    1514  F670  7E                        .BYTE   .LOW.INPOR2 
+    1515  F671  82                        .BYTE   .LOW.INPOR3 
+    1516  F672  86                        .BYTE   .LOW.INPOR4 
+    1517  F673                    INPRTH  = * 
+    1518  F673  F2                        .BYTE   .HIGH.INPOR1 
+    1519  F674  F2                        .BYTE   .HIGH.INPOR2 
+    1520  F675  F2                        .BYTE   .HIGH.INPOR3 
+    1521  F676  F2                        .BYTE   .HIGH.INPOR4 
+    1522                          ; 
+    1523  F677                    INBT    = * 
+    1524  F677  E4 00                     .BYTE   228,0           ; 300 
+    1525  F679  FB 05                     .BYTE   251,5           ; 45.5 
+    1526  F67B  E4 05                     .BYTE   228,5           ; 50 
+    1527  F67D  C8 05                     .BYTE   200,5           ; 56.875 
+    1528  F67F  E4 03                     .BYTE   228,3           ; 75 
+    1529  F681  CF 02                     .BYTE   207,2           ; 110 
+    1530  F683  A9 02                     .BYTE   169,2           ; 134.5 
+    1531  F685  E4 01                     .BYTE   228,1           ; 150 
+    1532  F687  E4 00                     .BYTE   228,0           ; 300 
+    1533                          ; 
+    1534  F689  FD FB F7 EF       STBITZ  .BYTE   $FD,$FB,$F7,$EF 
+    1535                          ; 
+    1536  F68D  1E 20 00 1E       STBITD  .BYTE   $1E,$20,$00,$1E,$1E,$00,$00 
+    1537  F691  1E 00 00          ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   42
+
+    1538                          
+    1539  F694                    PRIST   = * 
+    1540  F694  C9 53                     CMP     #'S             ; STATUS COMMAND? 
+    1541  F696  D0 41                     BNE     PRIAUX          ; BR IF NOT 
+    1542                          ;                                 ***** PRINTER STATUS REQUEST ***** 
+    1543  F698                            ACKACK                  ; SEND ACK 
+    1544  F698  20 06 F1         +        JSR     SNDACK 
+    1545  F69B                            LASTAT                  ; LATCHSTATUS 
+    1546  F69B  00               +        BRK 
+    1547  F69C  EA               +        NOP 
+    1548  F69D  A9 43                     LDA     #'C             ; COMPLETE MARKER BYTE 
+    1549  F69F  85 B1                     STA     BUFE-1+5 
+    1550  F6A1  A5 9F                     LDA     PRIFLG          ; PRINT STATUS FLAG BYTE 
+    1551  F6A3  09 80                     ORA     #$80            ; SET HIGH BIT = PRINTER KNOWS ABOUT CR 
+    1552  F6A5  85 B0                     STA     BUFE-1+4 
+    1553  F6A7  A5 9D                     LDA     PRIAX1          ; OLD AUX1! 
+    1554  F6A9  85 AF                     STA     BUFE-1+3 
+    1555  F6AB  84 9D                     STY     PRIAX1          ; NEW AUX1 BECOMES OLD 
+    1556  F6AD  A9 1F                     LDA     #.LOW.WRITIM+1  ; PRINTER TIMEOUT (LOW BYTE) 
+    1557  F6AF  85 AE                     STA     BUFE-1+2 
+    1558  F6B1  A9 00                     LDA     #.HIGH.(WRITIM+1) ; TIMEOUT (HIGH BYTE) 
+    1559  F6B3  85 AD                     STA     BUFE-1+1 
+    1560  F6B5  A9 04                     LDA     #4              ; BUFFER LENGTH--NOT INCL DONE BYTE 
+    1561  F6B7  85 AA                     STA     BUFUSE 
+    1562  F6B9  20 E8 F0                  JSR     CHECKS          ; COMPUTE CHECKSUM 
+    1563  F6BC  85 AC                     STA     CHEK            ; INTO BUFFER 
+    1564  F6BE  A9 05                     LDA     #5              ; BUFFER LENGTH--INCL DONE BYTE 
+    1565  F6C0  85 AA                     STA     BUFUSE 
+    1566  F6C2                            LASTAT                  ; LATCHSTATUS 
+    1567  F6C2  00               +        BRK 
+    1568  F6C3  EA               +        NOP 
+    1569  F6C4  20 E8 F2                  JSR     TOCOMP          ; SEND BUFFER TO COMPUTER 
+    1570  F6C7  60                        RTS                     ; AND ALL DONE! ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   43
+
+    1571                                  .PAGE           ; 
+    1572  F6C8                    PRNAKC  = * 
+    1573  F6C8  A9 01                     LDA     #$01            ; ILLEGAL COMMAND ERROR 
+    1574  F6CA  85 9F                     STA     PRIFLG 
+    1575  F6CC                    COMNAK  = * 
+    1576  F6CC  A9 02                     LDA     #$02            ; *NEW* ILLEGAL COMMAND ERROR, DON'T RET
+    1577  F6CE  20 08 F1                  JSR     SNDWX 
+    1578  F6D1  60                        RTS                     ; AND RETURN--NO MORE ACTIONS 
+    1579  F6D2                    PRNAKD  = * 
+    1580  F6D2  A9 02                     LDA     #$02            ; BAD DATA FRAME ERROR 
+    1581  F6D4  85 9F                     STA     PRIFLG 
+    1582  F6D6  4C C6 F4                  JMP     RSWDRR          ; GO SEND BAD DATA ERROR 
+    1583                          ; 
+    1584  F6D9                    PRIAUX  = * 
+    1585  F6D9  C9 57                     CMP     #'W             ; PRINT COMMAND? 
+    1586  F6DB  D0 EB                     BNE     PRNAKC          ; BR TO ERROR CODE IF NOT 
+    1587                          ;                                 ***** PRINT ***** 
+    1588  F6DD  A5 AE                     LDA     BUFE-1+2        ; AUX1 
+    1589  F6DF  C9 4E                     CMP     #'N             ; ALLOW ONLY NORMAL MODE 
+    1590  F6E1  D0 E5                     BNE     PRNAKC          ; BRANCH IF NOT 
+    1591  F6E3  84 9D                     STY     PRIAX1          ; SAVE AUX1 FOR STATUS REQ 
+    1592  F6E5  A9 28                     LDA     #40             ; EXPECTED PRINT BUFFER LENGTH***** 
+    1593  F6E7  85 AA                     STA     BUFUSE 
+    1594  F6E9  20 F6 F0                  JSR     FILL0           ; FILL BUFFER FOR AST19 
+    1595  F6EC                            ACKACK                  ; SEND ACK 
+    1596  F6EC  20 06 F1         +        JSR     SNDACK 
+    1597  F6EF  A9 0A                     LDA     #10             ; SET UP TIMEOUT ON DATA READ 
+    1598  F6F1  85 A9                     STA     TIMOUT 
+    1599  F6F3  A9 6D                     LDA     #109            ; TOTAL= ABOUT 1 SEC 
+    1600  F6F5  8D 97 01                  STA     TIMO1K 
+    1601  F6F8  20 06 F0                  JSR     AST19           ; ACCEPT BUFFER 
+    1602  F6FB  B0 D5                     BCS     PRNAKD          ; BR IF BAD READ 
+    1603  F6FD  20 D9 F0                  JSR     INVBUF          ; INVERT BUFFER 
+    1604  F700  20 E8 F0                  JSR     CHECKS          ; CHECK CHECKSUM 
+    1605  F703  C5 AC                     CMP     CHEK 
+    1606  F705  D0 CB                     BNE     PRNAKD          ; NAK IF CHECKSUM ERROR 
+    1607  F707                            ACKACK                  ; SEND ACK 
+    1608  F707  20 06 F1         +        JSR     SNDACK 
+    1609  F70A  A9 96                     LDA     #10*WRITIM/(1+(WRITIM/26)) ; SET UP TIMEOUT = WRITIM SEC
+    1610  F70C  85 A9                     STA     TIMOUT 
+    1611  F70E  A9 DA                     LDA     #109*(1+(WRITIM/26)) 
+    1612  F710  8D 97 01                  STA     TIMO1K 
+    1613  F713                    PRIBUF  = * 
+    1614  F713  8D 85 01                  STA     COMHI           ; SET UP WATCH FOR COMMAND FALLING 
+    1615  F716  AD 85 01                  LDA     INTS2           ; RESET INTERRUPTS 2 
+    1616  F719  A6 AA                     LDX     BUFUSE          ; PRESENT BUFFER LEN WITHOUT CHECKSUM 
+    1617  F71B                    PRIBL   = * 
+    1618  F71B  2C 85 01                  BIT     INTS2           ; CHECK COMMAND AND TIMEOUT LOW 
+    1619  F71E  70 71                     BVS     PRIBR           ; GO RESET IF COMMAND CAME 
+    1620  F720  10 09                     BPL     PRIBL2          ; BRANCH AROUND HIGH-ORDER TIMOUT IF NOT
+    1621  F722  C6 A9                     DEC     TIMOUT 
+    1622  F724  F0 6C                     BEQ     PRIBAD          ; ERROR IF TIMED OUT 
+    1623  F726  A9 DA                     LDA     #109*(1+(WRITIM/26))  ; RESET TIMEOUT .1X SEC 
+    1624  F728  8D 97 01                  STA     TIMO1K ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   44
+
+    1625  F72B                    PRIBL2  = * 
+    1626  F72B                            LASTAT                  ; DO LATCH STATUS 
+    1627  F72B  00               +        BRK 
+    1628  F72C  EA               +        NOP 
+    1629  F72D  24 02                     BIT     PORTR           ; CHECK IF PRINTER BUSY 
+    1630  F72F  50 EA                     BVC     PRIBL           ; LOOP IF SO 
+    1631                          ; 
+    1632  F731  B5 AC                     LDA     BUFE-1,X        ; GET NEXT CHARACTER TO PRINT 
+    1633  F733  85 A8                     STA     OPRINT          ; SAVE TO LOOK AT LATER 
+    1634  F735  C9 9B                     CMP     #$9B            ; ATASCII EOL? 
+    1635  F737  D0 02                     BNE     *+4 
+    1636  F739  A9 0D                     LDA     #13             ; ASCII CR 
+    1637  F73B  C9 0D                     CMP     #13             ; NOW PRINTING CR? 
+    1638  F73D  D0 09                     BNE     NOTCR 
+    1639  F73F  C5 A7                     CMP     LPRINT          ; WAS LAST THING PRINTED A CR? 
+    1640  F741  D0 05                     BNE     NOTCR           ; IF NOT, GO PRINT 
+    1641  F743  A9 20                     LDA     #'              ; IF TWO CR'S, INSERT A BLANK 
+    1642  F745  85 A8                     STA     OPRINT 
+    1643  F747  E8                        INX                     ; SO CR WILL STILL BE SENT 
+    1644  F748                    NOTCR   = * 
+    1645  F748  85 A7                     STA     LPRINT          ; SAVE THIS AS LATEST CHAR PRINTED 
+    1646  F74A  49 FF                     EOR     #$FF            ; INVERT FOR NEG PRINT PORT 
+    1647  F74C  8D 82 01                  STA     PORTP           ; OUTPUT 
+    1648  F74F                            LASTAT                  ; FILL TIME-- 
+    1649  F74F  00               +        BRK 
+    1650  F750  EA               +        NOP 
+    1651  F751  A5 02                     LDA     PORTR           ; SEND STROBE: 
+    1652  F753  09 20                     ORA     #$20            ;  BIT 6=STROBE 
+    1653  F755  85 02                     STA     PORTR 
+    1654  F757                            LASTAT                  ; MORE TIME--MORE LATCHSTATUS 
+    1655  F757  00               +        BRK 
+    1656  F758  EA               +        NOP 
+    1657  F759  A5 02                     LDA     PORTR           ; TURN STROBE OFF 
+    1658  F75B  29 DF                     AND     #$FF-$20        ;  BIT6=STROBE 
+    1659  F75D  85 02                     STA     PORTR 
+    1660  F75F  A0 02                     LDY     #2              ; SET UP Y FOR BUSY LOOP 
+    1661  F761                    WBUSY   = * 
+    1662  F761  2C 85 01                  BIT     INTS2           ; CHECK COMMAND AND TIMEOUT 
+    1663  F764  70 2B                     BVS     PRIBR           ; GO RESET IF COMMAND STARTED 
+    1664  F766  10 09                     BPL     PRIBS2          ; SKIP HIGH ORDER TIMOUT IF NOT TIME 
+    1665  F768  C6 A9                     DEC     TIMOUT 
+    1666  F76A  F0 26                     BEQ     PRIBAD          ; GO ERROR EXIT IF TIMEOUT 
+    1667  F76C  A9 6D                     LDA     #109            ; RESET TIMEOUT .1 SEC 
+    1668  F76E  8D 97 01                  STA     TIMO1K 
+    1669  F771                    PRIBS2  = * 
+    1670  F771  24 02                     BIT     PORTR           ; CHECK FOR BUSY 
+    1671  F773  50 05                     BVC     BFOUND          ; BRANCH IF BUSY 
+    1672  F775                            LASTAT                  ; DO A LATCH STATUS 
+    1673  F775  00               +        BRK 
+    1674  F776  EA               +        NOP 
+    1675  F777  88                        DEY 
+    1676  F778  D0 E7                     BNE     WBUSY           ; KEEP TRYING FOR BUSY TILL Y ZEROS 
+    1677                          ; 
+    1678  F77A                    BFOUND  = * ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   45
+
+    1679  F77A                            LASTAT                  ; KILL MORE TIME WITH LATCHSTATUS 
+    1680  F77A  00               +        BRK 
+    1681  F77B  EA               +        NOP 
+    1682  F77C  A9 FF                     LDA     #$FF            ; NOW RESET THE PRINT DATA TO ASCII NUL 
+    1683  F77E  8D 82 01                  STA     PORTP 
+    1684  F781  A5 A8                     LDA     OPRINT          ; DID WE JUST PRINT CR? 
+    1685  F783  C9 9B                     CMP     #$9B            ; IF SO, WE'RE DONE 
+    1686  F785  F0 03                     BEQ     PRIDON 
+    1687  F787  CA                        DEX                     ; NEXT BUFFER BYTE 
+    1688  F788  D0 91                     BNE     PRIBL           ; LOOP BACK TO PRINT IT 
+    1689  F78A                    PRIDON  = * 
+    1690  F78A  A9 00                     LDA     #0 
+    1691  F78C  85 9F                     STA     PRIFLG          ; SET NO ERROR FOR STATUS 
+    1692  F78E                            DONDON                  ; ELSE SEND A DONE 
+    1693  F78E  20 02 F1         +        JSR     SNDDON 
+    1694  F791                    PRIBR   = * 
+    1695  F791  60                        RTS                     ; ALL DONE! 
+    1696                          ; 
+    1697  F792                    PRIBAD  = * 
+    1698  F792  A9 04                     LDA     #$04            ; PRINTER BUSY ERROR 
+    1699  F794  85 9F                     STA     PRIFLG 
+    1700  F796  4C F8 F4                  JMP     RSWRRR          ; GO RETURN ERROR CODE TO COMPUTER ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   46
+
+    1701                                  .PAGE           ; 
+    1702                          ;                                 ***** RS232 BOOT COMMAND ***** 
+    1703                          ; 
+    1704                          ; 
+    1705  F799                    RSBOOT  = * 
+    1706  F799  C9 21                     CMP     #'!             ; BOOT COMMAND? 
+    1707  F79B  D0 05                     BNE     RSDOWN          ; BR IF NOT 
+    1708  F79D  A0 04                     LDY     #4+0            ; POINTER INTO BTOP TABLE FOR BTOCOM 
+    1709  F79F  4C 3D F8                  JMP     BTOCOM 
+    1710                          ; ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   47
+
+    1711                                  .PAGE           ; 
+    1712                          ;                                 ***** RS232 DOWNLOAD COMMAND ***** 
+    1713                          ; 
+    1714                          ; 
+    1715  F7A2                    RSDOWN  = * 
+    1716  F7A2  C9 26                     CMP     #'&             ; DOWNLOAD COMMAND? 
+    1717  F7A4  F0 07                     BEQ     RSDOW           ; BR IF SO 
+    1718  F7A6  A2 01                     LDX     #$01            ; ELSE SET COMMAND ERROR 
+    1719  F7A8  96 99                     STX     PORT1S,Y 
+    1720  F7AA  4C CC F6                  JMP     COMNAK          ; GO SEND NAK TO COMPUTER 
+    1721                          ; 
+    1722  F7AD                    RSDOW   = * 
+    1723  F7AD  A0 08                     LDY     #4+4            ; POINTER INTO BTOP TABLE FOR BTOCOM 
+    1724  F7AF  4C 3D F8                  JMP     BTOCOM 
+    1725                          ; 
+    1726  FFF9                    HANDLE  =       $FFF9           ; END OF HANDLER (INCL CHECK) PLUS 1 
+    1727  0591                    HANDLL  =       $591            ; HANDLER BODY SIZE 
+    1728  FA67                    HANDLB  =       HANDLE-HANDLL-1 ; BEGINNING OF HANDLER IN THIS ROM 
+    1729  FA67                    BOOTE   =       HANDLB          ; END OF BOOTER/RELOCATOR (INCL CHECK) P
+    1730  014F                    BOOTL   =       $14F            ; LENGTH OF BOOTER/RELOCATOR 
+    1731  F911                    BOOTB   =       BOOTE-BOOTL-7   ; DISK-FORMAT BOOTER/RELOCATOR IN THIS RERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   48
+
+    1732                                  .PAGE           ; 
+    1733                          ;---------------------------------------------------------------- 
+    1734                          ;       RS232 POLL ANSWERING 
+    1735                          ;---------------------------------------------------------------- 
+    1736                          ; 
+    1737                          ; 
+    1738  F7B2                    RSPOLL  = * 
+    1739  F7B2  A0 0C                     LDY     #4+8            ; POINT TO POLL ANSWER IN BTOP TABLE 
+    1740  F7B4  4C 3D F8                  JMP     BTOCOM          ; GO ANSWER POLL 
+    1741                          ; 
+    1742  F7B7                    POLLB   = * 
+    1743  F7B7  50                        .BYTE   $50             ; RS232 DEVICE ADDRESS 
+    1744  F7B8  01                        .BYTE   1               ; UNIT NUMBER 
+    1745  F7B9  21                        .BYTE   '!'             ; BOOT COMMAND 
+    1746  F7BA  40                        .BYTE   $40             ; EXPECT DATA FROM DEVICE 
+    1747  F7BB  00 05                     .WORD   $0500           ; BOOT LOAD ADDRESS 
+    1748  F7BD  02 00                     .WORD   2               ; TIMEOUT 
+    1749  F7BF  55 01                     .WORD   BOOTE-BOOTB-1   ; LENGTH 
+    1750  F7C1  00 00                     .BYTE   0,0             ; AUX1 AND AUX2 
+    1751  F7C3  10                        .BYTE   $10             ; CHECKSUM ON ALL THIS STUFF 
+    1752  F7C4                    POLLE   = * ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   49
+
+    1753                                  .PAGE           ; 
+    1754                          ;---------------------------------------------------------------- 
+    1755                          ;       DISK SIMULATION--STATUS, READ--FOR BOOT 
+    1756                          ;---------------------------------------------------------------- 
+    1757                          ; 
+    1758                          ; 
+    1759  F7C4                    DISKB   = * 
+    1760  F7C4  A5 AF                     LDA     BUFE-1+3        ; COMMAND 
+    1761  F7C6  C9 53                     CMP     #'S             ; STATUS? 
+    1762  F7C8  F0 41                     BEQ     DISKST 
+    1763  F7CA  A4 A3                     LDY     BOOTFL          ; TEST BOOT FLAG 
+    1764  F7CC  D0 61                     BNE     NEDISK          ; IF NOT ZERO, DISALLOW DISK 
+    1765  F7CE  C9 52                     CMP     #'R             ; READ? 
+    1766  F7D0  D0 5D                     BNE     NEDISK 
+    1767  F7D2  A6 AD                     LDX     BUFE-1+1        ; AUX2=SECTOR # (HIGH BYTE) 
+    1768  F7D4  D0 59                     BNE     NEDISK          ; SHOULD BE ZERO 
+    1769  F7D6  A6 AE                     LDX     BUFE-1+2        ; AUX1=SECTOR # (LOW) 
+    1770  F7D8  F0 55                     BEQ     NEDISK          ; SHOULD NOT BE ZERO 
+    1771  F7DA  E0 04                     CPX     #4              ; SECTORS 1, 2, 3 ONLY LEGAL 
+    1772  F7DC  10 51                     BPL     NEDISK 
+    1773                          ; 
+    1774  F7DE                            ACKACK 
+    1775  F7DE  20 06 F1         +        JSR     SNDACK 
+    1776  F7E1  A6 AE                     LDX     BUFE-1+2        ; SECTOR NUMBER 
+    1777  F7E3  BD 36 F8                  LDA     DISKDL-1,X 
+    1778  F7E6  85 8B                     STA     DISKW           ; SET UP POINTER TO CODE 
+    1779  F7E8  BD 39 F8                  LDA     DISKDH-1,X 
+    1780  F7EB  85 8C                     STA     DISKW+1 
+    1781  F7ED                            DONDON 
+    1782  F7ED  20 02 F1         +        JSR     SNDDON 
+    1783  F7F0  A0 80                     LDY     #-128 
+    1784                          ; 
+    1785  F7F2                    DISKTO  = * 
+    1786  F7F2  98                        TYA 
+    1787  F7F3  48                        PHA                     ; SAVE Y 
+    1788  F7F4  B1 8B                     LDA     (DISKW),Y 
+    1789  F7F6  20 8A F0                  JSR     TOCOMB          ; SEND BYTE TO COMPUTER 
+    1790  F7F9  B0 34                     BCS     NEDISK          ; BR IF ERROR 
+    1791  F7FB  68                        PLA 
+    1792  F7FC  A8                        TAY 
+    1793  F7FD  C8                        INY                     ; BUMP COUNTER 
+    1794  F7FE  D0 F2                     BNE     DISKTO          ; LOOP TILL COUNTED OUT 
+    1795                          ; 
+    1796  F800  A6 AE                     LDX     BUFE-1+2 
+    1797  F802  BD 33 F8                  LDA     DISKCH-1,X      ; CHECKSUM 
+    1798  F805  20 8A F0                  JSR     TOCOMB 
+    1799  F808  B0 25                     BCS     NEDISK          ; BR IF ERROR 
+    1800  F80A  60                        RTS 
+    1801                          ; 
+    1802  F80B                    DISKST  = * 
+    1803  F80B  C6 A3                     DEC     BOOTFL          ; DECREMENT BOOT COUNTER 
+    1804  F80D  D0 1F                     BNE     NODISK          ; NOT ZERO = NOT US 
+    1805                          ; 
+    1806  F80F                            ACKACK ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   50
+
+    1807  F80F  20 06 F1         +        JSR     SNDACK 
+    1808  F812  A9 08                     LDA     #$08            ; PSEUDO DISK STATUS 
+    1809  F814  85 B0                     STA     BUFE-1+4 
+    1810  F816  A2 01                     LDX     #$01 
+    1811  F818  86 AE                     STX     BUFE-1+2 
+    1812  F81A  CA                        DEX 
+    1813  F81B  86 AF                     STX     BUFE-1+3 
+    1814  F81D  86 AD                     STX     BUFE-1+1 
+    1815  F81F  A2 04                     LDX     #4              ; BUFFER SIZE 
+    1816  F821  86 AA                     STX     BUFUSE 
+    1817  F823  20 E8 F0                  JSR     CHECKS          ; COMPUTE CHECKSUM 
+    1818  F826  85 AC                     STA     CHEK 
+    1819  F828                            DONDON 
+    1820  F828  20 02 F1         +        JSR     SNDDON 
+    1821  F82B  20 E8 F2                  JSR     TOCOMP 
+    1822                          ; 
+    1823  F82E                    NODISK  = * 
+    1824  F82E  60                        RTS 
+    1825                          ; 
+    1826  F82F                    NEDISK  = * 
+    1827  F82F  A9 FF                     LDA     #$FF            ; SET BOOTFL MINUS 
+    1828  F831  85 A3                     STA     BOOTFL 
+    1829  F833  60                        RTS 
+    1830                          ; 
+    1831  F834  9E 34 9B          DISKCH  .BYTE   $9E,$34,$9B 
+    1832                          ; 
+    1833  F837                    DISKDL  = * 
+    1834  F837  91 11 91                  .BYTE   .LOW.RELOCR-128,.LOW.RELOCR,.LOW.RELOCR+128 
+    1835  F83A                    DISKDH  = * 
+    1836  F83A  F8 F9 F9                  .BYTE   .HIGH.(RELOCR-128),.HIGH.RELOCR,.HIGH.(RELOCR+128) 
+    1837                          ; 
+    1838  F911                    RELOCR  =       BOOTB ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   51
+
+    1839                                  .PAGE           ; 
+    1840                          ;---------------------------------------------------------------- 
+    1841                          ;       SUBROUTINE TO SEND CONSTANT DATA BLOCKS TO COMPUTER 
+    1842                          ;               ON ENTRY, Y CONTAINS INDEX INTO BTOP TABLE (PLUS 4) 
+    1843                          ;               BTOP TABLE POINTS TO VARIOUS POSSIBLE DATA BLOCKS 
+    1844                          ;---------------------------------------------------------------- 
+    1845                          ; 
+    1846                          ; 
+    1847  F83D                    BTOCOM  = * 
+    1848  F83D  A2 03                     LDX     #3              ; POINTER INIT LOOP CTR 
+    1849  F83F                    BTOL    = * 
+    1850  F83F  B9 69 F8                  LDA     BTOP-1,Y 
+    1851  F842  95 8B                     STA     DISKW,X 
+    1852  F844  88                        DEY 
+    1853  F845  CA                        DEX 
+    1854  F846  10 F7                     BPL     BTOL            ; INIT POINTERS LOOP 
+    1855                          ; 
+    1856  F848                            ACKACK                  ; SEND ACK TO COMPUTER 
+    1857  F848  20 06 F1         +        JSR     SNDACK 
+    1858  F84B                            DONDON                  ; SEND DONE TO COMPUTER 
+    1859  F84B  20 02 F1         +        JSR     SNDDON 
+    1860  F84E                    BTOOL   = * 
+    1861  F84E  A2 00                     LDX     #0 
+    1862  F850  A1 8B                     LDA     (DISKW,X)       ; GET BYTE TO SEND 
+    1863  F852  20 8A F0                  JSR     TOCOMB          ; SEND IT 
+    1864  F855  B0 12                     BCS     BTOE            ; GO RETURN IF ERROR 
+    1865  F857  E6 8B                     INC     DISKW           ; BUMP POINTER 
+    1866  F859  D0 02                     BNE     BTOC 
+    1867  F85B  E6 8C                     INC     DISKW+1 
+    1868  F85D                    BTOC    = * 
+    1869  F85D  A5 8B                     LDA     DISKW           ; TEST END OF DATA 
+    1870  F85F  C5 8D                     CMP     DISKW+2 
+    1871  F861  D0 EB                     BNE     BTOOL 
+    1872  F863  A5 8C                     LDA     DISKW+1 
+    1873  F865  C5 8E                     CMP     DISKW+3 
+    1874  F867  D0 E5                     BNE     BTOOL 
+    1875                          ; 
+    1876  F869                    BTOE    = * 
+    1877  F869  60                        RTS                     ; RETURN ON END OF DATA OR ERROR 
+    1878                          ; 
+    1879                          ; 
+    1880  F86A                    BTOP    = * 
+    1881  F86A  11 F9 67 FA               .WORD   BOOTB,BOOTE 
+    1882  F86E  67 FA F9 FF               .WORD   HANDLB,HANDLE 
+    1883  F872  B7 F7 C4 F7               .WORD   POLLB,POLLE ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   52
+
+    1884                          
+    1885                          ;================================================================ 
+    1886                          ;       RESET INITIALIZATION ENTRY POINT--CHIP RESET ONLY 
+    1887                          ;================================================================ 
+    1888                          ; 
+    1889                          ; 
+    1890  F876                    RESET   = * 
+    1891  F876                    BEGIN   = * 
+    1892                          ; 
+    1893                          ;       ZERO MEMORY AND TEST IF IT TAKES THE ZEROS 
+    1894                          ; 
+    1895  F876  A0 00                     LDY     #0 
+    1896  F878  18                        CLC                     ; CLEAR RAM CHECK FLAG 
+    1897  F879                    ZEROL   = * 
+    1898  F879  A9 00                     LDA     #0 
+    1899  F87B  99 80 02                  STA     $0280,Y 
+    1900  F87E  B9 80 02                  LDA     $0280,Y 
+    1901  F881  F0 09                     BEQ     RAMOK           ; IF LOADED ZERO, SKIP ERROR CODE 
+    1902  F883  38                        SEC                     ; SET RAM TEST ERROR 
+    1903  F884  98                        TYA                     ; DEVELOP CODE BYTE 
+    1904  F885  29 80                     AND     #$80            ; KEEP TOP BIT (WHICH RAM) 
+    1905  F887  09 55                     ORA     #$55            ; ERROR CODE 
+    1906  F889  8D 82 01                  STA     PORTP           ; PUT IN PRINTER PORT 
+    1907  F88C                    RAMOK   = * 
+    1908  F88C  C8                        INY                     ; BUMP POINTER 
+    1909  F88D  D0 EA                     BNE     ZEROL 
+    1910                          ; 
+    1911  F88F  88                        DEY                     ; $FF FOR SOME INITIALIZATION 
+    1912  F890  84 A1                     STY     HILOST 
+    1913  F892  B0 03                     BCS     *+5             ; SKIP STORING INTO PRINTER PORT IF RAM 
+    1914  F894  8C 82 01                  STY     PORTP 
+    1915  F897  8C 83 01                  STY     DPORTP          ; PRINTER I/O DIRECTION = OUT 
+    1916                          ; 
+    1917                          ;       SET UP INITIAL DATA AND DIRECTION REGISTERS 
+    1918                          ; 
+    1919  F89A  A9 1E                     LDA     #$1E 
+    1920  F89C  85 02                     STA     PORTR           ; INITIAL READIES=NO, PRINT=NO STROBE 
+    1921  F89E  A9 3E                     LDA     #$3E 
+    1922  F8A0  85 03                     STA     DPORTR 
+    1923  F8A2  85 00                     STA     PORTD           ; INITIAL OUT=MARK 
+    1924  F8A4  85 01                     STA     DPORTD 
+    1925  F8A6  A9 1A                     LDA     #26             ; BOOT COUNTER 
+    1926  F8A8  85 A3                     STA     BOOTFL 
+    1927  F8AA  85 A4                     STA     POLLCT 
+    1928  F8AC  A9 0D                     LDA     #13             ; ASCII CR 
+    1929  F8AE  85 A7                     STA     LPRINT          ; INITIAL OUT SAVED IN LPRINT 
+    1930                          ; 
+    1931  F8B0  2C 80 01                  BIT     PORT1 
+    1932  F8B3  30 FB                     BMI     *-3             ; IF COMMAND IS LOW, WAIT! 
+    1933  F8B5  2C 80 01                  BIT     PORT1 
+    1934  F8B8  10 FB                     BPL     *-3             ; NOW WAIT FOR IT TO GO LOW (IGNORING 1 
+    1935                          ;                               ; FALL THROUGH TO 'MAIN' ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   53
+
+    1936                                  .PAGE           ; 
+    1937                          ;---------------------------------------------------------------- 
+    1938                          ;       MAIN ROUTINE: 
+    1939                          ;---------------------------------------------------------------- 
+    1940                          ; 
+    1941  F8BA                    MAIN    = * 
+    1942  F8BA  A2 7F                     LDX     #$7F            ; RESET STACK ! 
+    1943  F8BC  9A                        TXS 
+    1944  F8BD                    INIT    = * 
+    1945  F8BD  D8                        CLD                     ; NO DECIMAL MODE 
+    1946  F8BE  78                        SEI                     ; NO INTERRUPTS 
+    1947                          ; 
+    1948                          ;       SET I/O PORT DIRECTION REGISTERS 
+    1949                          ; 
+    1950  F8BF  A9 3E                     LDA     #$3E 
+    1951  F8C1  85 01                     STA     DPORTD 
+    1952  F8C3  85 03                     STA     DPORTR 
+    1953  F8C5  A2 00                     LDX     #0 
+    1954  F8C7  8E 81 01                  STX     DPORT1 
+    1955  F8CA  CA                        DEX 
+    1956  F8CB  8E 83 01                  STX     DPORTP 
+    1957                          ; 
+    1958  F8CE                    OLDCOM  = * 
+    1959  F8CE                            LASTAT                  ; LATCH STATUS 
+    1960  F8CE  00               +        BRK 
+    1961  F8CF  EA               +        NOP 
+    1962  F8D0  2C 80 01                  BIT     PORT1           ; CHECK COMMAND LINE 
+    1963  F8D3  30 F9                     BMI     OLDCOM          ; LOW NOW--LOOP FOR RISE *****FOREVER***
+    1964  F8D5  A9 04                     LDA     #4              ; SET UP FOR COMMAND RECEIVE 
+    1965  F8D7  85 AA                     STA     BUFUSE          ; COMMAND BUFFER LENGTH 
+    1966  F8D9  20 F6 F0                  JSR     FILL0           ; PRESET BUFFER 
+    1967                          ; 
+    1968  F8DC                    NONCOM  = * 
+    1969  F8DC                            LASTAT                  ; LATCHSTATUS 
+    1970  F8DC  00               +        BRK 
+    1971  F8DD  EA               +        NOP 
+    1972  F8DE  2C 80 01                  BIT     PORT1           ; CHECK FOR COMMAND LINE TO FALL 
+    1973  F8E1  10 F9                     BPL     NONCOM          ; NOT YET--LOOP *****FOREVER***** 
+    1974                          ; 
+    1975  F8E3  20 15 F3                  JSR     COMAND          ; GO DO COMMAND! 
+    1976  F8E6  4C BA F8                  JMP     MAIN            ; NO MATTER WHAT REASON FOR RETURN ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   54
+
+    1977                                  .PAGE 
+    1978  F8E9  43 4F 50 59       FILLER  .BYTE   'COPYRIGHT 1980 ATARI INC ZDYBEL/SCHEIMAN' 
+    1979  F8ED  52 49 47 48       
+    1980  F8F1  54 20 31 39       
+    1981  F8F5  38 30 20 41       
+    1982  F8F9  54 41 52 49       
+    1983  F8FD  20 49 4E 43       
+    1984  F901  20 5A 44 59       
+    1985  F905  42 45 4C 2F       
+    1986  F909  53 43 48 45       
+    1987  F90D  49 4D 41 4E       
+    1988                          ;       .BYTE   'SZ' 
+    1989                          ; 
+    1990                          ; 
+    1991                          ; ABOVE FILLER ADJUSTS FOR CONTROLLER (THIS), HANDLER, AND 
+    1992                          ; RELOCATOR SIZE TO FILL THE FINAL ROM.  FINAL MEMORY MAP LOOKS 
+    1993                          ; LIKE THIS: 
+    1994                          ; 
+    1995                          ; ($F000) - (RELOCR-1)          CONTROLLER (THIS) UP TO HERE 
+    1996                          ; (RELOCR) - (RELOCR+5)         DISK IMITATION SECTOR 0 FLAGS 
+    1997                          ; (BOOTB+6) - (BOOTE-2)         CODE PART OF RELOCATOR (SENT IN 
+    1998                          ;                               ONE PIECE AFTER POLL, OR SENT AS 
+    1999                          ;                               THREE DISK BLOCKS IMITATION DISK; 
+    2000                          ;                               LATTER CASE CHECKSUMS AT DISKCH) 
+    2001                          ; (RELCHK)                      RELOCATOR CHECKSUM 
+    2002                          ; (HANDLB) - (HANDLE-2)         CODE PART OF HANDLER 
+    2003                          ; (HNDCHK)                      HANDLER CHECKSUM 
+    2004                          ; ($FFF9)                       ROM VERSION NUMBER 
+    2005                          ; ($FFFA) - ($FFFB)             ROM CHECKSUM 
+    2006                          ; ($FFFC) - ($FFFD)             RESET VECTOR 
+    2007                          ; ($FFFE) - ($FFFF)             IRQ (BRK) VECTOR 
+    2008                          ; 
+    2009                          ; FINAL ASSEMBLY PROCEEDS AS FOLLOWS: 
+    2010                          ;   SET BOOTB, BOOTE PER HANDLER AND RELOCATOR CODE SIZES 
+    2011                          ;          (DON'T FORGET CHECKSUMS) 
+    2012                          ;   ADJUST FILLER 
+    2013                          ;   USING CHECKSUM PROGRAM, CALCULATE RELOCATOR CHECKSUM 
+    2014                          ;   USING CHECKSUM PROGRAM, CALCULATE DISKCH AND HNDCHK SUMS 
+    2015                          ;          (NOTE THAT THIRD DISKCH SUM COVERS STUFF FOLLOWING 
+    2016                          ;           RELOCATOR) 
+    2017                          ;   SET VERSION NUMBER 
+    2018                          ;   SET CHECKSUM AT END OF POLL ANSWER (BEFORE POLLE) 
+    2019                          ;   REASSEMBLE 
+    2020                          ;   CALCULATE ROM CHECKSUM AND REASSEMBLE 
+    2021                          ;   UPLOAD RESULT 
+    2022                          ; 
+    2023                          ; 
+    2024                                  *=      RELOCR 
+    2025  F911  00 03                     .BYTE   0,3             ; FLAGS, SECTOR COUNT 
+    2026  F913  00 05                     .WORD   $0500           ; ENTRY ADDRESS 
+    2027  F915  C0 E4                     .WORD   $E4C0           ; ADDRESS OF RTS INSTRUCTION IN OS !!!!!
+    2028                          ; 
+    2029                                  *=      BOOTE-1 
+    2030  FA66  7B                RELCHK  .BYTE   $7B             ; RELOCATOR CHECKSUM ERR LINE  ADDR  B1 B2 B3 B4        RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   55
+
+    2031                          
+    2032                          ;---------------------------------------------------------------- 
+    2033                          ;       START VECTOR, HARDWARE VECTORS 
+    2034                          ;---------------------------------------------------------------- 
+    2035                          ; 
+    2036                          ; 
+    2037  86D3                    CHKSUM  =       $86D3           ;$686D3 
+    2038  0001                    VERSON  =       1               ; REVISION NUMBER 
+    2039                          ; 
+    2040                                  *=      $FFF8 
+    2041  FFF8  C5                HNDCHK  .BYTE   $C5                     ; HANDLER CHECKSUM 
+    2042  FFF9  01                        .BYTE   VERSON 
+T ` 2043  FFFA  D3 86 76 F8               .WORD   CHKSUM,RESET,LSTAT 
+    2044  FFFE  CA F0             
+    2045                          ; 
+    2046  0000                            .END 
+
+
+  ASSEMBLY ERRORS =    1                                   RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN             PAGE   56
+
+
+                             CROSS REFERENCE
+
+LABEL     VALUE        REFERENCE
+
+ALLOUT    F191           611  -672   719
+APOLL     F347          1023 -1029
+ASIN19    F063          -406   418
+ASST19    F077           410  -420
+AST19     F006          -353  1254  1601
+AST19C    F000          -350  1008
+AST19E    F083           390   404   412  -433
+AST19L    F00F          -361   384   397   430
+AST19R    F085           383  -437
+AST19S    F009           352  -356
+AST19X    F088           381  -440
+ASY19     F05A           365   372   379   388   394  -399
+BAUD1     0091          -270
+BAUD2     0092          -271
+BAUD3     0093          -272
+BAUD4     0094          -273
+BAUDS     0091          -269   614   621   631
+BEGIN     F876         -1891
+BFOUND    F77A          1671 -1678
+BITOUT    0087          -250   630   633   724
+BLKOUT    F128          -606  1285
+BOOTB     F911         -1731  1749  1838  1881
+BOOTE     FA67         -1729  1731  1749  1881  2029
+BOOTFL    00A3          -298  1040  1048  1763  1803  1828  1926
+BOOTL     014F         -1730  1731
+BTOC      F85D          1866 -1868
+BTOCOM    F83D          1709  1724  1740 -1847
+BTOE      F869          1864 -1876
+BTOL      F83F         -1849  1854
+BTOOL     F84E         -1860  1871  1874
+BTOP      F86A          1850 -1880
+BUFB      012D          -325   326
+BUFE      00AD          -322   323   920   923   940   943  1017  1020
+                        1038  1061  1062  1071  1082  1084  1142  1162
+                        1165  1166  1170  1171  1174  1175  1186  1189
+                        1199  1202  1208  1211  1213  1232  1242  1277
+                        1316  1353  1376  1377  1379  1380  1382  1383
+                        1384  1385  1387  1549  1552  1554  1557  1559
+                        1588  1632  1760  1767  1769  1776  1796  1809
+                        1811  1813  1814
+BUFFB     032D          -326
+BUFFE     02AD          -323   539   638   639   657   692
+BUFLEN    0080          -318
+BUFSIG    00AB          -316   609   718  1243
+BUFUSE    00AA          -314   358   519   535   551   962  1220  1238
+                        1389  1561  1565  1593  1616  1816  1965
+CHECK     02AC          -320   409   522   524   555   965
+CHECKS    F0E8          -534  1014  1223  1257  1390  1562  1604  1817
+CHEK      00AC          -319   320  1015  1224  1258  1391  1563  1605
+                        1818
+CHEKSL    F0ED          -538   541
+CHKSUM    86D3         -2037  2043
+COMAND    F315         -1002  1975
+COMHI     0185          -164   354  1614
+COML      0008         -1435  1446
+COMLO     0184          -163   351
+COMNAK    F6CC         -1575  1720
+DISKB     F7C4          1045 -1759
+DISKCH    F834          1797 -1831
+DISKDH    F83A          1779 -1835
+DISKDL    F837          1777 -1833
+DISKST    F80B          1762 -1802
+DISKTO    F7F2         -1785  1794
+DISKW     008B          -258  1778  1780  1788  1851  1862  1865  1867
+                        1869  1870  1872  1873
+DPORT1    0181          -157  1954
+DPORTD    0001          -153  1924  1951
+DPORTP    0183          -159  1915  1956
+DPORTR    0003          -155  1922  1952
+ERROUT    F18F           613  -669
+FDXALL    F5F3          1400 -1444
+FDXCOD    F5D1         -1418  1427  1460
+FDXCOM    F5DF         -1431  1435  1452
+FDXDAT    0080          -235   237   238   239   240  1325  1329  1330
+                        1332  1335  1336  1425
+FDXF1     F5F5         -1447  1455
+FDXF2     F60C         -1459  1463
+FDXF3     F62B         -1473  1478
+FDXFA     F5E7         -1439  1466
+FDXFB     F5EB         -1440  1468
+FDXFC     F5EF         -1441  1470
+FDXL      000E         -1427  1433  1433  1433  1449  1451  1453  1453
+                        1458  1472  1475  1476
+FILL0     F0F6          -550  1247  1594  1966
+FILL0L    F0FB          -554   557
+FILLER    F8E9         -1978
+GETMSK    F30D           985  -992
+GETRDY    F2FA           612  -982  1392
+GETTST    F30A           986  -991
+GOTEST    F4CF         -1271
+HAND1     0095          -276
+HAND2     0096          -277
+HAND3     0097          -278
+HAND4     0098          -279
+HANDLB    FA67         -1728  1729  1882
+HANDLE    FFF9         -1726  1728  1882
+HANDLL    0591         -1727  1728
+HANDS     0095          -275   984  1086
+HILOST    00A1          -294   367   368   466   467   504   505   683
+                         684   892   893   898  1217  1912
+HNDCHK    FFF8         -2041
+INBIT     0087          -249   775   780   790
+INBITS    0088          -252   774  1349
+INBT      F677          1371  1373 -1523
+INBYTE    0089          -254   772   782   788   794   800
+INHIT     0086          -246   813   831
+INIT      F8BD         -1944
+INNONE    F20A          -763   766   770   802
+INOT01    F266           823  -827
+INOUT     008A          -256   801   819  1359  1363  1399
+INOUT0    F25F          -821
+INOUT1    F263           820  -824
+INPOR1    F279          -842  1513  1518
+INPOR2    F27E          -846  1514  1519
+INPOR3    F282          -850  1515  1520
+INPOR4    F286          -854  1516  1521
+INPORT    008D          -260   840  1405  1407
+INPRTH    F673          1406 -1517
+INPRTL    F66F          1404 -1512
+INSHIF    F21E          -777   783   791
+INSTAR    008F          -264   795   798  1352
+INSTKO    F22E          -787   796
+INSTOK    F236           786  -793
+INSTOP    F22C           781  -785
+INSTRM    F208          -760  1408
+INSTRS    F66C          1351 -1510
+INTH      0085          -244   830  1374
+INTIME    F247           765   769   779  -804   839
+INTL      0084          -242   834  1372
+INTM      F26C           814  -832
+INTS1     0005          -171   685   810
+INTS2     0185          -162   357   382   593  1615  1618  1662
+INVBL     F0DC          -521   526
+INVBUF    F0D9          -518  1013  1256  1603
+LOHIST    00A0          -292   374   375   469   470   508   509   680
+                         681   895   896  1215
+LPRINT    00A7          -308  1639  1645  1929
+LSTAT     F0CA          -501  2043
+LSTHI     F0CA          -502  1429  1448
+LSTL      0007         -1429  1433  1433  1451  1453  1475  1476
+LSTLO     F0D1          -506  1429  1450
+MAIN      F8BA           438   595   873   973 -1941  1976
+MEMORY  M 0000             0
+NARG      0000             0
+NEDISK    F82F          1764  1766  1768  1770  1772  1790  1799 -1826
+NEXOUT    F1CB           703  -716
+NO        0000           -29
+NOBOOT    F364          1041  1044 -1046
+NODISK    F82E          1804 -1823
+NONCOM    F8DC         -1968  1973
+NOPOL     F342          1009  1011  1016 -1024  1028  1031  1060
+NOPOLL    F352          1019 -1035
+NOT       0001           -30
+NOTCR     F748          1638  1640 -1644
+NOTEST    F4E4          1273 -1284
+NOTIN     F28A           809  -859
+NOTOUT    F1E1           679  -731
+OLDCOM    F8CE         -1958  1963
+OPORTD    00A2          -296   608   871  1286  1314
+OPRINT    00A8          -310  1633  1642  1684
+OUT0      F1B1          -694
+OUT01     F1B8           696  -700
+OUT0M     0080          -237   659   695   721
+OUT1      F1B5           693  -697
+OUT1M     0081          -238   653   658   698
+OUTBTH    F1F4           619  -739
+OUTBTL    F1E4           617  -734
+OUTFIL    F204           634  -744
+OUTFL     F163          -636   641
+OUTHIT    0086          -247   661   688   706   726
+OUTL      F193           662  -677   714
+OUTSL     F174          -647   650
+OUTTH     0083          -240   620   705   725
+OUTTL     0082          -239   618   709   727
+OUTTM1    F1C1           689  -708
+OUTTM2    F1C3          -710   729
+PIA1      0000          -150   152   153   154   155   170   171
+PIA2      0180          -151   156   157   158   159   162   163   164
+                         165   166   167   168
+POLLB     F7B7         -1742  1883
+POLLCT    00A4          -300  1027  1037  1927
+POLLE     F7C4         -1752  1883
+POLLF     009E          -288  1030  1033
+PORT1     0180          -156   366   373   452   465   468   503   507
+                         678   682   808   843   890   988  1010  1172
+                        1432  1931  1933  1962  1972
+PORT1S    0099          -281   869  1078  1095  1141  1143  1246  1263
+                        1278  1296  1309  1413  1719
+PORT2S    009A          -282  1279
+PORT3S    009B          -283  1280
+PORT4S    009C          -284  1282
+PORTD     0000          -152   363   370   377   386   392   403   407
+                         429   459   461   479   490   607   652   701
+                         722   817   828   851   872   946   951   953
+                        1059  1200  1287  1313  1324  1421  1426  1923
+PORTN     0090          -266   643   868   983  1068  1081  1099  1101
+                        1146  1148  1262  1295  1315  1338  1403  1412
+                        1465
+PORTP     0182          -158  1647  1683  1906  1914
+PORTR     0002          -154   847   855   926   931   933  1187  1206
+                        1629  1651  1653  1657  1659  1670  1920
+PRIAUX    F6D9          1541 -1584
+PRIAX1    009D          -286  1553  1555  1591
+PRIBAD    F792          1622  1666 -1697
+PRIBL     F71B         -1617  1630  1688
+PRIBL2    F72B          1620 -1625
+PRIBR     F791          1619  1663 -1694
+PRIBS2    F771          1664 -1669
+PRIBUF    F713         -1613
+PRICOM    F377          1050  1052 -1058
+PRIDON    F78A          1686 -1689
+PRIFLG    009F          -290  1550  1574  1581  1691  1699
+PRIST     F694          1063 -1539
+PRNAKC    F6C8         -1572  1586  1590
+PRNAKD    F6D2         -1579  1602  1606
+QPOLL     F343          1021 -1026
+RAMOK     F88C          1901 -1907
+RDYMSK    00A6          -306   987
+RELCHK    FA66         -2030
+RELOCR    F911          1834  1834  1834  1836  1836  1836 -1838  2024
+RESET     F876         -1890  2043
+ROLA      002A         -1437  1441  1441
+RORA      006A         -1438  1441  1441
+RSBAUD    F38C         -1074
+RSBOOT    F799          1307 -1705
+RSCERR    F5C4          1356  1368 -1410
+RSCOM     F382          1055 -1065
+RSCON     F3A7          1076 -1091
+RSCON1    F3BE          1100 -1106
+RSCON2    F3D0          1102 -1115
+RSCON3    F3DB          1103 -1121
+RSCON4    F3E6          1104 -1127
+RSCOND    F3EB          1113  1119  1125 -1131
+RSDOW     F7AD          1717 -1722
+RSDOWN    F7A2          1707 -1715
+RSPOLL    F7B2          1034 -1738
+RSRDY     F2BA          -919  1108  1112  1117  1123
+RSRDYD    F2CD           927  -932
+RSRDYS    F2C8           924  -928
+RSREX     F2CF           921  -934   941
+RSSEND    F474         -1219
+RSSENS    F297          -889  1155  1164  1168  1180  1194
+RSSTA1    F40C          1147 -1153
+RSSTA2    F438          1149 -1178
+RSSTA3    F44C          1150 -1192
+RSSTA4    F45F          1151 -1205
+RSSTAT    F3EF          1093 -1136
+RSSTAX    F465          1176  1188  1190  1201  1203 -1210
+RSSTRE    F4FC          1235 -1304
+RSTEMP    00A5          -302   897   899   900   901   903   906   907
+                         908
+RSWDER    F4BF          1255 -1260
+RSWDRR    F4C6         -1264  1582
+RSWERR    F4F1          1288 -1293  1394
+RSWNOD    F4CC          1245  1259 -1268
+RSWRIT    F482          1139 -1228
+RSWRRR    F4F8         -1297  1700
+RSWRT     F492          1233 -1237
+RSXMT     F2D0          -938  1109  1118  1124  1129
+RSXMTC    F2E0           944  -948
+RSXMTD    F2E5           947  -952
+RTEST     008F          -262  1005  1231  1272
+SNDACK    F106          -568  1080  1097  1145  1249  1270  1311  1544
+                        1596  1608  1775  1807  1857
+SNDDON    F102          -564  1088  1133  1222  1275  1290  1397  1693
+                        1782  1820  1859
+SNDWX     F108           566  -571  1266  1299  1415  1577
+SNDWXL    F10B          -574   579
+SNDXX     F115          -583   594
+STACK   S 0000             0
+STBAUD    F63A          1375  1378 -1482
+STBAUX    0091          -268  1083  1340  1360
+STBITD    F68D          1323  1328  1334 -1536
+STBITZ    F689          1321  1326  1333 -1534
+STBNRM    F573          1364 -1369
+STNORM    F560          1342 -1358
+STODD     F5B5         -1402
+STRES     F290           732  -870  1434
+STREST    F28B          -867
+TIMO1     0194          -165
+TIMO1K    0197          -168   396   582  1253  1600  1612  1624  1668
+TIMO64    0196          -167  1007
+TIMO8     0195          -166
+TIMOUT    00A9          -312   389  1004  1251  1598  1610  1621  1665
+TIMR1     0014          -170   656   712   713   835   836
+TO0       F0BC          -483
+TO01      F0C3           485  -489
+TO1       F0C0           482  -486
+TOCMPL    F2EB          -964   969
+TOCMPR    F2F7           967  -972
+TOCOM     00A5          -304   456   481
+TOCOMB    F08A          -451   586   966  1789  1798  1863
+TOCOMD    F0C8           478  -493
+TOCOML    F09E          -464   491
+TOCOMP    F2E8          -961  1225  1398  1569  1821
+VERSON    0001         -2038  2042
+WBUSY     F761         -1661  1676
+WRITIM    001E          -173  1556  1558  1609  1609  1611  1623
+YES       0001           -28
+ZEROL     F879         -1897  1909

@@ -1,0 +1,1978 @@
+        LIST     X
+
+
+
+
+
+
+
+
+
+;================================================================
+
+        .TITLE  'RS-232 PERIPHERAL  STARTED 10/25/79  SCHEIMAN'
+
+;================================================================
+;
+; TANDEM FILENAME: R850CS1
+;
+;
+; REVISION HISTORY:
+;       VERSION 0
+;       VERSION 1     14 OCT 1980
+        .PAGE           ;
+;================================================================
+;       GLOBAL DEFINITIONS:  CONSTANTS, EQUATES, MACROS, RAM LOCATIONS
+;================================================================
+;
+YES     =       1
+NO      =       0
+NOT     =       1
+;
+;
+        .PAGE           ;
+;       QUICK SUMMARY OF I/O:
+;
+;
+;       PRINTER:
+;               STATUS  (AUX BYTES CONTAIN NOTHING)
+;                       RETURNS FLAGS (10000XYZ)
+;                                       (X=BUSY,Y=DATA ERR,Z=CMD ERR)
+;                               MOST PREVIOUS AUX1
+;                               TIMEOUT IN SECONDS (TWO BYTES)
+;               WRITE   (AUX1 CONTAINS 'N' FOR NORMAL)
+;                               (COMPUTER SENDS 40 BYTES;
+;                                DATA FOLLOWING AN EOL IS IGNORED)
+;
+;
+;       RS232 PORTS:
+;
+;               STATUS (AUX CONTAINS NOTHING)
+;                       RETURNS ERRORS (F000BNDC)
+;                                       N=NOT READY ERROR (DSR,CTS,CRX)
+;                                       F=FRAME ERROR
+;                                       D=SERIAL DATA ERROR
+;                                       B=ILLEGAL OPTION COMBINATION ON COMMAND
+;                                       C=ILLEGAL COMMAND ERROR
+;                               SENSE (RSCDXY0Z)
+;                                       R=DSR
+;                                       S=DSR SINCE PREV STATUS
+;                                       C=CTS
+;                                       D=CTS SINCE PREV STATUS
+;                                       X=CRX (CARRIER)
+;                                       Y=CRX SINCE PREV STATUS
+;                                       Z=RCV (DATA NOW)
+;
+;               WRITE (AUX1=LLLLLLLL)
+;                       LLLLLLLL=TRANSMISSION LENGTH (MAY BE 0)
+;                               WILL RECEIVE 64 BYTES, THEN WRITE LLLLLLLL BYTES
+;
+;               BAUD (AUX1=T*NNBBBB,AUX2=*****RCX)
+;                       T=2 STOP BITS
+;                       NN=WORD SIZE (00=8,11=5,10=6,01=7)
+;                       BBBB=BAUD SELECT
+;                       R=WATCH READY LINE
+;                       C=WATCH CLEAR TO SEND
+;                       X=WATCH CARRIER
+;
+;               CONTROL (AUX1=RSCD**AB)
+;                       R=ENABLE SETTING DTR
+;                       S=DTR
+;                       C=ENBALE SETTING RTS
+;                       D=RTS
+;                       A=ENABLE SETTING XMT
+;                       B=XMT
+;
+;               STREAM (AUX1=****WR**)
+;                       W=OUT, R=IN
+;
+;       MISC I/O:
+;
+;               TEST (RS232 PORT 1 ADDRESS; AUX1=LLLLLLLL)
+;                       LLLLLLLL=BYTE COUNT
+;                               WILL RECEIVE LLLLLLLL BYTES THEN JUMP TO IT
+;                               IN BUFFER AS TEST CODE
+;
+;               DISK STATUS REQUEST (AUX NOTHING)
+;                       RETURNS FLAGS,0,TIMEOUT (2 BYTES?????)
+;                       FLAGS=00001000 (WRITE PROTECTED)
+;
+;               DISK READ (AUX1,AUX2=SECTOR LSB,MSB)
+;                       RETURNS 128 DATA BYTES
+;
+;       NOTES ON PSEUDO-DISK BOOT:  BOOT STARTS WITH READ FROM SECTOR 1
+;               DATA:  FLAGS
+;               NUMBER OF SECTORS (INCLUDING FIRST)
+;               LOAD ADDRESS (TWO BYTES)
+;               DOSINI ADDRESS (TWO BYTES)
+;               DATA
+;
+;               THE BOOT WILL LOAD INFO
+;               STARTING AT THE LOAD ADDRESS.
+;               SUBSEQUENT SECTORS WILL BE READ IN ASCENDING ORDER FROM 2.
+;               AFTER THE READS ARE DONE, THE OS WILL JSR TO THE
+;               LOAD ADDRESS+6.  THE ROUTINE SHOULD RTS WITH CARRY
+;               CLEAR TO INDICATE NO ERROR.  THE OS THEN JSR'S TO
+;               THE DOSINI ROUTINE.  THIS LATTER ENTRY IS CALLED ON
+;               ANY SUBSEQUENT WARM STARTS.
+        .PAGE   ;
+;       PORT DEFINITIONS:
+;
+;       PORTD=DATA OUT PORT
+;               7       IN      RCV 3   +
+;               6       IN      FAULT   1=NO PRINTER
+;               5       OUT     DATA-TO +
+;               4       OUT     SEND 4  +
+;               3       OUT     SEND 3  +
+;               2       OUT     SEND 2  +
+;               1       OUT     SEND 1  +
+;               0       IN      DATA-FR -
+;       PORTR=READY OUT PORT
+;               7       IN      RCV 2   +
+;               6       IN      BUSY    0=BUSY
+;               5       OUT     STROBE  1=STROBE
+;               4       OUT     RTS 1   -
+;               3       OUT     DTR 3   -
+;               2       OUT     DTR 2   -
+;               1       OUT     DTR 1   -
+;               0       IN      RCV 4   +
+;       PORT1=MODEM IN PORT
+;               7       IN      COMMAND 1=COMMAND
+;               6       ---     ---     ---
+;               5       IN      CTS 1   -
+;               4       IN      CARRIER -
+;               3       IN      DSR 3   -
+;               2       IN      DSR 2   -
+;               1       IN      DSR 1   -
+;               0       IN      RCV 1   +
+;       PORTP=PRINTER OUT PORT, ALL - LOGIC
+;
+PIA1    =       $0000
+PIA2    =       $0180
+PORTD   =       PIA1+0  ; DATA-OUT PORT
+DPORTD  =       PIA1+1
+PORTR   =       PIA1+2  ; READY-OUT PORT
+DPORTR  =       PIA1+3
+PORT1   =       PIA2+0  ; MODEM-IN PORT
+DPORT1  =       PIA2+1
+PORTP   =       PIA2+2  ; PRINTER-OUT PORT
+DPORTP  =       PIA2+3
+;
+;
+INTS2   =       PIA2+5          ; PIA2 INTERRUPT FLAGS
+COMLO   =       PIA2+4          ; CONFIG PIA2 TO DETECT COMMAND END
+COMHI   =       PIA2+5          ; CONFIG TO DETECT COMMAND START
+TIMO1   =       PIA2+20         ; TIMEOUT AT 1X CLOCK
+TIMO8   =       PIA2+21         ; TIMEOUT AT 8X CLOCK
+TIMO64  =       PIA2+22         ; TIMEOUT AT 64X CLOCK
+TIMO1K  =       PIA2+23         ; TIMEOUT AT 1024X CLOCK
+;
+TIMR1   =       PIA1+20         ; BAUD TIMER AT 1X CLOCK
+INTS1   =       PIA1+5          ; PIA1 INTERRUPT FLAGS
+;
+WRITIM  =       30              ; 30 SEC PRINTER TIMEOUT (50 MAX)
+        .PAGE           ;
+;----------------------------------------------------------------
+;       MACROS
+;----------------------------------------------------------------
+;
+;
+;RES    .MACRO  LEN
+;*      =       *+LEN
+;       .ENDM
+;
+;
+NPAGE   .MACRO
+        *=      +(*+255)/256*256
+        .ENDM
+;
+;
+ACKACK  .MACRO
+        JSR     SNDACK
+        .ENDM
+;
+;
+DONDON  .MACRO
+        JSR     SNDDON
+        .ENDM
+;
+;
+LASTAT  .MACRO
+        BRK
+        NOP
+        .ENDM
+;
+;
+LSTATL  .MACRO
+        LDA     PORT1
+        ORA     LOHIST
+        STA     LOHIST
+        .ENDM
+;
+;
+LSTATH  .MACRO
+        LDA     PORT1
+        AND     HILOST
+        STA     HILOST
+        .ENDM
+        .PAGE           ;
+;----------------------------------------------------------------
+;       RAM DEFINITIONS:
+;----------------------------------------------------------------
+;
+;
+;       PAGE 0:
+;
+;
+        *=      $0080
+;
+;               **********NOTE: THE FIRST 16 RAM LOCATIONS MAY BE USED
+;                       BY THE LOAD-AND-TEST FUNCTION.  THEREFORE, IN ANY
+;                       FUTURE RELEASE OF THIS CODE, THESE BYTES SHOULD
+;                       BE USED ONLY AS LOCAL (TEMP) VARIABLES OF ANY
+;                       FUNCTION IMPLEMENTED HEREIN. **********
+;
+FDXDAT  RES     4               ; DATA BYTES FOR FULL DUPLEX STREAM
+;
+OUT0M   =       FDXDAT          ; PORTD SPACE FOR BLKOUT ROUTINE
+OUT1M   =       FDXDAT+1        ; MARK FOR BLKOUT
+OUTTL   =       FDXDAT+2        ; BLKOUT TIMER RELOAD VALUE
+OUTTH   =       FDXDAT+3        ; BLKOUT OUTER LOOP TIMER RELOAD VALUE
+;
+INTL    RES     1               ; ODD WORDSIZE STREAM IN INNER TIMER VAL
+;
+INTH    RES     1               ; DITTO OUTER TIMER VAL
+;
+INHIT   =       *               ; ODD WORD STREAM OUTERLOOP TIMER
+OUTHIT  RES     1               ; BLKOUT OUTER LOOP TIMER
+;
+INBIT   =       *               ; ODD WORD STREAM BIT COUNTER
+BITOUT  RES     1               ; BLKOUT BIT COUNTER
+;
+INBITS  RES     1               ; ODD WORD STREAM BIT CTR RESET
+;
+INBYTE  RES     1               ; ODD WORD STREAM INPUT DATA WORK
+;
+INOUT   RES     1               ; ODD WORD STREAM DATA-TO WORK AREA
+;
+DISKW   = *                     ; VECTOR FOR BOOT ROUTINES
+        RES     2               ; (TOTAL OF 4 BYTES FOR DISKW)
+INPORT  RES     2               ; JUMP VECTOR TO ODD STREAM PROPER PORT
+;
+RTEST   =       *               ; LOAD AND XEQ TEST FLAG
+;
+INSTAR  RES     1               ; ODD WORD START BIT TEST MASK
+;
+PORTN   RES     1               ; PORT NUMBER OF CURRENT RS232 OP
+;
+STBAUX  = *
+BAUDS   = *
+BAUD1   RES     1               ; PORTS 1 THRU 4 BAUD RATES
+BAUD2   RES     1
+BAUD3   RES     1
+BAUD4   RES     1
+;
+HANDS   = *
+HAND1   RES     1               ; PORTS 1 THRU 4 HANDSHAKE MODE FLAGS
+HAND2   RES     1
+HAND3   RES     1
+HAND4   RES     1
+;
+PORT1S  RES     1               ; PORTS 1 THRU 4 ERROR STATUS
+PORT2S  RES     1
+PORT3S  RES     1
+PORT4S  RES     1
+;
+PRIAX1  RES     1               ; OLD AUX1 FOR PRINTER STATUS REQ
+;
+POLLF   RES     1               ; FLAG INDICATING POLL HAS BEEN ANSWERED
+;
+PRIFLG  RES     1               ; PRINTER STATUS FLAGS
+;
+LOHIST  RES     1               ; LOW-TO-HIGH STATUS LATCH
+;
+HILOST  RES     1               ; HIGGH-TO-LOW STATUS LATCH
+;
+OPORTD  RES     1               ; SAVED VALUE OF PORTD DURING STREAMING
+;
+BOOTFL  RES     1               ; DISK BOOT FLAG
+;
+POLLCT  RES     1               ; POLL COUNTER
+;
+RSTEMP  = *                     ; TEMPORARY FOR RS232 STATUS REQ
+;
+TOCOM   RES     1               ; TEMP FOR TOCOMB ROUTINE
+;
+RDYMSK  RES     1               ; PORT READINESS TEST MASK
+;
+LPRINT  RES     1               ; LATEST CHAR SENT TO PRINTER
+;
+OPRINT  RES     1               ; ATASCII OF LATEST PRINTED CHAR
+;
+TIMOUT  RES     1               ; HIGH BYTE OF TIMEOUT COUNTER (LOWER IN PIA2)
+;
+BUFUSE  RES     1               ; CURRENT BUFFER LENGTH <<EXCLUDING CHECKSUM>>
+;
+BUFSIG  RES     1               ; # OF SIGNIFICANT BYTES IN BUFFER
+;
+BUFLEN  =       128
+CHEK    RES     1               ; CHECKSUM PART OF BUFFER
+CHECK   =       CHEK+$0200      ; IMAGE IN PAGE 2
+;
+BUFE    RES     BUFLEN          ; BUFFER (STORED BACKWARDS!)
+BUFFE   =       BUFE+$0200      ; BUFFER END IMAGE IN PAGE 2
+;
+BUFB    =       *               ; BUFFER 'BEGINNING', PAGE 1
+BUFFB   =       BUFB+$0200      ; BUF BEGIN IMAGE IN PAGE 3
+;
+;
+        .PAGE   ;
+;================================================================
+;       SUBROUTINES
+;================================================================
+;
+;
+        *=      $F000   ; CODE ORIGIN
+;
+;
+;----------------------------------------------------------------
+;       19.2 KBAUD ASYNCH READ ROUTINE:
+;               READS FROM SERIAL PORT
+;               TWO ENTRIES--AST19C READS COMMANDS, RESETS IF COM RISES
+;                       AST19 READS DATA, RESETS IF COM FALLS
+;               ERROR RETURN (C SET) ON DATA READ ERROR,
+;                  TIMEOUT, OR TOO MANY BYTES
+;               TIMEOUT INITIALLY SET EXTERNALLY, PIA2 CLOCK AND 'TIMOUT'
+;----------------------------------------------------------------
+;
+;
+;
+AST19C  =       *
+        STA     COMLO           ; SET UP DETECT COMMAND RISE
+        JMP     AST19S          ; GO FINISH SETUP
+AST19   =       *
+        STA     COMHI           ; SET UP DETECT COMMAND FALL
+;
+AST19S  = *
+        LDX     INTS2           ; RESET INTERRUPT FLAG BITS
+        LDX     BUFUSE          ; BUFFER SIZE INTO X
+        INX                     ; INCLUDE CHECKSUM BYTE
+;
+AST19L  =       *
+        LDA     #$01            ;2 TEST FOR START BIT
+        BIT     PORTD           ;3
+        BEQ     *+4             ;3 BRANCH IF NOT
+        BNE     ASY19           ;3 GO IF SO
+        LDA     PORT1           ;4 LATCH 1/2 STATUS
+        AND     HILOST          ;3
+        STA     HILOST          ;3
+        LDA     #$01            ;2 TEST FOR START BIT
+        BIT     PORTD           ;3
+        BEQ     *+4             ;3 BRANCH IF NOT START
+        BNE     ASY19           ;3 GO IF SO
+        LDA     PORT1           ;4 LATCH OTHER 1/2 STATUS
+        ORA     LOHIST          ;3
+        STA     LOHIST          ;3
+        LDA     #$01            ;2 TEST FOR START BIT
+        BIT     PORTD           ;3
+        BEQ     *+4             ;3 BRANCH IF NOT START
+        BNE     ASY19           ;3 BRANCH IF START
+        TXA                     ;2 TEST END-BUFFER
+        BEQ     AST19X          ;2 BR IF END
+        BIT     INTS2           ;4 TEST COMMAND CHANGE OR TIMEOUT
+        BVS     AST19R          ;2 BRANCH IF COMMAND LINE CHANGED
+        BPL     AST19L          ;2 BRANCH IF NOT LOW-ORDER TIMEOUT
+        LDA     #$01            ;2 TEST FOR START BIT
+        BIT     PORTD           ;3
+        BEQ     *+4             ;3 BRANCH IF NOT START
+        BNE     ASY19           ;3 BRANCH IF START
+        DEC     TIMOUT          ;5 HIGH-ORDER TIMEOUT
+        BEQ     AST19E          ;2 BRANCH IF TIMEOUT
+        LDA     #$01            ;2 TEST FOR START BIT
+        BIT     PORTD           ;3
+        BEQ     *+4             ;3 BRANCH IF NOT
+        BNE     ASY19           ;3 GO IF SO
+        LDA     #109            ;2 RESET TIMER .1 SEC
+        STA     TIMO1K          ;4
+        BNE     AST19L          ;3 (UNCONDITIONAL)
+;
+ASY19   = *
+        NOP                     ;2
+        NOP                     ;2
+        JMP     *+3             ;3 (NOP)
+        BIT     PORTD           ;3 TEST IF STILL START BIT
+        BEQ     AST19E          ;2 BRANCH ERROR IF NOT
+;
+ASIN19  = *
+        LDA     PORTD           ;3 SAMPLE THE BIT STREAM
+        ROR     A               ;2 SHIFT IN NEW BIT
+        ROR     CHECK-1,X       ;7
+        BCS     ASST19          ;2 BRANCH IF START BIT JUST OUT
+        TXA                     ;2 TEST FOR BUFFER FULL
+        BEQ     AST19E          ;2 IF SO, BRANCH--TOO MANY BYTES
+        NOP                     ;2
+        JMP     *+3             ;3
+        LASTAT                  ;32 CALL LATCHSTATUS
+        JMP     ASIN19          ;3 LOOP BACK
+;
+ASST19  = *
+        DEX                     ;2 BUMP BUFFER POINTER
+        NOP                     ;2
+        NOP                     ;2
+        NOP                     ;2
+        LASTAT                  ;33 CALL LATCHSTATUS
+        LDA     #$01            ;2
+        BIT     PORTD           ;3 TEST STOP BIT
+        BEQ     AST19L          ;3 BRANCH IF OK STOP
+;                               ; FALL TRHOUGH TO ERROR IF NOT
+;
+AST19E  = *
+        SEC                     ; SET ERROR CODE
+        RTS                     ; AND RETURN
+;
+AST19R  = *
+        JMP     MAIN            ; ERROR EXIT--RESET!
+;
+AST19X  = *
+        CLC                     ; SET NO ERROR (NORMAL EXIT)
+        RTS                     ; AND RETURN
+;
+;
+        .PAGE   ;
+;----------------------------------------------------------------
+;       SEND A BYTE TO THE COMPUTER
+;               RETURNS ERROR FLAG (C BIT) IF COMMAND LINE LOW
+;----------------------------------------------------------------
+;
+TOCOMB  = *
+        BIT     PORT1           ; CHECK COMMAND LINE
+        BPL     *+4             ; AROUND IF OK
+        SEC                     ; OTHERWISE, SET ERROR
+        RTS                     ; AND RETURN
+        STA     TOCOM           ; SAVE BYTE IN TEMP AREA
+;
+        LDY     #9              ; BIT SEND COUNTER
+        LDA     PORTD           ; SEND START BIT
+        AND     #$FF-$20
+        STA     PORTD
+        JMP     *+3             ;3
+;
+TOCOML  = *
+        LDA     PORT1           ;4 DO LATCH STATUS INLINE
+        AND     HILOST          ;3
+        STA     HILOST          ;3
+        LDA     PORT1           ;4
+        ORA     LOHIST          ;3
+        STA     LOHIST          ;3
+        NOP                     ;2
+        NOP                     ;2
+        NOP                     ;2
+        NOP                     ;2
+        NOP                     ;2
+        NOP                     ;2
+        DEY                     ;2 BUMP BIT COUNTER
+        BMI     TOCOMD          ;2 BRANCH IF NEG, WE'RE DONE
+        LDA     PORTD           ;3 READY TO SEND NEXT BIT
+        SEC                     ;2 MAKE SURE SHIFT IN STOP BIT
+        ROR     TOCOM           ;5 NEXT BIT INTO CARRY
+        BCS     TO1             ;2
+TO0     = *
+        AND     #$FF-$20        ;2 ZERO
+        BCC     TO01            ;3
+TO1     = *
+        ORA     #$20            ;2 ONE
+        NOP                     ;2
+TO01    = *
+        STA     PORTD           ;3 SEND BIT
+        JMP     TOCOML          ;3 LOOP FOR NEXT BIT
+;
+TOCOMD  = *
+        CLC                     ; NO ERROR RETURNED
+        RTS                     ; RETURN, WE'RE DONE
+        .PAGE           ;
+;----------------------------------------------------------------
+;       STATUS LATCH ROUTINE--CALLED VIA LASTAT
+;----------------------------------------------------------------
+;
+LSTAT   = *
+LSTHI   = *
+        LDA     PORT1
+        AND     HILOST          ; CHECK FOR HIGH-TO-LOW CHANGE
+        STA     HILOST
+LSTLO   = *
+        LDA     PORT1
+        ORA     LOHIST          ; CHECK LOW-TO-HIGH CHANGE
+        STA     LOHIST
+        RTI                     ; RETURN -- 33 CYCLES EXECUTION
+        .PAGE                   ;
+;----------------------------------------------------------------
+;       INVERT BUFFER ROUTINE
+;----------------------------------------------------------------
+;
+;
+INVBUF  = *
+        LDX     BUFUSE          ; CURRENT BUFFER LENGTH
+        INX                     ; INCLUDE CHECKSUM
+INVBL   = *
+        LDA     CHECK-1,X       ; GET BYTE
+        EOR     #$FF            ; INVERT
+        STA     CHECK-1,X       ; STORE BACK
+        DEX                     ; BUMP POINTER
+        BNE     INVBL           ; LOOP TIL DONE
+        RTS                     ; THEN RETURN
+;
+;----------------------------------------------------------------
+;       CHECKSUM ADD ROUTINE
+;----------------------------------------------------------------
+;
+;
+CHECKS  = *
+        LDX     BUFUSE          ; CURRENT BUFFER LENGTH
+        LDA     #0              ; CLEAR THE SUM
+        CLC                     ; CLEAR THE CARRY
+CHEKSL  = *
+        ADC     BUFFE-1,X       ; ADD A BYTE (WITH END-CARRY)
+        DEX                     ; BUMP BUF POINTER
+        BNE     CHEKSL          ; LOOP TIL DONE
+        ADC     #$00            ; ADD LAST END-CARRY
+        RTS                     ; THEN RETURN
+;
+;
+;----------------------------------------------------------------
+;       FILL BUFFER WITH ZEROS
+;----------------------------------------------------------------
+;
+FILL0   = *
+        LDX     BUFUSE
+        INX                     ; INCLUDE CHECKSUM
+        LDA     #0              ; VALUE TO FILL
+FILL0L  = *
+        STA     CHECK-1,X
+        DEX                     ; BUMP POINTER
+        BNE     FILL0L          ; LOOP TILL DONE
+        RTS                     ; THEN LEAVE
+        .PAGE           ;
+;----------------------------------------------------------------
+;       ACK/NAK/DONE/ERROR SEND TO COMPUTER ROUTINES
+;----------------------------------------------------------------
+;
+SNDDON  = *
+        LDA     #'C             ; COMPLETE
+        BNE     SNDWX
+;
+SNDACK  = *
+        LDA     #'A             ; ACKNOWLEDGE
+;
+SNDWX   = *
+        PHA                     ; SAVE THE BYTE TO BE SENT
+        LDY     #16             ; WAIT A WHILE BEFORE SENDING = 1/2 MS
+SNDWXL  = *
+        LASTAT                  ; LATCHSTATUS
+        DEY
+        BNE     SNDWXL          ; LOOP ON COUNTER
+;
+        LDA     #$FF            ; SET UP TIMEOUT = .23 SEC
+        STA     TIMO1K
+SNDXX   = *
+        PLA                     ; GET BYTE TO BE SENT
+        PHA                     ; AND SAVE IT TOO
+        JSR     TOCOMB          ; SEND BYTE TO COMPUTER
+        BCS     *+4             ; BRANCH 'ROUND RETURN IF COMMAND SET
+        PLA                     ; LEAVE STACK RIGHT
+        RTS                     ; ALL DONE
+        LASTAT                  ; LATCHSTATUS
+        BIT     INTS2           ; CHECK TIMEOUT
+        BPL     SNDXX           ; LOOP IF NOT TIMED OUT
+        JMP     MAIN            ; ERROR EXIT--GOTO MAIN
+        .PAGE           ;
+;----------------------------------------------------------------
+;       BLOCK OUTPUT ROUUTINE
+;               SENDS BUFUSE CHARS OUT TO PORTN WITH
+;               PROPER WORD LENGTH, ETC.
+;               ERRORS--GOES STRES ON COMMAND; IF PORT GOES NOT READY,
+;                       SETS ERROR AND CARRY THEN RETURNS
+;----------------------------------------------------------------
+;
+;
+BLKOUT  = *
+        LDA     PORTD
+        STA     OPORTD          ; STASH PORTD FOR ERROR EXIT RESTORE
+        LDX     BUFSIG
+        CMP     #64
+        BEQ     ALLOUT          ; ALL DONE IF BUFFER EMPTY!
+        JSR     GETRDY          ; GO FIND OUT IF READY AND SET RDYMSK
+        BNE     ERROUT          ; BR IF NOT READY
+        LDA     BAUDS,Y         ; BAUD RATE
+        AND     #$0F
+        TAX
+        LDA     OUTBTL,X        ; GET TIMER VALUE FROM TABLE
+        STA     OUTTL
+        LDA     OUTBTH,X        ; AND LOOP COUNTER VALUE
+        STA     OUTTH
+        LDA     BAUDS,Y
+        AND     #$30            ; DETERMINE BITS-PER-WORD
+        LSR     A
+        LSR     A
+        LSR     A
+        LSR     A
+        EOR     #$03            ; FLIP SENSE OF BITS
+        ADC     #6              ; 7+00 -> 7; ...; 7+03 -> 10
+        TAX
+        STX     BITOUT          ; BITS-PER-WORD COUNT
+        LDA     BAUDS,Y         ; ONE OR TWO STOP BITS?
+        BPL     *+4
+        INC     BITOUT          ; ALLOW EXTRA STOP BIT
+        LDY     OUTFIL-6,X      ; SETUP TO MASK OFF HIGH-ORDER BITS
+        LDX     #64
+OUTFL   = *
+        TYA
+        ORA     BUFFE-1,X       ; MASK OFF HIGH BITS
+        STA     BUFFE-1,X
+        DEX
+        BNE     OUTFL           ; LOOP THRU BUFFER
+;
+        LDY     PORTN
+        LDA     #$01
+        LDX     #64
+        INX
+OUTSL   = *
+        ASL     A               ; HERE PUT TOGETHER VALUES
+        DEY                     ; FOR PORTD TO SET PORT 0 OR 1
+        BPL     OUTSL
+        TAY                     ; SAVE BIT POS
+        ORA     PORTD
+        STA     OUT1M           ; THIS WILL TURN XMT BIT TO MARK
+        TYA
+        EOR     #$FF
+        STA     TIMR1           ; START TIMER NOW!
+        STA     BUFFE-1,X       ; AND PUT DUMMY FILL AT BUFFER BEGIN
+        AND     OUT1M
+        STA     OUT0M           ; THIS WILL XMT SPACE
+        LDY     #00             ; INITIAL BIT COUNTER VALUE
+        STY     OUTHIT          ; INITIAL OUTER LOOP TIMER VALUE
+        BEQ     OUTL
+;
+;                                 JUMP THROUGH TO OUTL:  IF COMMAND OR
+;                                       NOT READY, WON'T OUTPUT;
+;                                       OTHERWISE, WHEN TIMER RUNS OUT,
+;                                       WILL THEN START NEXT (IE, FIRST) BIT
+;
+ERROUT  = *
+        SEC                     ; SET ERROR RETURN
+        RTS
+ALLOUT  = *
+        CLC                     ; SET NO ERROR
+        RTS
+;
+;
+OUTL    = *
+        LDA     PORT1           ; LATCHSTATUS INLINE AND COMMAND CHECK
+        BMI     NOTOUT          ; EXIT IF COMMAND FOUND
+        ORA     LOHIST
+        STA     LOHIST
+        LDA     PORT1
+        AND     HILOST
+        STA     HILOST
+        BIT     INTS1           ; WAIT FOR TIMER TO RUN DOWN
+        BPL     *-2
+;
+        DEC     OUTHIT          ; COUNT DOWN OUTER LOOP TIMER
+        BNE     OUTTM1          ; IF NOT TIMED OUT, GO RESET TIMER
+;
+        SEC                     ; THIS WILL SET UP FOR STOP BIT(S)
+        ROR     BUFFE-1,X       ; OUTPUT NEXT BIT
+        BCS     OUT1
+OUT0    = *
+        LDA     OUT0M           ; OUTPUT SPACE
+        BCC     OUT01
+OUT1    = *
+        LDA     OUT1M           ; OUTPUT MARK
+        NOP                     ;2
+OUT01   = *
+        STA     PORTD
+        DEY                     ; BIT COUNT
+        BMI     NEXOUT          ; IF WORD DONE, GO START NEXT
+;
+        LDA     OUTTH
+        STA     OUTHIT          ; RESET OUTER LOOP TIMER
+;
+OUTTM1  = *
+        LDA     OUTTL           ; READY TO RESET TIMER
+OUTTM2  = *
+        CLC
+        ADC     TIMR1           ; CORRECT RESET VALUE BY CURRENT TIME
+        STA     TIMR1           ; AND RESET TIMER
+        JMP     OUTL            ; LOOP
+;
+NEXOUT  = *
+        DEX                     ; NEXT BYTE
+        CPX     BUFSIG
+        BEQ     ALLOUT          ; GO EXIT IF DONE
+;
+        LDA     OUT0M
+        STA     PORTD           ; START BIT
+;
+        LDY     BITOUT          ; RESET BIT COUNTER
+        LDA     OUTTH
+        STA     OUTHIT          ; RESET OUTER LOOP TIMER
+        LDA     OUTTL
+        ADC     #18             ; ADJUST TIMER VALUE FOR START BIT COMPUTATIONS
+        JMP     OUTTM2          ; AND REENTER XMIT LOOP AT RELOAD TIMER POINT
+;
+NOTOUT  = *
+        JMP     STRES           ; FOUND COMMAND LINE--GOTO STRES
+;
+OUTBTL  = *
+        .BYTE   151,171,160,165,194,226,120,129
+        .BYTE   151,228,151,151,228,228,112,112
+OUTBTH  = *
+        .BYTE   024,140,136,116,075,044,067,056
+        .BYTE   024,008,006,004,002,001,001,001
+OUTFIL  = *
+        .BYTE   $E0,$C0,$80,$00
+        .PAGE           ;
+;----------------------------------------------------------------
+;       ODD WORDSIZE STREAM INPUT ROUTINE
+;               ASSUMES ALL SETUP DONE EXTERNALLY
+;               (TIMER VALUES INTL,INTH; # BITS INBITS; INOUT=FF;
+;               IN ROUTINE VECTOR INPORT; RDYMSK; INSTAR START MASK)
+;               RETURNS THROUGH STREST, WITH APPROP ERROR RETURNS,
+;               FRAME AND NOT READY
+;               RETURNS TO MAIN THROUGH STREST (SETS FRAME ERROR IF NEEDED)
+;                       IF COMMAND SENSED
+;               SUBROUTINE INTIME INCLUDED HERE
+;----------------------------------------------------------------
+;
+;
+INSTRM  = *
+        LDY     #0              ; NO FRAME ERROR FLAG
+;
+INNONE  = *
+        LDX     #0
+        JSR     INTIME          ; GO MARK 1/16 BIT TIME
+        BCS     INNONE          ; BRANCH IF STILL IN STOP BIT
+;
+        LDX     #7
+        JSR     INTIME          ; MARK OFF ????? BIT TIME
+        BCS     INNONE          ; IF NOT STILL START, GO BACK TO STOP
+;
+        ROR     INBYTE          ; SHIFT IN START BIT
+;
+        LDA     INBITS
+        STA     INBIT           ; START BIT COUNTER
+;
+INSHIF  = *
+        LDX     #15
+        JSR     INTIME          ; MARK OFF ONE BIT
+        DEC     INBIT
+        BMI     INSTOP          ; GO CHECK STOP IF ALL BITS MAYBE IN
+        ROR     INBYTE          ; ELSE BRING IN THIS BIT
+        JMP     INSHIF          ; AND GO GET NEXT ONE
+;
+INSTOP  = *
+        BCS     INSTOK          ; BRANCH IF THIS IS A STOP BIT
+INSTKO  = *
+        ROR     INBYTE          ; IF NOT STOP, BRING IN ANYWAY
+        LDY     #$80            ; FLAG FRAMING ERROR
+        INC     INBIT
+        BPL     INSHIF          ; GO GET ANOTHER BIT
+;
+INSTOK  = *
+        LDA     INBYTE
+        AND     INSTAR          ; CHECK START BIT
+        BNE     INSTKO          ; GO IF NOT START
+;
+        LDA     INSTAR
+        ADC     #-2
+        ORA     INBYTE          ; SET BITS BELOW START TO 1
+        STA     INOUT           ; AND SETUP TO SEND TO COMPUTER
+        JMP     INNONE          ; GO BACK LOOKING FOR START BIT
+        .PAGE           ;
+INTIME  = *
+        LASTAT                  ; LATCH STATUS
+        BIT     PORT1
+        BMI     NOTIN           ; GO IF COMMAND SENSED
+        BIT     INTS1
+        BPL     *-2             ; LOOP ON INNER TIMER
+        INX
+        DEC     INHIT           ; OUTER TIMER
+        BPL     INTM            ; GO IF OUTER TIMER NOT DONE
+;
+        DEX
+        LDA     PORTD           ; PREPARE TO SEND BIT OF INOUT TO COMPUTER
+        SEC
+        ROR     INOUT
+        BCS     INOUT1
+INOUT0  = *
+        AND     #$FF-$20        ; SEND 0
+        BCC     INOT01
+INOUT1  = *
+        ORA     #$20            ; SEND 1
+        NOP
+INOT01  = *
+        STA     PORTD           ; SEND
+;
+        LDA     INTH
+        STA     INHIT           ; RESET OUTER TIMER
+INTM    = *
+        CLC
+        LDA     INTL
+        ADC     TIMR1
+        STA     TIMR1           ; STORE ADJUSTED INNER TIMER VALUE
+;
+        DEX                     ; X1, X8, X16 (PART OF BIT) COUNTER
+        BPL     INTIME          ; LOOP IF STILL MORE
+        JMP     (INPORT)        ; ELSE GO SAMPLE INPUT PORT
+;
+INPOR1  = *
+        LDA     PORT1
+        ROR     A
+        RTS
+INPOR2  = *
+        LDA     PORTR
+        ROL     A
+        RTS
+INPOR3  = *
+        LDA     PORTD
+        ROL     A
+        RTS
+INPOR4  = *
+        LDA     PORTR
+        ROR     A
+        RTS
+;
+NOTIN   = *
+        TYA                     ; FRAME ERROR
+;       JMP     STREST
+        .PAGE           ;
+;----------------------------------------------------------------
+;       END OF ANY STREAM MODE RESET ROUTINE
+;----------------------------------------------------------------
+;
+STREST  = *
+        LDY     PORTN
+        STA     PORT1S,Y        ; STASH ERROR FLAG(S)
+STRES   = *
+        LDA     OPORTD          ; RESTORE VALUE OF PORTD (BEFORE STREAM)
+        STA     PORTD
+        JMP     MAIN            ; GO RESET ALL ELSE
+;
+;
+;----------------------------------------------------------------
+;       SENSE BYTE BUILDING SUBROUTINE
+;               ON ENTRY, Y CONTAINS MASK TO SELECT PROPER
+;                  BIT FROM PORT1.  ON EXIT, A CONTAINS SELECTED
+;                  BIT FROM PORT1 AND NEXT LOWER BIT IS 1 IF
+;                  PORT1 IS ONE AND HILOST AND LOHIST SHOW THAT
+;                  BIT TO HAVE BEEN ALWAYS 1 SINCE LAST RSSENS,
+;                  OR IF PORT1 IS ZERO AND HILOST AND LOHIST SHOW
+;                  THAT IT WAS 1 SOMETIME SINCE LAST RSSENS;
+;                  ELSE THE NEXT LOWER BIT IS ZERO.
+;----------------------------------------------------------------
+;
+;
+RSSENS  = *
+        LDX     PORT1           ; CURRENT VALUE OF PORT1
+        TXA
+        AND     HILOST          ; 1/2 LASTAT
+        STA     HILOST
+        TXA
+        ORA     LOHIST          ; OTHER 1/2
+        STA     LOHIST
+        STX     RSTEMP          ; RSTEMP <- PORT1
+        EOR     HILOST
+        EOR     RSTEMP          ; A <- 'SINCE LAST STATUS'
+        STY     RSTEMP          ; RSTEMP <- MASK
+        AND     RSTEMP          ; MASK BIT IN A REG
+        LSR     A               ; AND PUT IT IN ITS PLACE
+        STX     RSTEMP          ; RSTEMP <- PORT1
+        TAX                     ; X <- MASKED SHIFTED 'SINCE' BIT
+        TYA
+        AND     RSTEMP          ; MASK PORT1
+        STX     RSTEMP
+        ORA     RSTEMP          ; PUT IT ALL TOGETHER
+        RTS
+        .PAGE           ;
+;----------------------------------------------------------------
+;       TWO ROUTINES TO SET/CLEAR DTR,RTS, AND XMT
+;               CALLED FROM RSCON (CONTROL) WITH A=MASK
+;               OF WHAT BIT IN AUX1 TO CHECK, AND Y=MASK
+;               OF WHAT BIT TO SET/CLEAR.  RSRDY SETS/CLEARS
+;               BITS IN PORTR; RSXMT SETS/CLEARS PORTD
+;----------------------------------------------------------------
+;
+RSRDY   = *
+        BIT     BUFE-1+2                ; AUX1
+        BEQ     RSREX           ; GO RETURN IF NO ACTION OK'D
+        LSR     A               ; LINE UP MASK
+        BIT     BUFE-1+2
+        BNE     RSRDYS          ; BRANCH=GO SET; ELSE CLEAR
+        TYA
+        ORA     PORTR
+        BNE     RSRDYD          ; GO FINISH
+RSRDYS  = *
+        TYA
+        EOR     #$FF            ; FLIP MASK
+        AND     PORTR
+RSRDYD  = *
+        STA     PORTR           ; STORE NEW VALUE WITH SET/CLEAR BIT
+RSREX   = *
+        RTS
+;
+;
+RSXMT   = *
+        LDA     #$02            ; IN MASK (NOT PASSED FROM CALLER)
+        BIT     BUFE-1+2        ; AUX1
+        BEQ     RSREX           ; GO RETURN IF NO ACTION ALLOWED
+        LSR     A               ; SHIFT MASK
+        BIT     BUFE-1+2
+        BEQ     RSXMTC          ; BRANCH=CLEAR BIT; ELSE SET
+        TYA
+        ORA     PORTD           ; SET BIT
+        BNE     RSXMTD          ; GO FINISH
+RSXMTC  = *
+        TYA
+        EOR     #$FF            ; FLIP MASK
+        AND     PORTD           ; CLEAR BIT
+RSXMTD  = *
+        STA     PORTD           ; STORE WITH SET/CLEAR BIT
+        RTS
+        .PAGE   ;
+;----------------------------------------------------------------
+;       ROUTINE TO SEND BUFFER TO COMPUTER <<INCLUDING CHECKSUM>>
+;               PERFORMS ERROR RESET IF COMMAND LINE FALLS
+;----------------------------------------------------------------
+;
+TOCOMP  = *
+        LDX     BUFUSE          ; BUFFER SIZE
+        INX                     ; PLUS CHECKSUM
+TOCMPL  = *
+        LDA     CHECK-1,X       ; NEXT BYTE
+        JSR     TOCOMB          ; SEND IT
+        BCS     TOCMPR          ; IF COMMAND ERROR RETURNED, ERROR RESET
+        DEX                     ; BUMP POINTER
+        BNE     TOCMPL          ; LOOP IF MORE IN BUFFER
+        RTS                     ; RETURN WHEN DONE
+;
+TOCMPR  = *
+        JMP     MAIN            ; ERROR--RESET
+;
+;
+;----------------------------------------------------------------
+;       SUBROUTINE TO SET RDYMSK FOR QUICK CHECK OF PORT READINESS
+;               ALSO PERFORMS THE CHECK AND LEAVES PORTN IN Y-REG
+;----------------------------------------------------------------
+;
+;
+GETRDY  = *
+        LDY     PORTN
+        LDX     HANDS,Y         ; HANDSHAKE FOR THIS PORT
+        LDA     GETMSK,X        ; TURN HANDSHAKE INTO MASK
+        AND     GETTST,Y        ; PUT TOGETHER FOR THIS PORT
+        STA     RDYMSK
+        BIT     PORT1           ; PERFORM READINESS TEST
+        RTS
+;
+GETTST  .BYTE   $32,$04,$08
+GETMSK  .BYTE   $00,$10,$20,$30,$0E,$1E,$2E,$3E
+        .PAGE           ;
+;----------------------------------------------------------------
+;       COMMAND INTERPRETER!
+;               ON ENTRY, BUFUSE=4, FILL0 DONE, COMMAND EDGE SENSED
+;               NO ERRORS RETURNED;  WILL DO RESET EXIT ON SOME ERRORS
+;               *****NOTE THIS IS MOSTLY ALL DUMMY CODE RIGHT NOW!!!!!
+;----------------------------------------------------------------
+;
+COMAND  = *
+        LDA     #1              ; SET UP SERIAL READ TIMEOUT = 3 MS
+        STA     TIMOUT
+        STA     RTEST           ; CLEAR TEST FLAG
+        LDA     #52
+        STA     TIMO64
+        JSR     AST19C          ; GO READ COMMAND
+        BCS     NOPOL           ; GO SIMPLY RETURN TO MAIN IF ERROR
+        BIT     PORT1           ; CHECK COMMAND STILL LOW
+        BPL     NOPOL           ; SIMPLY RETURN IF COMMAND LINE'S HIGH
+;
+        JSR     INVBUF          ; INVERT BUFFER
+        JSR     CHECKS          ; COMPUTE CHECKSUM
+        CMP     CHEK            ; SAME?
+        BNE     NOPOL           ; BRANCH IF SO
+        LDA     BUFE-1+3        ; COMMAND BYTE
+        CMP     #'?             ; POLL COMMAND?
+        BNE     NOPOLL
+        LDA     BUFE-1+2        ; AUX1
+        BEQ     QPOLL
+        CMP     #1              ; IF AUX1=1, THIS POLL IS FOR RS232
+        BEQ     APOLL
+NOPOL   = *
+        RTS
+QPOLL   = *
+        DEC     POLLCT          ; COUNT CONSECUTIVE RETRIES
+        BNE     NOPOL           ; IF THIS ISN'T 26TH RETRY, DON'T ANSWER
+APOLL   = *
+        LDY     POLLF           ; HAVE WE ANSWERED POLL ONCE?
+        BMI     NOPOL
+        LDA     #$FF            ; FLAG ANSWERED
+        STA     POLLF
+        JMP     RSPOLL
+NOPOLL  = *
+        LDA     #26             ; RESET POLL RETRY COUNTER
+        STA     POLLCT
+        LDA     BUFE-1+4        ; GET DEVICE ID
+        TAY                     ; SAVE FOR LATER
+        BIT     BOOTFL          ; TEST BOOT FLAG
+        BMI     NOBOOT          ; IF MINUS, DON'T PRETEND WE'RE DISK
+        CMP     #$31            ; DISK 1?
+        BNE     NOBOOT
+        JMP     DISKB           ; GO PRETEND DISK
+NOBOOT  = *
+        LDX     #$FF            ; FLAG FOR NO BOOT
+        STX     BOOTFL
+        CMP     #$40            ; PRINTER ID?
+        BEQ     PRICOM
+        CMP     #$41            ; PRINTER 2 ID?
+        BEQ     PRICOM
+        AND     #$FC
+        CMP     #$50            ; RS232 ID?
+        BEQ     RSCOM           ; BRANCH IF MAYBE SO
+        RTS                     ; ELSE RETURN--NO ACTION
+;
+PRICOM  = *
+        BIT     PORTD           ; CHECK FOR PRINTER FAULT
+        BVS     NOPOL           ; IF NO OK, GO RETURN
+        LDY     BUFE-1+2        ; PUT AUX1 IN Y FOR LATER SAVING
+        LDA     BUFE-1+3        ; COMMAND BYTE
+        JMP     PRIST           ; GO CHECK OUT COMMAND
+;
+RSCOM   = *
+        TYA
+        AND     #$03            ; DEVELOP PORT NUMBER
+        STA     PORTN           ; STASH PORT NUMBER FOR LATER
+        TAY                     ; STASH IN Y, TOO
+        LDX     #0              ; STATUS = NO ERRORS
+        LDA     BUFE-1+3        ; LOOK AT COMMAND
+;                                 FALL THROUGH FOR TESTING COMMAND BYTE
+        .PAGE           ;
+RSBAUD  = *
+        CMP     #'B             ; IS THIS BAUD SET COMMAND?
+        BNE     RSCON           ; BR IF NOT
+;                                 ***** RS232 BAUD/HANDSHAKE SET *****
+        STX     PORT1S,Y        ; ZERO STATUS
+        ACKACK                  ; SEND ACK
+        LDY     PORTN
+        LDA     BUFE-1+2        ; AUX1 IS BAUD BYTE
+        STA     STBAUX,Y        ; SAVE IT
+        LDA     BUFE-1+1        ; AUX2 = HANDSHAKE
+        AND     #$07            ; KILL EXTRANEOUS BITS
+        STA     HANDS,Y
+        DONDON                  ; SEND DONE
+        RTS
+        .PAGE           ;
+RSCON   = *
+        CMP     #'A             ; RS232 CONTROL COMMAND?
+        BNE     RSSTAT          ; BR IF NOT
+;                                 ***** RS232 CONTROL *****
+        STX     PORT1S,Y        ; ZERO STATUS
+        ACKACK                  ; SEND ACK
+        LDA     #$80            ; SET A-REG WITH MASK FOR RSRDY
+        DEC     PORTN
+        BMI     RSCON1          ; GO TO PROPER ROUTINE
+        DEC     PORTN
+        BMI     RSCON2
+        BEQ     RSCON3
+        BPL     RSCON4
+;
+RSCON1  = *
+        LDY     #$02            ; PORT 1 RDY/XMT BIT MASK
+        JSR     RSRDY
+        JSR     RSXMT
+        LDA     #$20            ; PORT 1 RTS MASK
+        LDY     #$10
+        JSR     RSRDY
+        JMP     RSCOND          ; ALL DONE
+;
+RSCON2  = *
+        LDY     #$04            ; PORT 2 RDY/XMT BIT MASK
+        JSR     RSRDY
+        JSR     RSXMT
+        JMP     RSCOND
+;
+RSCON3  = *
+        LDY     #$08            ; PORT 3 RDY/XMT BIT MASK
+        JSR     RSRDY
+        JSR     RSXMT
+        JMP     RSCOND
+;
+RSCON4  = *
+        LDY     #$10            ; PORT 4 XMT MASK
+        JSR     RSXMT
+;
+RSCOND  = *
+        DONDON                  ; SEND COMPLETE
+        RTS                     ; EXIT COMMAND INTERPRETER
+        .PAGE           ;
+RSSTAT  = *
+        CMP     #'S             ; RS232 STATUS?
+        BEQ     *+5             ; SKIP JUMP IF SO
+        JMP     RSWRIT
+;                                 ***** RS232 STATUS/SENSE REQUEST *****
+        LDA     PORT1S,Y        ; ERROR STATUS
+        STA     BUFE-1+2        ; FIRST DATA BYTE BACK
+        STX     PORT1S,Y        ; SET ERROR STATUS TO NO ERROR
+        ACKACK                  ; SEND ACK
+        DEC     PORTN           ; NOW GO TO SENSE ROUTINE FOR PROPER PORT
+        BMI     RSSTA1
+        DEC     PORTN
+        BMI     RSSTA2
+        BEQ     RSSTA3
+        BPL     RSSTA4
+;
+RSSTA1  = *
+        LDY     #$02            ; MASK DSR 1
+        JSR     RSSENS
+        ASL     A               ; NOW PUT BITS IN RIGHT PLACE
+        ASL     A
+        ASL     A
+        ASL     A
+        ASL     A
+        ASL     A
+        STA     BUFE-1+1        ; SECOND DATA BYTE
+        LDY     #$20            ; MASK CTS 1
+        JSR     RSSENS
+        ORA     BUFE-1+1        ; ADD TO SECOND DATA BYTE
+        STA     BUFE-1+1
+        LDY     #$10            ; MASK CRX 1
+        JSR     RSSENS
+        LSR     A
+        ORA     BUFE-1+1        ; ADD TO DATA
+        STA     BUFE-1+1
+        LDA     PORT1           ; GET RCV NOW
+        AND     #$01
+        ORA     BUFE-1+1
+        STA     BUFE-1+1
+        JMP     RSSTAX          ; GO COMMON CODE
+;
+RSSTA2  = *
+        LDY     #$04            ; MASK DSR 2
+        JSR     RSSENS
+        ASL     A               ; PUT IN RIGHT PLACE
+        ASL     A
+        ASL     A
+        ASL     A
+        ASL     A
+        STA     BUFE-1+1
+        BIT     PORTR           ; GET RCV 2 (NOW)
+        BPL     RSSTAX
+        INC     BUFE-1+1
+        BNE     RSSTAX
+;
+RSSTA3  = *
+        LDY     #$08            ; MASK DSR 3
+        JSR     RSSENS
+        ASL     A
+        ASL     A
+        ASL     A
+        ASL     A
+        STA     BUFE-1+1
+        BIT     PORTD           ; RCV 3 NOW
+        BPL     RSSTAX
+        INC     BUFE-1+1
+        BNE     RSSTAX
+;
+RSSTA4  = *
+        LDA     PORTR           ; RCV 4 NOW
+        AND     #$01
+        STA     BUFE-1+1
+;
+RSSTAX  = *
+        LDA     BUFE-1+1
+        EOR     #$FC            ; REVERSE SENSE OF BITS
+        STA     BUFE-1+1
+        LDX     #$0             ; RESET LOHIST AND HILOST
+        STX     LOHIST
+        DEX
+        STX     HILOST
+        LDA     #2              ; BUFFER LENGTH
+RSSEND  = *
+        STA     BUFUSE          ; BUFFER LENGTH
+        DONDON                  ; SEND DONE TO COMPUTER
+        JSR     CHECKS          ; COMPUTE CHECKSUM
+        STA     CHEK            ; BUT IN BUFFER
+        JSR     TOCOMP          ; SEND BUFFER TO COMPUTER
+        RTS                     ; ALL DONE
+        .PAGE           ;
+RSWRIT  = *
+        CMP     #'              ; (BLANK) LOAD & XEQ TEST?
+        BNE     *+8             ; BR IF NOT
+        DEC     RTEST           ; SET TEST FLAG
+        LDA     BUFE-1+2        ; AUX1=BUFFER LENGTH
+        BNE     RSWRT
+        CMP     #'W             ; WRITE COMMAND?
+        BNE     RSSTRE          ; BR IF NOT
+        LDA     #64             ; LENGTH OF BUFFER TO READ
+RSWRT   = *
+        STA     BUFUSE
+;                                 ***** RS232 BLOCK WRITE/LOAD & XEQ TEST *****
+        SEC
+        LDA     #64
+        SBC     BUFE-1+2        ; AUX1 = NUMBER OF BYTES
+        STA     BUFSIG
+        CMP     #64
+        BEQ     RSWNOD          ; SPECIAL IF NO DATA TO BE SENT
+        STX     PORT1S,Y        ; STATUS TO ZERO (IF BLOCK LENGTH NOT ZERO)
+        JSR     FILL0           ; PREPARE TO READ
+        ACKACK                  ; ACK
+        LDA     #10             ; SET UP TIMEOUT = 1 SEC
+        STA     TIMOUT
+        LDA     #109
+        STA     TIMO1K
+        JSR     AST19           ; GO READ IN BUFFER
+        BCS     RSWDER          ; BR IF ERROR RETURNED
+        JSR     INVBUF          ; INVERT BUFFER
+        JSR     CHECKS          ; COMPUTE CHECKSUM
+        CMP     CHEK            ; CHECK SUM
+        BEQ     RSWNOD
+RSWDER  = *
+        LDA     #$02            ; DATA ERROR
+        LDY     PORTN
+        STA     PORT1S,Y
+RSWDRR  = *
+        LDA     #$01            ; NEW SPECIAL NAK=BAD DATA RECEIVE, TRY AGAIN IM
+        JSR     SNDWX
+        RTS
+RSWNOD  = *
+        ACKACK                  ; ELSE ACK
+GOTEST  = *
+        LDA     RTEST           ; CHECK TEST FLAG
+        BNE     NOTEST          ; BRANCH IF NOT SET
+        DONDON                  ; SEND DONE
+        PHA                     ; TO MAKE STACK OK ON RETURN!
+        JSR     BUFE            ; ENTER TEST CODE!
+        STA     PORT1S          ; STASH TEST RETURNED VALUES
+        STX     PORT2S
+        STY     PORT3S
+        PLA                     ; ONE MORE RETURNED VALUE
+        STA     PORT4S
+        RTS                     ; IF TEST RETURNED, DO LIKEWISE
+NOTEST  = *
+        JSR     BLKOUT          ; GO SEND OUT BLOCK
+        LDA     OPORTD          ; RESTORE PORTD
+        STA     PORTD
+        BCS     RSWERR          ; ERROR RETURNED?
+        DONDON                  ; SEND DONE
+        RTS                     ; AND EXIT COMINT
+;
+RSWERR  = *
+        LDA     #$04            ; PORT NOT READY ERROR FLAG
+        LDY     PORTN
+        STA     PORT1S,Y        ; STASH STATUS
+RSWRRR  = *
+;       LDA     #$04            ; *NEW* PORT NOT READY OR PRINTER BUSY, DON'T RE
+        JSR     SNDWX
+        RTS
+        .PAGE           ;
+;                                 ***** RS232 STREAM STARTUP *****
+;
+RSSTRE  = *
+        CMP     #'X             ; START STREAM MODE COMMAND?
+        BEQ     *+5             ; SKIP JUMP IF SO
+        JMP     RSBOOT
+;
+        STX     PORT1S,Y        ; ZERO STATUS
+        ACKACK                  ; START STREAM BY SENDING ACK
+;
+        LDA     PORTD           ; SAVE PORTD FOR STREAM RESET
+        STA     OPORTD
+        LDY     PORTN           ; SET UP PORT VALUES...
+        LDA     BUFE-1+2        ;  DEPENDING ON PORT NUMBER
+        ROR     A               ;  AND I/O DIRECTION;
+        ROR     A               ;  *****WORKS WRONG IF DIR=NONE! *****
+        AND     #$03
+        TAX
+        LDA     STBITZ,Y
+        AND     #$FF-$20        ; MASK IN,OUT <=> ZERO,ZERO
+        ORA     STBITD-1+0,X    ; DEPENDS ON I/O DIR
+        AND     PORTD
+        STA     FDXDAT+2
+        LDA     STBITZ,Y
+        EOR     #$FF            ; MASK IN,OUT <=> ZERO,ONE
+        AND     STBITD-1+2,X    ; DEPENDING ON DIR
+        ORA     FDXDAT+2
+        STA     FDXDAT+0
+        ORA     #$20            ; MASK IN,OUT <=> ONE,ONE (DEPENDING)
+        STA     FDXDAT+1
+        LDA     STBITZ,Y        ; MASK IN,OUT <=> ONE,ZERO
+        ORA     STBITD-1+4,X    ; DEPENDING
+        AND     FDXDAT+1
+        STA     FDXDAT+3
+;
+        LDY     PORTN
+        LDX     #0              ; NOT ODD WORDSIZE FLAG
+        LDA     STBAUX,Y
+        AND     #$30            ; ODD WORD SIZE REQUESTED?
+        BEQ     STNORM          ; IF NOT, BRANCH
+        LSR     A
+        LSR     A
+        LSR     A
+        LSR     A
+        EOR     #$03            ; FORM BIT COUNT
+        ADC     #5
+        STA     INBITS          ; STASH BIT COUNT FOR STREAM ROUTINE
+        TAX
+        LDA     INSTRS-5,X
+        STA     INSTAR          ; MASK FOR START BIT TEST
+        LDA     BUFE-1+2
+        AND     #$0C            ; CHECK THAT I/O DIRECTION IS LEGAL
+        CMP     #$04            ; INPUT ONLY!
+        BNE     RSCERR
+        LDX     #$FF            ; ODD WORD FLAG
+STNORM  = *
+        STX     INOUT           ; SAVE ODD WORD FLAG (& INIT INOUT)
+        LDA     STBAUX,Y        ; GET BAUD RATE TO USE
+        ROL     A               ; *2 TO INDEX TABLE
+        AND     #$1E            ; MASK 4 BITS
+        BIT     INOUT           ; ODD WORDSIZE?
+        BPL     STBNRM          ; GO IF NOT
+        CLC
+        ADC     #32             ; ADJUST TABLE LOOKUP FOR ODD WORDS
+        CMP     #32+17          ; LEGAL BAUD (300 MAX)?
+        BPL     RSCERR          ; GO IF NOT
+STBNRM  = *
+        TAY                     ; INDEX REG
+        LDA     INBT-32,Y
+        STA     INTL            ; INIT ODD COUNTER VALUES (EVEN IF NOT USED)
+        LDA     INBT-32+1,Y
+        STA     INTH
+        LDA     STBAUD,Y        ; FILL BUFFER WITH INFO FOR POKEY
+        STA     BUFE-1+5        ; AUDF3
+        STA     BUFE-1+9        ; AUDF1 (BAUD LOW)
+        LDA     STBAUD+1,Y
+        STA     BUFE-1+3        ; AUDF4
+        STA     BUFE-1+7        ; AUDF2 (BAUD HIGH)
+        LDA     #$A0
+        STA     BUFE-1+2        ; AUDC4 (STRAIGHT COUNT, NO SOUND)
+        STA     BUFE-1+4        ; AUDC3
+        STA     BUFE-1+6        ; AUDC2
+        STA     BUFE-1+8        ; AUDC1
+        LDA     #$78            ; *****TEMP*****
+        STA     BUFE-1+1        ; AUDCTL
+        LDX     #9
+        STX     BUFUSE
+        JSR     CHECKS          ; MAKE CHECKSUM
+        STA     CHEK
+        JSR     GETRDY          ; GO SEE IF PORT IS READY (AND SETUP RDYMSK)
+        BEQ     *+5             ; BR AROUND ERROR ACTION IF READY
+        JMP     RSWERR
+;
+        DONDON                  ; SEND COMPLETE TO COMPUTER
+        JSR     TOCOMP
+        BIT     INOUT           ; ODD WORDSIZE?
+        BPL     FDXALL          ; GO DO NORMAL STREAM IF NOT
+;
+STODD   = *
+        LDX     PORTN           ; SETUP INPORT VECTOR FOR RIGHT PORT
+        LDA     INPRTL,X
+        STA     INPORT
+        LDA     INPRTH,X
+        STA     INPORT+1
+        JMP     INSTRM          ; GO DO STREAM
+;
+RSCERR  = *
+        LDA     #$09            ; COMMAND INVALID
+        LDY     PORTN
+        STA     PORT1S,Y        ; STASH ERROR FLAGS
+        LDA     #$03            ; *NEW* BAD OPTION SET, DON'T RETRY COMMAND
+        JSR     SNDWX
+        RTS                     ; AND RETURN TO MAIN
+;
+FDXCOD  = *
+        LDA     $FFFF           ; WILL BE PATCHED TO LOAD PROPER PORT RCV
+        NOP                     ; WILL BECOME PROPER ROL OR ROR
+        LDA     PORTD           ; ADD IN SERIAL OUT LINE (DATA-FR)
+        ROL     A               ; PUT INTO BOTTOM TWO BITS
+        AND     #$03
+        TAX                     ; TURN INTO TABLE INDEX
+        LDA     FDXDAT,X        ; GET BYTE FROM TABLE
+        STA     PORTD           ; SEND OUT
+FDXL    =       *-FDXCOD
+;
+LSTL    =       LSTLO-LSTHI
+;
+FDXCOM  = *
+        BIT     PORT1           ; TEST COMMAND FRAME LINE
+        BPL     *-FDXL-FDXL-FDXL-LSTL-LSTL-3 ; *****IF NO COM, GOTO $100
+        JMP     STRES
+COML    =       *-FDXCOM
+;
+ROLA    =       $2A             ; ROL A OPCODE
+RORA    =       $6A             ; ROR A OPCODE
+FDXFA   .BYTE   $80,$02,$00,$02
+FDXFB   .BYTE   $01,$00,$00,$00
+FDXFC   .BYTE   RORA,ROLA,ROLA,RORA
+;
+;
+FDXALL  = *
+;                                 MOVE 'FILLER' ROUTINES INTO RAM
+        LDX     #COML-1
+FDXF1   = *
+        LDA     LSTHI,X         ; HILO STATUS ROUTINE (7 BYTES)
+        STA     FDXL+$100,X
+        LDA     LSTLO,X         ; LOHI STATUS ROUTINE (7 BYTES)
+        STA     2*FDXL+LSTL+$100,X
+        LDA     FDXCOM,X        ; COMMAND WATCHER (8 BYTES)
+        STA     +(FDXL+LSTL)*2+FDXL+$100,X
+        DEX
+        BPL     FDXF1           ; LOOP TILL DONE
+;
+;                                 MOVE FIRST COPY OF STREAM ROUTINE
+        LDX     #FDXL-1
+FDXF2   = *
+        LDA     FDXCOD,X        ; FDX STREAM ROUTINE
+        STA     $100,X
+        DEX
+        BPL     FDXF2           ; LOOP TILL DONE
+;
+        LDY     PORTN           ; NOW PATCH CODE FOR PROPER PORT
+        LDA     FDXFA,Y
+        STA     $100+1          ; PORT ADDRESS LOW
+        LDA     FDXFB,Y
+        STA     $100+2          ; PORT ADDRESS HIGH
+        LDA     FDXFC,Y
+        STA     $100+3          ; ROTATE A IN PROPER DIRECTION
+        LDX     #FDXL-1
+FDXF3   = *
+        LDA     $100,X          ; NOW MAKE THREE MORE COPIES
+        STA     FDXL+LSTL+$100,X ; OF THE FULL DUPLEX STREAMER
+        STA     +(FDXL+LSTL)*2+$100,X
+        DEX
+        BPL     FDXF3
+;
+        JMP     $100            ; GO TO IT!
+        .PAGE
+STBAUD  = *
+        .WORD   2976            ; 300 BAUD
+        .WORD   19661           ; 46 BAUD (60 WPM)
+        .WORD   17891           ; 50 BAUD (67 WPM)
+        .WORD   15727           ; 57 BAUD (75 WPM)
+        .WORD   11925           ; 75 BAUD (100 WPM)
+        .WORD   8128            ; 110 BAUD
+        .WORD   6646            ; 134.5 BAUD
+        .WORD   5959            ; 150 BAUD
+        .WORD   2976            ; 300 BAUD
+        .WORD   1484            ; 600 BAUD
+        .WORD   739             ; 1200 BAUD
+        .WORD   490             ; 1800 BAUD
+        .WORD   366             ; 2400 BAUD
+        .WORD   179             ; 4800 BAUD
+        .WORD   86              ; 9600 BAUD
+        .WORD   86              ; 9600 BAUD (*****)
+;
+        .WORD   179             ; 300*16 BAUD
+        .WORD   1222            ; 45.5 *16 BAUD
+        .WORD   1112            ; 50   *16 BAUD
+        .WORD   996             ; 56.875*16 BAUD
+        .WORD   739             ; 75   *16 BAUD
+        .WORD   501             ; 110  *16 BAUD
+        .WORD   409             ; 134.5*16 BAUD
+        .WORD   366             ; 150  *16 BAUD
+        .WORD   179             ; 300  *16 BAUD
+        .PAGE
+INSTRS  .BYTE   $04,$02,$01
+;
+INPRTL  = *
+        .BYTE   .LOW.INPOR1
+        .BYTE   .LOW.INPOR2
+        .BYTE   .LOW.INPOR3
+        .BYTE   .LOW.INPOR4
+INPRTH  = *
+        .BYTE   .HIGH.INPOR1
+        .BYTE   .HIGH.INPOR2
+        .BYTE   .HIGH.INPOR3
+        .BYTE   .HIGH.INPOR4
+;
+INBT    = *
+        .BYTE   228,0           ; 300
+        .BYTE   251,5           ; 45.5
+        .BYTE   228,5           ; 50
+        .BYTE   200,5           ; 56.875
+        .BYTE   228,3           ; 75
+        .BYTE   207,2           ; 110
+        .BYTE   169,2           ; 134.5
+        .BYTE   228,1           ; 150
+        .BYTE   228,0           ; 300
+;
+STBITZ  .BYTE   $FD,$FB,$F7,$EF
+;
+STBITD  .BYTE   $1E,$20,$00,$1E,$1E,$00,$00
+        .PAGE           ;
+PRIST   = *
+        CMP     #'S             ; STATUS COMMAND?
+        BNE     PRIAUX          ; BR IF NOT
+;                                 ***** PRINTER STATUS REQUEST *****
+        ACKACK                  ; SEND ACK
+        LASTAT                  ; LATCHSTATUS
+        LDA     #'C             ; COMPLETE MARKER BYTE
+        STA     BUFE-1+5
+        LDA     PRIFLG          ; PRINT STATUS FLAG BYTE
+        ORA     #$80            ; SET HIGH BIT = PRINTER KNOWS ABOUT CR
+        STA     BUFE-1+4
+        LDA     PRIAX1          ; OLD AUX1!
+        STA     BUFE-1+3
+        STY     PRIAX1          ; NEW AUX1 BECOMES OLD
+        LDA     #.LOW.WRITIM+1  ; PRINTER TIMEOUT (LOW BYTE)
+        STA     BUFE-1+2
+        LDA     #.HIGH.(WRITIM+1) ; TIMEOUT (HIGH BYTE)
+        STA     BUFE-1+1
+        LDA     #4              ; BUFFER LENGTH--NOT INCL DONE BYTE
+        STA     BUFUSE
+        JSR     CHECKS          ; COMPUTE CHECKSUM
+        STA     CHEK            ; INTO BUFFER
+        LDA     #5              ; BUFFER LENGTH--INCL DONE BYTE
+        STA     BUFUSE
+        LASTAT                  ; LATCHSTATUS
+        JSR     TOCOMP          ; SEND BUFFER TO COMPUTER
+        RTS                     ; AND ALL DONE!
+        .PAGE           ;
+PRNAKC  = *
+        LDA     #$01            ; ILLEGAL COMMAND ERROR
+        STA     PRIFLG
+COMNAK  = *
+        LDA     #$02            ; *NEW* ILLEGAL COMMAND ERROR, DON'T RETRY
+        JSR     SNDWX
+        RTS                     ; AND RETURN--NO MORE ACTIONS
+PRNAKD  = *
+        LDA     #$02            ; BAD DATA FRAME ERROR
+        STA     PRIFLG
+        JMP     RSWDRR          ; GO SEND BAD DATA ERROR
+;
+PRIAUX  = *
+        CMP     #'W             ; PRINT COMMAND?
+        BNE     PRNAKC          ; BR TO ERROR CODE IF NOT
+;                                 ***** PRINT *****
+        LDA     BUFE-1+2        ; AUX1
+        CMP     #'N             ; ALLOW ONLY NORMAL MODE
+        BNE     PRNAKC          ; BRANCH IF NOT
+        STY     PRIAX1          ; SAVE AUX1 FOR STATUS REQ
+        LDA     #40             ; EXPECTED PRINT BUFFER LENGTH*****
+        STA     BUFUSE
+        JSR     FILL0           ; FILL BUFFER FOR AST19
+        ACKACK                  ; SEND ACK
+        LDA     #10             ; SET UP TIMEOUT ON DATA READ
+        STA     TIMOUT
+        LDA     #109            ; TOTAL= ABOUT 1 SEC
+        STA     TIMO1K
+        JSR     AST19           ; ACCEPT BUFFER
+        BCS     PRNAKD          ; BR IF BAD READ
+        JSR     INVBUF          ; INVERT BUFFER
+        JSR     CHECKS          ; CHECK CHECKSUM
+        CMP     CHEK
+        BNE     PRNAKD          ; NAK IF CHECKSUM ERROR
+        ACKACK                  ; SEND ACK
+        LDA     #10*WRITIM/(1+(WRITIM/26)) ; SET UP TIMEOUT = WRITIM SEC.
+        STA     TIMOUT
+        LDA     #109*(1+(WRITIM/26))
+        STA     TIMO1K
+PRIBUF  = *
+        STA     COMHI           ; SET UP WATCH FOR COMMAND FALLING
+        LDA     INTS2           ; RESET INTERRUPTS 2
+        LDX     BUFUSE          ; PRESENT BUFFER LEN WITHOUT CHECKSUM
+PRIBL   = *
+        BIT     INTS2           ; CHECK COMMAND AND TIMEOUT LOW
+        BVS     PRIBR           ; GO RESET IF COMMAND CAME
+        BPL     PRIBL2          ; BRANCH AROUND HIGH-ORDER TIMOUT IF NOT LOW
+        DEC     TIMOUT
+        BEQ     PRIBAD          ; ERROR IF TIMED OUT
+        LDA     #109*(1+(WRITIM/26))  ; RESET TIMEOUT .1X SEC
+        STA     TIMO1K
+PRIBL2  = *
+        LASTAT                  ; DO LATCH STATUS
+        BIT     PORTR           ; CHECK IF PRINTER BUSY
+        BVC     PRIBL           ; LOOP IF SO
+;
+        LDA     BUFE-1,X        ; GET NEXT CHARACTER TO PRINT
+        STA     OPRINT          ; SAVE TO LOOK AT LATER
+        CMP     #$9B            ; ATASCII EOL?
+        BNE     *+4
+        LDA     #13             ; ASCII CR
+        CMP     #13             ; NOW PRINTING CR?
+        BNE     NOTCR
+        CMP     LPRINT          ; WAS LAST THING PRINTED A CR?
+        BNE     NOTCR           ; IF NOT, GO PRINT
+        LDA     #'              ; IF TWO CR'S, INSERT A BLANK
+        STA     OPRINT
+        INX                     ; SO CR WILL STILL BE SENT
+NOTCR   = *
+        STA     LPRINT          ; SAVE THIS AS LATEST CHAR PRINTED
+        EOR     #$FF            ; INVERT FOR NEG PRINT PORT
+        STA     PORTP           ; OUTPUT
+        LASTAT                  ; FILL TIME--
+        LDA     PORTR           ; SEND STROBE:
+        ORA     #$20            ;  BIT 6=STROBE
+        STA     PORTR
+        LASTAT                  ; MORE TIME--MORE LATCHSTATUS
+        LDA     PORTR           ; TURN STROBE OFF
+        AND     #$FF-$20        ;  BIT6=STROBE
+        STA     PORTR
+        LDY     #2              ; SET UP Y FOR BUSY LOOP
+WBUSY   = *
+        BIT     INTS2           ; CHECK COMMAND AND TIMEOUT
+        BVS     PRIBR           ; GO RESET IF COMMAND STARTED
+        BPL     PRIBS2          ; SKIP HIGH ORDER TIMOUT IF NOT TIME
+        DEC     TIMOUT
+        BEQ     PRIBAD          ; GO ERROR EXIT IF TIMEOUT
+        LDA     #109            ; RESET TIMEOUT .1 SEC
+        STA     TIMO1K
+PRIBS2  = *
+        BIT     PORTR           ; CHECK FOR BUSY
+        BVC     BFOUND          ; BRANCH IF BUSY
+        LASTAT                  ; DO A LATCH STATUS
+        DEY
+        BNE     WBUSY           ; KEEP TRYING FOR BUSY TILL Y ZEROS
+;
+BFOUND  = *
+        LASTAT                  ; KILL MORE TIME WITH LATCHSTATUS
+        LDA     #$FF            ; NOW RESET THE PRINT DATA TO ASCII NUL
+        STA     PORTP
+        LDA     OPRINT          ; DID WE JUST PRINT CR?
+        CMP     #$9B            ; IF SO, WE'RE DONE
+        BEQ     PRIDON
+        DEX                     ; NEXT BUFFER BYTE
+        BNE     PRIBL           ; LOOP BACK TO PRINT IT
+PRIDON  = *
+        LDA     #0
+        STA     PRIFLG          ; SET NO ERROR FOR STATUS
+        DONDON                  ; ELSE SEND A DONE
+PRIBR   = *
+        RTS                     ; ALL DONE!
+;
+PRIBAD  = *
+        LDA     #$04            ; PRINTER BUSY ERROR
+        STA     PRIFLG
+        JMP     RSWRRR          ; GO RETURN ERROR CODE TO COMPUTER
+        .PAGE           ;
+;                                 ***** RS232 BOOT COMMAND *****
+;
+;
+RSBOOT  = *
+        CMP     #'!             ; BOOT COMMAND?
+        BNE     RSDOWN          ; BR IF NOT
+        LDY     #4+0            ; POINTER INTO BTOP TABLE FOR BTOCOM
+        JMP     BTOCOM
+;
+        .PAGE           ;
+;                                 ***** RS232 DOWNLOAD COMMAND *****
+;
+;
+RSDOWN  = *
+        CMP     #'&             ; DOWNLOAD COMMAND?
+        BEQ     RSDOW           ; BR IF SO
+        LDX     #$01            ; ELSE SET COMMAND ERROR
+        STX     PORT1S,Y
+        JMP     COMNAK          ; GO SEND NAK TO COMPUTER
+;
+RSDOW   = *
+        LDY     #4+4            ; POINTER INTO BTOP TABLE FOR BTOCOM
+        JMP     BTOCOM
+;
+HANDLE  =       $FFF9           ; END OF HANDLER (INCL CHECK) PLUS 1
+HANDLL  =       $591            ; HANDLER BODY SIZE
+HANDLB  =       HANDLE-HANDLL-1 ; BEGINNING OF HANDLER IN THIS ROM
+BOOTE   =       HANDLB          ; END OF BOOTER/RELOCATOR (INCL CHECK) PLUS 1
+BOOTL   =       $14F            ; LENGTH OF BOOTER/RELOCATOR
+BOOTB   =       BOOTE-BOOTL-7   ; DISK-FORMAT BOOTER/RELOCATOR IN THIS ROM
+        .PAGE           ;
+;----------------------------------------------------------------
+;       RS232 POLL ANSWERING
+;----------------------------------------------------------------
+;
+;
+RSPOLL  = *
+        LDY     #4+8            ; POINT TO POLL ANSWER IN BTOP TABLE
+        JMP     BTOCOM          ; GO ANSWER POLL
+;
+POLLB   = *
+        .BYTE   $50             ; RS232 DEVICE ADDRESS
+        .BYTE   1               ; UNIT NUMBER
+        .BYTE   '!'             ; BOOT COMMAND
+        .BYTE   $40             ; EXPECT DATA FROM DEVICE
+        .WORD   $0500           ; BOOT LOAD ADDRESS
+        .WORD   2               ; TIMEOUT
+        .WORD   BOOTE-BOOTB-1   ; LENGTH
+        .BYTE   0,0             ; AUX1 AND AUX2
+        .BYTE   $10             ; CHECKSUM ON ALL THIS STUFF
+POLLE   = *
+        .PAGE           ;
+;----------------------------------------------------------------
+;       DISK SIMULATION--STATUS, READ--FOR BOOT
+;----------------------------------------------------------------
+;
+;
+DISKB   = *
+        LDA     BUFE-1+3        ; COMMAND
+        CMP     #'S             ; STATUS?
+        BEQ     DISKST
+        LDY     BOOTFL          ; TEST BOOT FLAG
+        BNE     NEDISK          ; IF NOT ZERO, DISALLOW DISK
+        CMP     #'R             ; READ?
+        BNE     NEDISK
+        LDX     BUFE-1+1        ; AUX2=SECTOR # (HIGH BYTE)
+        BNE     NEDISK          ; SHOULD BE ZERO
+        LDX     BUFE-1+2        ; AUX1=SECTOR # (LOW)
+        BEQ     NEDISK          ; SHOULD NOT BE ZERO
+        CPX     #4              ; SECTORS 1, 2, 3 ONLY LEGAL
+        BPL     NEDISK
+;
+        ACKACK
+        LDX     BUFE-1+2        ; SECTOR NUMBER
+        LDA     DISKDL-1,X
+        STA     DISKW           ; SET UP POINTER TO CODE
+        LDA     DISKDH-1,X
+        STA     DISKW+1
+        DONDON
+        LDY     #-128
+;
+DISKTO  = *
+        TYA
+        PHA                     ; SAVE Y
+        LDA     (DISKW),Y
+        JSR     TOCOMB          ; SEND BYTE TO COMPUTER
+        BCS     NEDISK          ; BR IF ERROR
+        PLA
+        TAY
+        INY                     ; BUMP COUNTER
+        BNE     DISKTO          ; LOOP TILL COUNTED OUT
+;
+        LDX     BUFE-1+2
+        LDA     DISKCH-1,X      ; CHECKSUM
+        JSR     TOCOMB
+        BCS     NEDISK          ; BR IF ERROR
+        RTS
+;
+DISKST  = *
+        DEC     BOOTFL          ; DECREMENT BOOT COUNTER
+        BNE     NODISK          ; NOT ZERO = NOT US
+;
+        ACKACK
+        LDA     #$08            ; PSEUDO DISK STATUS
+        STA     BUFE-1+4
+        LDX     #$01
+        STX     BUFE-1+2
+        DEX
+        STX     BUFE-1+3
+        STX     BUFE-1+1
+        LDX     #4              ; BUFFER SIZE
+        STX     BUFUSE
+        JSR     CHECKS          ; COMPUTE CHECKSUM
+        STA     CHEK
+        DONDON
+        JSR     TOCOMP
+;
+NODISK  = *
+        RTS
+;
+NEDISK  = *
+        LDA     #$FF            ; SET BOOTFL MINUS
+        STA     BOOTFL
+        RTS
+;
+DISKCH  .BYTE   $9E,$34,$9B
+;
+DISKDL  = *
+        .BYTE   .LOW.RELOCR-128,.LOW.RELOCR,.LOW.RELOCR+128
+DISKDH  = *
+        .BYTE   .HIGH.(RELOCR-128),.HIGH.RELOCR,.HIGH.(RELOCR+128)
+;
+RELOCR  =       BOOTB
+        .PAGE           ;
+;----------------------------------------------------------------
+;       SUBROUTINE TO SEND CONSTANT DATA BLOCKS TO COMPUTER
+;               ON ENTRY, Y CONTAINS INDEX INTO BTOP TABLE (PLUS 4)
+;               BTOP TABLE POINTS TO VARIOUS POSSIBLE DATA BLOCKS
+;----------------------------------------------------------------
+;
+;
+BTOCOM  = *
+        LDX     #3              ; POINTER INIT LOOP CTR
+BTOL    = *
+        LDA     BTOP-1,Y
+        STA     DISKW,X
+        DEY
+        DEX
+        BPL     BTOL            ; INIT POINTERS LOOP
+;
+        ACKACK                  ; SEND ACK TO COMPUTER
+        DONDON                  ; SEND DONE TO COMPUTER
+BTOOL   = *
+        LDX     #0
+        LDA     (DISKW,X)       ; GET BYTE TO SEND
+        JSR     TOCOMB          ; SEND IT
+        BCS     BTOE            ; GO RETURN IF ERROR
+        INC     DISKW           ; BUMP POINTER
+        BNE     BTOC
+        INC     DISKW+1
+BTOC    = *
+        LDA     DISKW           ; TEST END OF DATA
+        CMP     DISKW+2
+        BNE     BTOOL
+        LDA     DISKW+1
+        CMP     DISKW+3
+        BNE     BTOOL
+;
+BTOE    = *
+        RTS                     ; RETURN ON END OF DATA OR ERROR
+;
+;
+BTOP    = *
+        .WORD   BOOTB,BOOTE
+        .WORD   HANDLB,HANDLE
+        .WORD   POLLB,POLLE
+        .PAGE           ;
+;================================================================
+;       RESET INITIALIZATION ENTRY POINT--CHIP RESET ONLY
+;================================================================
+;
+;
+RESET   = *
+BEGIN   = *
+;
+;       ZERO MEMORY AND TEST IF IT TAKES THE ZEROS
+;
+        LDY     #0
+        CLC                     ; CLEAR RAM CHECK FLAG
+ZEROL   = *
+        LDA     #0
+        STA     $0280,Y
+        LDA     $0280,Y
+        BEQ     RAMOK           ; IF LOADED ZERO, SKIP ERROR CODE
+        SEC                     ; SET RAM TEST ERROR
+        TYA                     ; DEVELOP CODE BYTE
+        AND     #$80            ; KEEP TOP BIT (WHICH RAM)
+        ORA     #$55            ; ERROR CODE
+        STA     PORTP           ; PUT IN PRINTER PORT
+RAMOK   = *
+        INY                     ; BUMP POINTER
+        BNE     ZEROL
+;
+        DEY                     ; $FF FOR SOME INITIALIZATION
+        STY     HILOST
+        BCS     *+5             ; SKIP STORING INTO PRINTER PORT IF RAM ERROR
+        STY     PORTP
+        STY     DPORTP          ; PRINTER I/O DIRECTION = OUT
+;
+;       SET UP INITIAL DATA AND DIRECTION REGISTERS
+;
+        LDA     #$1E
+        STA     PORTR           ; INITIAL READIES=NO, PRINT=NO STROBE
+        LDA     #$3E
+        STA     DPORTR
+        STA     PORTD           ; INITIAL OUT=MARK
+        STA     DPORTD
+        LDA     #26             ; BOOT COUNTER
+        STA     BOOTFL
+        STA     POLLCT
+        LDA     #13             ; ASCII CR
+        STA     LPRINT          ; INITIAL OUT SAVED IN LPRINT
+;
+        BIT     PORT1
+        BMI     *-3             ; IF COMMAND IS LOW, WAIT!
+        BIT     PORT1
+        BPL     *-3             ; NOW WAIT FOR IT TO GO LOW (IGNORING 1 COMMAND!
+;                               ; FALL THROUGH TO 'MAIN'
+        .PAGE           ;
+;----------------------------------------------------------------
+;       MAIN ROUTINE:
+;----------------------------------------------------------------
+;
+MAIN    = *
+        LDX     #$7F            ; RESET STACK !
+        TXS
+INIT    = *
+        CLD                     ; NO DECIMAL MODE
+        SEI                     ; NO INTERRUPTS
+;
+;       SET I/O PORT DIRECTION REGISTERS
+;
+        LDA     #$3E
+        STA     DPORTD
+        STA     DPORTR
+        LDX     #0
+        STX     DPORT1
+        DEX
+        STX     DPORTP
+;
+OLDCOM  = *
+        LASTAT                  ; LATCH STATUS
+        BIT     PORT1           ; CHECK COMMAND LINE
+        BMI     OLDCOM          ; LOW NOW--LOOP FOR RISE *****FOREVER*****
+        LDA     #4              ; SET UP FOR COMMAND RECEIVE
+        STA     BUFUSE          ; COMMAND BUFFER LENGTH
+        JSR     FILL0           ; PRESET BUFFER
+;
+NONCOM  = *
+        LASTAT                  ; LATCHSTATUS
+        BIT     PORT1           ; CHECK FOR COMMAND LINE TO FALL
+        BPL     NONCOM          ; NOT YET--LOOP *****FOREVER*****
+;
+        JSR     COMAND          ; GO DO COMMAND!
+        JMP     MAIN            ; NO MATTER WHAT REASON FOR RETURN
+        .PAGE
+FILLER  .BYTE   'COPYRIGHT 1980 ATARI INC ZDYBEL/SCHEIMAN'
+;       .BYTE   'SZ'
+;
+;
+; ABOVE FILLER ADJUSTS FOR CONTROLLER (THIS), HANDLER, AND
+; RELOCATOR SIZE TO FILL THE FINAL ROM.  FINAL MEMORY MAP LOOKS
+; LIKE THIS:
+;
+; ($F000) - (RELOCR-1)          CONTROLLER (THIS) UP TO HERE
+; (RELOCR) - (RELOCR+5)         DISK IMITATION SECTOR 0 FLAGS
+; (BOOTB+6) - (BOOTE-2)         CODE PART OF RELOCATOR (SENT IN
+;                               ONE PIECE AFTER POLL, OR SENT AS
+;                               THREE DISK BLOCKS IMITATION DISK;
+;                               LATTER CASE CHECKSUMS AT DISKCH)
+; (RELCHK)                      RELOCATOR CHECKSUM
+; (HANDLB) - (HANDLE-2)         CODE PART OF HANDLER
+; (HNDCHK)                      HANDLER CHECKSUM
+; ($FFF9)                       ROM VERSION NUMBER
+; ($FFFA) - ($FFFB)             ROM CHECKSUM
+; ($FFFC) - ($FFFD)             RESET VECTOR
+; ($FFFE) - ($FFFF)             IRQ (BRK) VECTOR
+;
+; FINAL ASSEMBLY PROCEEDS AS FOLLOWS:
+;   SET BOOTB, BOOTE PER HANDLER AND RELOCATOR CODE SIZES
+;          (DON'T FORGET CHECKSUMS)
+;   ADJUST FILLER
+;   USING CHECKSUM PROGRAM, CALCULATE RELOCATOR CHECKSUM
+;   USING CHECKSUM PROGRAM, CALCULATE DISKCH AND HNDCHK SUMS
+;          (NOTE THAT THIRD DISKCH SUM COVERS STUFF FOLLOWING
+;           RELOCATOR)
+;   SET VERSION NUMBER
+;   SET CHECKSUM AT END OF POLL ANSWER (BEFORE POLLE)
+;   REASSEMBLE
+;   CALCULATE ROM CHECKSUM AND REASSEMBLE
+;   UPLOAD RESULT
+;
+;
+        *=      RELOCR
+        .BYTE   0,3             ; FLAGS, SECTOR COUNT
+        .WORD   $0500           ; ENTRY ADDRESS
+        .WORD   $E4C0           ; ADDRESS OF RTS INSTRUCTION IN OS !!!!!!!!!!
+;
+        *=      BOOTE-1
+RELCHK  .BYTE   $7B             ; RELOCATOR CHECKSUM
+        .PAGE           ;
+;----------------------------------------------------------------
+;       START VECTOR, HARDWARE VECTORS
+;----------------------------------------------------------------
+;
+;
+CHKSUM  =       $86D3           ;$686D3
+VERSON  =       1               ; REVISION NUMBER
+;
+        *=      $FFF8
+HNDCHK  .BYTE   $C5                     ; HANDLER CHECKSUM
+        .BYTE   VERSON
+        .WORD   CHKSUM,RESET,LSTAT
+;
+        .END
