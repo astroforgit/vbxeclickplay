@@ -4,6 +4,7 @@ bin/browser.lab
 bin/browser.atr
 bin/disk/BROWSER.XEX
 bin/disk/AUTORUN.SYS
+bin/vbxe-browser-*.xex
 build_*.txt
 test.asm
 test.xex
@@ -12,3 +13,10 @@ test.xex
 .claude/
 memory-notes/
 __pycache__/
+proxy/
+ice-t-sources/
+vbxe-examples/
+850src/
+mads.exe
+TODO_DOMA.md
+forum.txt
