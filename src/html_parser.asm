@@ -453,10 +453,19 @@ parse_chunk_done
         sta zp_in_skip
         rts
 ?oimg   jsr render_flush_word
+        ; Show [IMG] placeholder with src URL if available
         lda #<m_img
         ldx #>m_img
         jsr render_string
-        rts
+        lda img_src_len
+        beq ?nourl
+        lda #<img_src_buf
+        ldx #>img_src_buf
+        jsr render_string
+        lda #<m_img_end
+        ldx #>m_img_end
+        jsr render_string
+?nourl  rts
 ?ohr    jsr render_flush_word
         jsr render_newline
         jsr render_hr_line
@@ -466,7 +475,8 @@ parse_chunk_done
         jsr render_newline
         rts
 
-m_img   dta c'[IMG]',0
+m_img     dta c'[IMG:',0
+m_img_end dta c']',0
 .endp
 
 ; Remaining close tag checks
@@ -617,19 +627,34 @@ m_img   dta c'[IMG]',0
 ; process_attr
 ; ============================================================================
 .proc process_attr
+        ; Check "href" attribute (for <a> tags)
         lda attr_name_buf
         cmp #'h'
+        bne ?chk_src
+        lda attr_name_buf+1
+        cmp #'r'
+        bne ?chk_src
+        lda attr_name_buf+2
+        cmp #'e'
+        bne ?chk_src
+        lda attr_name_buf+3
+        cmp #'f'
+        bne ?chk_src
+        jsr store_link_url
+        rts
+
+?chk_src
+        ; Check "src" attribute (for <img> tags)
+        lda attr_name_buf
+        cmp #'s'
         bne ?done
         lda attr_name_buf+1
         cmp #'r'
         bne ?done
         lda attr_name_buf+2
-        cmp #'e'
+        cmp #'c'
         bne ?done
-        lda attr_name_buf+3
-        cmp #'f'
-        bne ?done
-        jsr store_link_url
+        jsr store_img_src
 ?done   rts
 .endp
 
@@ -855,5 +880,27 @@ tag_name_buf   .ds TAG_BUF_SIZE
 attr_name_buf  .ds ATTR_BUF_SIZE
 attr_val_buf   .ds VAL_BUF_SIZE
 entity_buf     .ds ENTITY_BUF_SZ
+
+; ============================================================================
+; store_img_src - Save src attribute value from <img> tag
+; ============================================================================
+IMG_SRC_SIZE = 128
+
+.proc store_img_src
+        ldy #0
+?cp     lda attr_val_buf,y
+        sta img_src_buf,y
+        beq ?done
+        iny
+        cpy #IMG_SRC_SIZE-1
+        bne ?cp
+        lda #0
+        sta img_src_buf,y
+?done   sty img_src_len
+        rts
+.endp
+
+img_src_buf .ds IMG_SRC_SIZE
+img_src_len dta b(0)
 
 ; Link storage is in data.asm (at $9200+ to avoid MEMAC B conflict)
