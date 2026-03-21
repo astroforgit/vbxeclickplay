@@ -62,28 +62,23 @@ m_help  dta c' Mouse:Click link  U:URL  B:Back  Q:Quit',0
         ; Check mouse button click
         lda zp_mouse_btn
         beq ?no_click
-        ; Debounce: wait for button release
         lda #0
         sta zp_mouse_btn
-?brel   lda zp_mouse_btn
-        bne ?brel2
-        ; Button released — check what was clicked
+        ; Wait for physical button release (STRIG1: 0=pressed, 1=released)
+?brel   lda STRIG1
+        beq ?brel
+        ; Check if cursor is on a link (uses mouse_saved_attr, no hide needed)
         jsr mouse_check_link
         bcs ?no_click
-        jmp ?brel_end
-?brel2  lda #0
-        sta zp_mouse_btn
-        jmp ?brel
-?brel_end
         ; A = link number — follow it
         sta zp_cur_link
         lda #KEY_NONE
         sta CH
         jsr mouse_hide_cursor
+        lda #$FF
+        sta zp_mouse_prev_x
         jsr ui_follow_link
         jsr ?chk_pending
-        lda #$FF
-        sta zp_mouse_prev_x   ; force cursor redraw
         jmp ?loop
 
 ?no_click

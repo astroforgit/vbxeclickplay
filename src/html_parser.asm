@@ -726,9 +726,12 @@ m_tbl_sep dta c' | ',0
         jsr render_flush_word
         lda #1
         sta zp_in_link
-        lda #ATTR_LINK
+        lda zp_link_num
+        clc
+        adc #ATTR_LINK_BASE    ; attr = $20 + link_num
         jsr render_set_attr
         jsr render_link_prefix
+        inc zp_link_num        ; increment AFTER setting attr
         rts
 .endp
 
@@ -905,7 +908,7 @@ LINK_URL_SIZE  = 128
         bne ?cp
         lda #0
         sta (zp_tmp_ptr),y
-?ok     inc zp_link_num
+?ok     ; Do NOT increment zp_link_num here — open_link does it
 ?full   rts
 .endp
 
@@ -1168,8 +1171,10 @@ IMG_SRC_SIZE = 256
         lda #0
         sta (zp_tmp_ptr),y
 
-?ok     ; Show [N]IMG with link attr
-        lda #ATTR_LINK
+?ok     ; Show [N]IMG with link attr (attr = $20+link_num)
+        lda zp_link_num
+        clc
+        adc #ATTR_LINK_BASE
         jsr render_set_attr
         jsr render_link_prefix     ; shows [N]
         lda #<m_imgtxt

@@ -109,7 +109,8 @@ COL_GRAY       = 6
 COL_YELLOW     = 7
 
 ATTR_NORMAL    = COL_WHITE
-ATTR_LINK      = COL_BLUE
+ATTR_LINK      = COL_BLUE     ; basic link color (for UI elements)
+ATTR_LINK_BASE = $20          ; link attrs: $20+link_num (palette $20-$3F = blue)
 ATTR_HEADING   = COL_ORANGE
 ATTR_H1        = COL_YELLOW
 ATTR_H2        = COL_ORANGE

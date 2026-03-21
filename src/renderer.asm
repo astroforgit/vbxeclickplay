@@ -178,6 +178,9 @@
 ; ----------------------------------------------------------------------------
 .proc render_page_pause
         status_msg COL_YELLOW, m_more
+        ; Clear any residual mouse click from previous scroll/rendering
+        lda #0
+        sta zp_mouse_btn
 
 ?wait   ; Non-blocking loop: check keyboard and mouse
         ; Wait one frame (vsync)
@@ -191,23 +194,27 @@
         ; Check mouse button click
         lda zp_mouse_btn
         beq ?no_click
-        ; Debounce: wait for button release
+        ; Wait for physical button release
+?brel   lda STRIG1
+        beq ?brel
+        ; Clear btn after release
         lda #0
         sta zp_mouse_btn
-?brel   lda zp_mouse_btn
-        bne ?brel2
-        ; Button released — check what was clicked
+        ; Check if cursor is on a link
         jsr mouse_check_link
-        bcs ?click_cont        ; not on link — treat as "next page"
-        ; A = link number — store as pending
+        bcs ?click_ignore      ; not on link — do nothing
+        ; Link found — store pending and ABORT rendering (C=1)
         sta pending_link
-        jmp ?next              ; continue page (will follow link after)
-?brel2  lda #0
-        sta zp_mouse_btn
-        jmp ?brel
-?click_cont
-        ; Click not on link = "next page" (like Space)
-        jmp ?next
+        jsr mouse_hide_cursor
+        lda #$FF
+        sta zp_mouse_prev_x
+        sec
+        rts
+
+?click_ignore
+        ; Not a link — do nothing, just go back to wait
+        ; Do NOT set prev_x=$FF — cursor is properly tracked
+        jmp ?wait
 
 ?no_click
         ; Check keyboard (non-blocking via CH)
@@ -217,28 +224,31 @@
         ; Key available — kbd_get returns immediately via CIO
         jsr kbd_get
         cmp #CH_SPACE
-        beq ?next
+        beq ?key_next
         cmp #155               ; ATASCII Return
-        beq ?next
+        beq ?key_next
         cmp #'q'
-        beq ?quit
+        beq ?key_quit
         cmp #'Q'
-        beq ?quit
+        beq ?key_quit
         jmp ?wait
 
-?next   ; Hide mouse cursor and force redraw on next show
+?key_next
+        ; Keyboard: hide cursor first, then advance
         jsr mouse_hide_cursor
         lda #$FF
-        sta zp_mouse_prev_x   ; force full redraw in next mouse_show_cursor
+        sta zp_mouse_prev_x
 
+?advance
         ; Restore status bar to loading
         status_msg COL_YELLOW, m_loading
         clc
         rts
 
-?quit   jsr mouse_hide_cursor
+?key_quit
+        jsr mouse_hide_cursor
         lda #$FF
-        sta zp_mouse_prev_x   ; force full redraw
+        sta zp_mouse_prev_x
         sta pending_link       ; $FF = no pending link
         sec
         rts

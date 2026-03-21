@@ -4,7 +4,7 @@
 
 ; Strings (stay in code segment)
 default_url    dta c'N:http://retro.hackaday.com/',0
-msg_welcome    dta c'VBXE Web Browser alpha37',0
+msg_welcome    dta c'VBXE Web Browser alpha42',0
 msg_welcome2   dta c'for Atari XE/XL with VBXE',0
 msg_press_u    dta c'Press U to enter URL, or Q to quit',0
 msg_no_vbxe    dta c'VBXE not detected!',0

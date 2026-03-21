@@ -384,10 +384,14 @@ mouse_old_y     dta 0          ; old Y bits, pre-shifted <<2
         cmp zp_mouse_y
         beq ?done
 ?moved
+        ; Skip restore if prev_x=$FF (invalid — screen was redrawn)
+        lda zp_mouse_prev_x
+        cmp #$FF
+        beq ?no_restore
         lda zp_mouse_prev_y
         ldx zp_mouse_prev_x
         jsr mouse_restore_char
-
+?no_restore
         lda zp_mouse_y
         ldx zp_mouse_x
         jsr mouse_invert_char
@@ -491,78 +495,18 @@ mouse_col_off    dta 0
 ; Output: C=0 A=link#, C=1 not on link
 ; ----------------------------------------------------------------------------
 .proc mouse_check_link
-        lda zp_mouse_y
-        ldx zp_mouse_x
-        jsr mouse_calc_vram
-        iny                    ; attr byte
-        sty mouse_col_off
-
-        ; Read attr at cursor
-        jsr vbxe_read_vram
-        cmp #ATTR_LINK
-        bne ?no
-
-        ; Scan backward for '['
-        ldy mouse_col_off
-        dey                    ; back to char byte
-?scan   cpy #0
-        beq ?no
-        dey
-        dey
-        sty mouse_col_off
-        jsr vbxe_read_vram
-        cmp #'['
-        bne ?scan
-
-        ; Found '[' - read first digit
-        ldy mouse_col_off
-        iny
-        iny
-        sty mouse_col_off
-        jsr vbxe_read_vram
-        cmp #'0'
-        bcc ?no
-        cmp #'9'+1
-        bcs ?no
+        ; Link number is encoded in the attr byte: $20+link_num
+        ; mouse_saved_attr has the original attr from cursor position
+        ; Output: C=0 A=link#, C=1 not on link
+        lda mouse_saved_attr
+        cmp #ATTR_LINK_BASE
+        bcc ?no                ; < $20 = not a link
+        cmp #ATTR_LINK_BASE+MAX_LINKS
+        bcs ?no                ; >= $40 = not a link
         sec
-        sbc #'0'
-        sta ?num
-
-        ; Read next char - ']' or second digit
-        ldy mouse_col_off
-        iny
-        iny
-        sty mouse_col_off
-        jsr vbxe_read_vram
-        cmp #']'
-        beq ?got
-        cmp #'0'
-        bcc ?no
-        cmp #'9'+1
-        bcs ?no
-        sec
-        sbc #'0'
-        sta ?d2
-        ; num = num*10 + d2
-        lda ?num
-        asl
-        sta ?t
-        asl
-        asl
-        clc
-        adc ?t
-        clc
-        adc ?d2
-        sta ?num
-
-?got    lda ?num
+        sbc #ATTR_LINK_BASE    ; A = link number
         clc
         rts
-
 ?no     sec
         rts
-
-?num    dta 0
-?d2     dta 0
-?t      dta 0
 .endp

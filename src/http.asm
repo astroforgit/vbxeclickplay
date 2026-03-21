@@ -319,14 +319,30 @@ http_bytes_hi dta b(0)
 ; Relative URLs get base_url prepended
 ; ----------------------------------------------------------------------------
 .proc http_resolve_url
-        ; Check if already absolute
+        ; Check if already absolute: must start with "http" or "N:"
         lda url_buffer
-        cmp #'h'
-        beq ?done
-        cmp #'H'
-        beq ?done
         cmp #'N'
-        beq ?done
+        bne ?not_n
+        lda url_buffer+1
+        cmp #':'
+        beq ?done              ; "N:..." = absolute
+?not_n  lda url_buffer
+        cmp #'h'
+        beq ?chk_http
+        cmp #'H'
+        beq ?chk_http
+        jmp ?not_abs
+?chk_http
+        lda url_buffer+1
+        cmp #'t'
+        bne ?not_abs
+        lda url_buffer+2
+        cmp #'t'
+        bne ?not_abs
+        lda url_buffer+3
+        cmp #'p'
+        beq ?done              ; "http..." = absolute
+?not_abs
 
         ; Check if root-relative (starts with '/')
         cmp #'/'

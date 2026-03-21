@@ -299,6 +299,33 @@ BCB_CONTENT_SCROLL_OFS = 63
         inx
         cpx #8
         bne ?lp
+
+        ; Set palette entries $20-$3F to blue (link colors with embedded link#)
+        ldy #VBXE_CSEL
+        lda #ATTR_LINK_BASE
+        sta (zp_vbxe_base),y
+
+        ldx #0
+?lnk    ldy #VBXE_CR
+        lda #$00               ; R = same as COL_BLUE
+        sta (zp_vbxe_base),y
+        iny
+        lda #$AA               ; G
+        sta (zp_vbxe_base),y
+        iny
+        lda #$FF               ; B
+        sta (zp_vbxe_base),y
+
+        ; Set CSEL to next entry
+        ldy #VBXE_CSEL
+        txa
+        clc
+        adc #ATTR_LINK_BASE+1
+        sta (zp_vbxe_base),y
+
+        inx
+        cpx #32
+        bne ?lnk
         rts
 
 ;            blk  wht  blue org  grn  red  gray yel

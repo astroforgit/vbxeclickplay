@@ -6,7 +6,7 @@
 
 ## Status
 
-**Alpha 37** - early development, testing on real hardware. Help is welcome!
+**Alpha 42** - early development, testing on real hardware. Help is welcome!
 
 ## Requirements
 
