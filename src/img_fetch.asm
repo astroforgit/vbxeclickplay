@@ -362,35 +362,6 @@ img_fn_err   dta b(0)
         bcc ?hdr_ok
         jmp ?e_hdr
 ?hdr_ok
-        ; Show dimensions on status bar for debug
-        status_msg COL_YELLOW, m_step4
-        lda img_hdr_w+1
-        jsr ?hex
-        jsr vbxe_putchar
-        lda img_hdr_w
-        lsr
-        lsr
-        lsr
-        lsr
-        jsr ?hex
-        jsr vbxe_putchar
-        lda img_hdr_w
-        and #$0F
-        jsr ?hex
-        jsr vbxe_putchar
-        lda #'x'
-        jsr vbxe_putchar
-        lda img_hdr_h
-        lsr
-        lsr
-        lsr
-        lsr
-        jsr ?hex
-        jsr vbxe_putchar
-        lda img_hdr_h
-        and #$0F
-        jsr ?hex
-        jsr vbxe_putchar
         ; Allocate VRAM
         lda img_hdr_h
         ldx img_hdr_w
@@ -493,7 +464,6 @@ m_imgview dta c' Image - press any key',0
 m_step1  dta c' IMG: resolving URL...',0
 m_step2  dta c' IMG: connecting...',0
 m_step3  dta c' IMG: reading header...',0
-m_step4  dta c' IMG: hdr ok, dim=',0
 m_step5  dta c' IMG: reading palette...',0
 m_step6  dta c' IMG: reading pixels...',0
 me_open  dta c'IMG err: OPEN failed',0

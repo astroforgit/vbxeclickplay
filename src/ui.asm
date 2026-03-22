@@ -106,7 +106,7 @@ m_help  dta c' Click:Link  U:URL  B:Back  Q:Quit',0
 
         ; Q = return to welcome screen
 ?quit   jsr mouse_hide_cursor
-        jsr net_close
+        jsr fn_close
         lda img_active
         beq ?qi1
         jsr vbxe_img_hide
@@ -260,6 +260,7 @@ m_go    dta c'Go to: ',0
         lda #0
         sta url_length+1
 
+        jsr http_resolve_url   ; resolve relative URLs from links
         jsr history_push
         jsr http_navigate
         rts
@@ -393,7 +394,7 @@ m_iload dta c' Loading image...',0
 .proc ui_status_progress
         ; Convert bytes to KB (divide by 256 = just use high byte)
         ; Show update only when KB value changes (avoid flicker)
-        lda http_get.http_bytes_hi
+        lda http_bytes_hi
         cmp prog_last_kb
         beq ?skip              ; same KB as last time, skip update
         sta prog_last_kb

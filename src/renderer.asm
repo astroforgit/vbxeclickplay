@@ -29,6 +29,7 @@
         sta zp_page_lines
         sta zp_page_lines+1
         sta page_abort
+        sta skip_to_heading
         lda #$FF
         sta pending_link
         rts
@@ -111,6 +112,8 @@
 ; Input: A = char
 ; ----------------------------------------------------------------------------
 .proc render_out_char
+        ldx skip_to_heading
+        bne ?skip_ret
         pha
         lda zp_render_row
         ldx zp_render_col
@@ -125,7 +128,9 @@
 
         jsr render_do_nl
         jsr render_indent_out
-?ok     rts
+?ok
+?skip_ret
+        rts
 .endp
 
 ; ----------------------------------------------------------------------------
@@ -142,6 +147,8 @@
 ; When content area is full, pause for user input (pagination)
 ; ----------------------------------------------------------------------------
 .proc render_do_nl
+        lda skip_to_heading
+        bne ?ok_ret
         lda #0
         sta zp_render_col
         sta last_was_sp
@@ -159,11 +166,14 @@
         jsr ui_clear_content
         lda #CONTENT_TOP
         sta zp_render_row
+        lda #0
+        sta zp_link_num        ; reset links for new screen
 
         inc zp_page_lines
         bne ?ok
         inc zp_page_lines+1
-?ok     rts
+?ok
+?ok_ret rts
 
 ?abort  ; User pressed Q - set abort flag
         lda #1
@@ -255,11 +265,17 @@
         rts
 
 ?click_ignore
-        ; Not a link — advance page (same as Space)
+        ; Not a link — check if click is on status bar (--More--)
+        lda zp_mouse_y
+        cmp #STATUS_ROW
+        bne ?click_nop         ; click on page content = do nothing
+        ; Click on --More-- bar = advance page
         jsr mouse_hide_cursor
         lda #$FF
         sta zp_mouse_prev_x
         jmp ?advance
+?click_nop
+        jmp ?wait
 
 ?no_click
         ; Check keyboard (non-blocking via CH)
@@ -274,6 +290,10 @@
         beq ?key_next
         cmp #155               ; ATASCII Return
         beq ?key_next
+        cmp #'h'
+        beq ?key_heading
+        cmp #'H'
+        beq ?key_heading
         cmp #'q'
         beq ?key_quit
         cmp #'Q'
@@ -292,6 +312,16 @@
         clc
         rts
 
+?key_heading
+        ; Skip to next heading - set flag, advance without pause
+        jsr mouse_hide_cursor
+        lda #$FF
+        sta zp_mouse_prev_x
+        lda #1
+        sta skip_to_heading
+        status_msg COL_YELLOW, m_skipping
+        jmp ?advance
+
 ?key_quit
         jsr mouse_hide_cursor
         lda #$FF
@@ -300,7 +330,8 @@
         sec
         rts
 
-m_more    dta c' -- More -- (Spc/Q)',0
+m_more    dta c' -- More -- (Spc/H/Q)',0
+m_skipping dta c' Skipping to heading...',0
 m_loading dta c' Loading...',0
 rpp_link_num dta 0
 .endp
@@ -428,6 +459,7 @@ last_was_sp dta 0
 title_len   dta 0
 page_abort  dta 0
 pending_link dta $FF           ; $FF = none, 0-31 = link number to follow
+skip_to_heading dta 0          ; 1 = skip rendering until next heading
 
 WORD_BUF_SZ = 80
 word_buf    .ds WORD_BUF_SZ

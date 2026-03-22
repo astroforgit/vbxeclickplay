@@ -4,9 +4,16 @@
 
 ; Strings (stay in code segment)
 default_url    dta c'N:http://retro.hackaday.com/',0
-msg_welcome    dta c'VBXE Web Browser alpha46',0
-msg_welcome2   dta c'for Atari XE/XL with VBXE',0
-msg_press_u    dta c'Press U to enter URL, or Q to quit',0
+msg_welcome    dta c'VBXE Web Browser alpha48',0
+msg_welcome2   dta c'80-column web browser for Atari XE/XL',0
+msg_req        dta c'Requires: VBXE + FujiNet',0
+msg_keys_hdr   dta c'Controls:',0
+msg_keys1      dta c'U - enter URL          B - back',0
+msg_keys2      dta c'Click - follow link    Space - next page',0
+msg_keys3      dta c'H - skip to heading    Q - quit page',0
+msg_keys4      dta c'Images: click [IMG] link to view',0
+msg_press_u    dta c'Press U to enter URL',0
+msg_author     dta c'w1k 2025-2026  github.com/viktorcech/vbxe-browser',0
 msg_no_vbxe    dta c'VBXE not detected!',0
 
 ; ============================================================================

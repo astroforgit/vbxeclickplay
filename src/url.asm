@@ -1,0 +1,442 @@
+; ============================================================================
+; URL Utilities - resolve, prefix, lowercase, image extension check
+; ============================================================================
+
+; ----------------------------------------------------------------------------
+; http_ensure_prefix - Add "N:http://" to url_buffer if missing
+; ----------------------------------------------------------------------------
+.proc http_ensure_prefix
+        ; Check if url_buffer starts with "N:" (already has FujiNet prefix)
+        lda url_buffer
+        cmp #'N'
+        bne ?chkhttp
+        lda url_buffer+1
+        cmp #':'
+        beq ?ok
+?chkhttp
+        ; Check if starts with "http" - need to prepend "N:" only
+        lda url_buffer
+        cmp #'h'
+        beq ?addN
+        cmp #'H'
+        beq ?addN
+        jmp ?addFull
+
+        ; Has "http://..." but missing "N:" - shift by 2 and prepend "N:"
+?addN   ldy url_length
+        cpy #URL_BUF_SIZE-3
+        bcc ?sh2
+        ldy #URL_BUF_SIZE-3
+?sh2    clc
+        tya
+        adc #2
+        tax
+        stx url_length
+?sh2lp  dex
+        dey
+        bmi ?cp2
+        lda url_buffer,y
+        sta url_buffer,x
+        jmp ?sh2lp
+?cp2    lda #'N'
+        sta url_buffer
+        lda #':'
+        sta url_buffer+1
+        ldy url_length
+        lda #0
+        sta url_buffer,y
+        sta url_length+1
+        jmp ?ok
+
+?addFull
+        ; No http prefix - shift buffer right by 9 and prepend "N:http://"
+        ldy url_length
+        cpy #URL_BUF_SIZE-10
+        bcc ?shift
+        ldy #URL_BUF_SIZE-10
+?shift
+        clc
+        tya
+        adc #9
+        tax                     ; X = new end position
+        stx url_length
+?shlp   dex
+        dey
+        bmi ?copy
+        lda url_buffer,y
+        sta url_buffer,x
+        jmp ?shlp
+
+?copy   ; Copy "N:http://" to start
+        ldx #0
+?cplp   lda ?prefix,x
+        sta url_buffer,x
+        inx
+        cpx #9
+        bne ?cplp
+        ; Null-terminate
+        ldy url_length
+        lda #0
+        sta url_buffer,y
+        sta url_length+1
+?ok     rts
+
+?prefix dta c'N:http://'
+.endp
+
+; ----------------------------------------------------------------------------
+; http_save_base - Save current url_buffer as base URL (up to last '/')
+; Call BEFORE overwriting url_buffer with a new link URL
+; ----------------------------------------------------------------------------
+.proc http_save_base
+        ; Find last '/' in url_buffer, but ignore "://" slashes
+        ; Strategy: find position after "://", then last '/' after that
+        ldy #0
+        sty zp_tmp1            ; zp_tmp1 = index after last path '/'
+        sty zp_tmp2            ; zp_tmp2 = position after "://"
+
+        ; First find "://" to know where host starts
+?find_scheme
+        lda url_buffer,y
+        beq ?check
+        cmp #':'
+        bne ?fs_next
+        ; Check if followed by "//"
+        iny
+        lda url_buffer,y
+        cmp #'/'
+        bne ?fs_next
+        iny
+        lda url_buffer,y
+        cmp #'/'
+        bne ?fs_next
+        iny                    ; Y = position after "://"
+        sty zp_tmp2
+        jmp ?scan_path
+?fs_next
+        iny
+        bne ?find_scheme
+
+?scan_path
+        ; Now scan for '/' in the path portion (after host)
+        lda url_buffer,y
+        beq ?check
+        cmp #'/'
+        bne ?sp_next
+        iny
+        sty zp_tmp1            ; save position after this '/'
+        dey
+?sp_next
+        iny
+        bne ?scan_path
+
+?check  ; If no path '/' found (zp_tmp1 <= zp_tmp2), use whole URL + "/"
+        lda zp_tmp1
+        cmp zp_tmp2
+        bcc ?use_all
+        beq ?use_all
+        ; Good - copy up to last path '/'
+        jmp ?copy
+
+?use_all
+        ; No path slash - copy whole URL and append "/"
+        ldy #0
+?ua     lda url_buffer,y
+        beq ?ua_slash
+        sta base_url,y
+        iny
+        bne ?ua
+?ua_slash
+        lda #'/'
+        sta base_url,y
+        iny
+        lda #0
+        sta base_url,y
+        rts
+
+?copy   ; Copy url_buffer[0..zp_tmp1-1] to base_url
+        ldy #0
+?cplp   cpy zp_tmp1
+        beq ?term
+        lda url_buffer,y
+        sta base_url,y
+        iny
+        bne ?cplp
+?term   lda #0
+        sta base_url,y
+        rts
+.endp
+
+; ----------------------------------------------------------------------------
+; http_resolve_url - Resolve relative URL in url_buffer against base_url
+; Absolute URLs (http://...) pass through unchanged
+; Relative URLs get base_url prepended
+; ----------------------------------------------------------------------------
+.proc http_resolve_url
+        ; Check if already absolute: must start with "http" or "N:"
+        lda url_buffer
+        cmp #'N'
+        bne ?not_n
+        lda url_buffer+1
+        cmp #':'
+        beq ?done              ; "N:..." = absolute
+?not_n  lda url_buffer
+        cmp #'h'
+        beq ?chk_http
+        cmp #'H'
+        beq ?chk_http
+        jmp ?not_abs
+?chk_http
+        lda url_buffer+1
+        cmp #'t'
+        bne ?not_abs
+        lda url_buffer+2
+        cmp #'t'
+        bne ?not_abs
+        lda url_buffer+3
+        cmp #'p'
+        beq ?done              ; "http..." = absolute
+?not_abs
+
+        ; Check if root-relative (starts with '/')
+        cmp #'/'
+        beq ?root_rel
+
+        ; --- Relative URL: prepend base_url ---
+        ; Step 1: copy url_buffer to rx_buffer (temp)
+        ldy #0
+?s1     lda url_buffer,y
+        sta rx_buffer,y
+        beq ?s1d
+        iny
+        bne ?s1
+?s1d
+        ; Step 2: copy base_url to url_buffer
+        ldy #0
+?s2     lda base_url,y
+        beq ?s2d
+        sta url_buffer,y
+        iny
+        bne ?s2
+?s2d    ; Y = length of base_url
+        ; Step 3: append relative URL from rx_buffer
+        ldx #0
+?s3     lda rx_buffer,x
+        sta url_buffer,y
+        beq ?upd
+        iny
+        inx
+        cpy #URL_BUF_SIZE-1
+        bne ?s3
+        lda #0
+        sta url_buffer,y
+?upd    sty url_length
+        lda #0
+        sta url_length+1
+?done   rts
+
+?root_rel
+        ; Root-relative: find host part in base_url
+        ; Look for "://" then the next "/" after that
+        ldy #0
+?rr1    lda base_url,y
+        beq ?rr_use_all        ; no "://" found, use whole base
+        cmp #':'
+        bne ?rr1n
+        iny
+        lda base_url,y
+        cmp #'/'
+        bne ?rr1n
+        iny
+        lda base_url,y
+        cmp #'/'
+        beq ?rr_found_scheme
+        dey
+?rr1n   iny
+        bne ?rr1
+
+?rr_found_scheme
+        ; Y points to 2nd '/' of "://", skip to find host end
+        iny                    ; skip past "//"
+?rr2    lda base_url,y
+        beq ?rr_host_end       ; end of base = host only, no path
+        cmp #'/'
+        beq ?rr_host_end
+        iny
+        bne ?rr2
+
+?rr_host_end
+        ; Y = position of '/' after host (or end of string)
+        sty zp_tmp1
+
+        ; Save original url_buffer to rx_buffer
+        ldy #0
+?rr3    lda url_buffer,y
+        sta rx_buffer,y
+        beq ?rr3d
+        iny
+        bne ?rr3
+?rr3d
+        ; Copy host part of base_url
+        ldy #0
+?rr4    cpy zp_tmp1
+        beq ?rr4d
+        lda base_url,y
+        sta url_buffer,y
+        iny
+        bne ?rr4
+?rr4d
+        ; Append root-relative path from rx_buffer
+        ldx #0
+?rr5    lda rx_buffer,x
+        sta url_buffer,y
+        beq ?rr_upd
+        iny
+        inx
+        cpy #URL_BUF_SIZE-1
+        bne ?rr5
+        lda #0
+        sta url_buffer,y
+?rr_upd sty url_length
+        lda #0
+        sta url_length+1
+        rts
+
+?rr_use_all
+        ; Fallback: use whole base_url + url_buffer
+        jmp ?s1                ; treat as relative
+.endp
+
+; ----------------------------------------------------------------------------
+; http_check_img_ext - Check if url_buffer ends with image extension
+; Output: C=1 if image (.png, .jpg, .gif), C=0 if not
+; ----------------------------------------------------------------------------
+.proc http_check_img_ext
+        ; Find last '.' in URL
+        ldy #0
+        ldx #$FF               ; X = position of last dot ($FF=none)
+?scan   lda url_buffer,y
+        beq ?check
+        cmp #'.'
+        bne ?next
+        tya
+        tax                    ; X = dot position
+?next   iny
+        bne ?scan
+?check  cpx #$FF
+        bne ?has_dot
+        clc
+        rts                    ; no dot found
+?has_dot
+        ; Y = end of URL, X = last dot
+        ; Compare extension (after dot) against known types
+        inx                    ; X = first char after dot
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'p'
+        beq ?p
+        cmp #'j'
+        beq ?j
+        cmp #'g'
+        beq ?g
+        jmp ?no
+?p      ; "png"
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'n'
+        bne ?no
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'g'
+        bne ?no
+        inx
+        lda url_buffer,x
+        beq ?yes               ; null after "png" = match
+        jmp ?no
+?j      ; "jpg" or "jpeg"
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'p'
+        bne ?no
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'g'
+        bne ?je
+        inx
+        lda url_buffer,x
+        beq ?yes               ; null after "jpg" = match
+        jmp ?no
+?je     cmp #'e'               ; jpeg
+        bne ?no
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'g'
+        bne ?no
+        inx
+        lda url_buffer,x
+        beq ?yes
+        jmp ?no
+?g      ; "gif"
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'i'
+        bne ?no
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'f'
+        bne ?no
+        inx
+        lda url_buffer,x
+        beq ?yes               ; null after "gif" = match
+?no     clc
+        rts
+?yes    sec
+        rts
+.endp
+
+; ----------------------------------------------------------------------------
+; http_url_tolower - Convert DOMAIN part of url_buffer to lowercase
+; Only lowercases up to first '/' after "://" (path is case-sensitive!)
+; ----------------------------------------------------------------------------
+.proc http_url_tolower
+        ldy #0
+        ; Find "://" first
+?fs     lda url_buffer,y
+        beq ?done
+        cmp #':'
+        bne ?fs_n
+        iny
+        lda url_buffer,y
+        cmp #'/'
+        bne ?fs_n
+        iny
+        lda url_buffer,y
+        cmp #'/'
+        beq ?found
+        dey
+?fs_n   iny
+        bne ?fs
+        rts                    ; no "://" found, don't touch
+?found  iny                    ; skip past "//"
+        ; Lowercase until end of domain (next '/' or end)
+?lp     lda url_buffer,y
+        beq ?done
+        cmp #'/'
+        beq ?done              ; reached path, stop lowercasing
+        cmp #'A'
+        bcc ?next
+        cmp #'Z'+1
+        bcs ?next
+        ora #$20
+        sta url_buffer,y
+?next   iny
+        bne ?lp
+?done   rts
+.endp

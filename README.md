@@ -6,7 +6,7 @@
 
 ## Status
 
-**Alpha 46** - early development, testing on real hardware. Help is welcome!
+**Alpha 48** - early development, testing on real hardware. Help is welcome!
 
 ## Requirements
 
@@ -20,9 +20,10 @@
 
 - **VBXE 80-column text** using overlay mode with color attributes
 - **ST mouse support** - point and click on links, works during browsing and page scrolling
-- **HTML parser**: headings (h1-h3), paragraphs, links, lists (ul/ol), bold, italic, tables, blockquotes, code/pre, entities
+- **HTML parser**: headings (h1-h3), paragraphs, links, lists (ul/ol), bold, italic, tables, blockquotes, code/pre, entities, HTML comments
 - **Image viewing** - inline images shown as clickable IMG links, fullscreen display via server-side converter (256-color, up to 320x184)
-- **Up to 64 links per page** with palette-encoded link detection
+- **Up to 64 links per screen** with palette-encoded link detection (recycled on each page scroll)
+- **Skip to heading** - press H on bottom prompt to jump past navigation menus to next heading
 - **URL navigation** with address bar input
 - **History** with back navigation
 - **FujiNet networking** - HTTP via N: device SIO
@@ -42,9 +43,10 @@ The browser uses VBXE overlay in text mode (TMON) for 80-column display:
 
 | Input | Action |
 |-------|--------|
-| **Mouse click** | Follow link / view image / scroll page |
+| **Mouse click** | Follow link / view image / advance --More-- |
 | **U** | Enter URL |
 | **B** | Back (history) |
+| **H** | Skip to next heading (skips navigation menus) |
 | **Q** | Quit / return to welcome |
 | **Space/Return** | Scroll to next page |
 
@@ -70,7 +72,9 @@ mads src/browser.asm -o:bin/browser.xex -l:bin/browser.lab
 | `fujinet.asm` | FujiNet N: device SIO layer |
 | `network.asm` | Network abstraction layer |
 | `http.asm` | HTTP GET workflow, URL handling, relative URL resolution |
-| `html_parser.asm` | Streaming HTML tag/entity parser (28 tags, 64 links) |
+| `html_parser.asm` | Streaming HTML tag/entity parser (34 tags, comment support) |
+| `html_tags.asm` | Tag handlers, attribute processing, link/image storage |
+| `html_entities.asm` | Tag lookup tables, HTML entity decoding |
 | `renderer.asm` | Text layout, word wrapping, pagination |
 | `keyboard.asm` | Keyboard input via CIO K: device |
 | `ui.asm` | UI: URL bar, status bar, navigation, main event loop |
