@@ -337,7 +337,7 @@ img_fn_err   dta b(0)
 ; Called when user clicks on [N]IMG link
 ; ----------------------------------------------------------------------------
 .proc img_fetch_single
-        jsr ui_status_img_loading
+        status_msg COL_YELLOW, m_step1
 
         ; Resolve relative URL and build vbxe.php converter URL
         jsr img_resolve_and_build_url
@@ -347,37 +347,81 @@ img_fn_err   dta b(0)
         ; Delay between connections
         wait_frames 30
 
+        status_msg COL_YELLOW, m_step2
+
         ; Open connection
         jsr fn_open
-        bcs ?err
+        bcc ?open_ok
+        jmp ?e_open
+?open_ok
+
+        status_msg COL_YELLOW, m_step3
 
         ; Read header
         jsr img_read_header
-        bcs ?err_close
-
+        bcc ?hdr_ok
+        jmp ?e_hdr
+?hdr_ok
+        ; Show dimensions on status bar for debug
+        status_msg COL_YELLOW, m_step4
+        lda img_hdr_w+1
+        jsr ?hex
+        jsr vbxe_putchar
+        lda img_hdr_w
+        lsr
+        lsr
+        lsr
+        lsr
+        jsr ?hex
+        jsr vbxe_putchar
+        lda img_hdr_w
+        and #$0F
+        jsr ?hex
+        jsr vbxe_putchar
+        lda #'x'
+        jsr vbxe_putchar
+        lda img_hdr_h
+        lsr
+        lsr
+        lsr
+        lsr
+        jsr ?hex
+        jsr vbxe_putchar
+        lda img_hdr_h
+        and #$0F
+        jsr ?hex
+        jsr vbxe_putchar
         ; Allocate VRAM
         lda img_hdr_h
         ldx img_hdr_w
         ldy img_hdr_w+1
         jsr vbxe_img_alloc
-        bcs ?err_close
+        bcc ?alloc_ok
+        jmp ?e_alloc
+?alloc_ok
+
+        status_msg COL_YELLOW, m_step5
 
         ; Read palette
         jsr img_read_palette
-        bcs ?err_close
+        bcc ?pal_ok
+        jmp ?e_pal
+?pal_ok
 
-        ; Set VBXE palette
+        status_msg COL_YELLOW, m_step6
+
+        ; Read pixels BEFORE setting palette (palette overwrites link colors)
+        jsr vbxe_img_begin_write
+        jsr img_read_pixels
+
+        jsr fn_close
+
+        ; Set VBXE palette AFTER pixels (keeps text colors during download)
         lda #<img_pal_buf
         sta zp_tmp_ptr
         lda #>img_pal_buf
         sta zp_tmp_ptr+1
         jsr vbxe_img_setpal
-
-        ; Read pixels
-        jsr vbxe_img_begin_write
-        jsr img_read_pixels
-
-        jsr fn_close
 
         ; Write status text
         status_msg COL_YELLOW, m_imgview
@@ -388,21 +432,76 @@ img_fn_err   dta b(0)
         ; Wait for user key
         jsr kbd_get
 
+        ; Clear mouse state (VBI may have set btn during image view)
+        lda #0
+        sta zp_mouse_btn
+        lda #KEY_NONE
+        sta CH
+
         ; Restore text display
         jsr vbxe_img_hide
         jsr setup_palette
         jsr ui_status_done
         rts
 
-?err_close
-        jsr fn_close
-?err    lda #<m_imgerr
-        ldx #>m_imgerr
+?e_open lda #<me_open
+        ldx #>me_open
+        jsr ui_show_error
+        rts
+?e_hdr  jsr fn_close
+        ; Patch error code digit into message string
+        lda img_err_code
+        clc
+        adc #'0'
+        sta me_hdr_n
+        ; Patch FN error as hex into message
+        lda img_fn_err
+        lsr
+        lsr
+        lsr
+        lsr
+        jsr ?hex
+        sta me_hdr_h
+        lda img_fn_err
+        and #$0F
+        jsr ?hex
+        sta me_hdr_h+1
+        lda #<me_hdr
+        ldx #>me_hdr
+        jsr ui_show_error
+        rts
+?hex    cmp #10
+        bcc ?dig
+        clc
+        adc #'A'-10
+        rts
+?dig    clc
+        adc #'0'
+        rts
+?e_alloc jsr fn_close
+        lda #<me_alloc
+        ldx #>me_alloc
+        jsr ui_show_error
+        rts
+?e_pal  jsr fn_close
+        lda #<me_pal
+        ldx #>me_pal
         jsr ui_show_error
         rts
 
 m_imgview dta c' Image - press any key',0
-m_imgerr  dta c'Image load failed',0
+m_step1  dta c' IMG: resolving URL...',0
+m_step2  dta c' IMG: connecting...',0
+m_step3  dta c' IMG: reading header...',0
+m_step4  dta c' IMG: hdr ok, dim=',0
+m_step5  dta c' IMG: reading palette...',0
+m_step6  dta c' IMG: reading pixels...',0
+me_open  dta c'IMG err: OPEN failed',0
+me_hdr   dta c'IMG err: hdr '
+me_hdr_n dta c'? FN=$'
+me_hdr_h dta c'??',0
+me_alloc dta c'IMG err: VRAM alloc',0
+me_pal   dta c'IMG err: palette',0
 .endp
 
 ; ----------------------------------------------------------------------------
@@ -466,18 +565,18 @@ m_imgerr  dta c'Image load failed',0
         jsr fn_close
         jmp ?img_err
 
-?ok4    ; Set VBXE palette
+?ok4    ; Read pixels BEFORE setting palette (keeps text colors during download)
+        jsr vbxe_img_begin_write
+        jsr img_read_pixels
+
+        jsr fn_close
+
+        ; Set VBXE palette AFTER pixels
         lda #<img_pal_buf
         sta zp_tmp_ptr
         lda #>img_pal_buf
         sta zp_tmp_ptr+1
         jsr vbxe_img_setpal
-
-        ; Read pixels
-        jsr vbxe_img_begin_write
-        jsr img_read_pixels
-
-        jsr fn_close
 
         ; Image loaded successfully
         inc img_count

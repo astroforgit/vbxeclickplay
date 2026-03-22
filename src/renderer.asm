@@ -193,7 +193,9 @@
 
         ; Check mouse button click
         lda zp_mouse_btn
-        beq ?no_click
+        bne ?has_click
+        jmp ?no_click
+?has_click
         ; Wait for physical button release
 ?brel   lda STRIG1
         beq ?brel
@@ -203,7 +205,47 @@
         ; Check if cursor is on a link
         jsr mouse_check_link
         bcs ?click_ignore      ; not on link — do nothing
-        ; Link found — store pending and ABORT rendering (C=1)
+
+        ; Link found — check if it's an image link
+        sta rpp_link_num
+        jsr calc_link_addr     ; zp_tmp_ptr = link URL
+        ldy #0
+        lda (zp_tmp_ptr),y
+        cmp #'I'
+        bne ?normal_click
+        iny
+        lda (zp_tmp_ptr),y
+        cmp #':'
+        bne ?normal_click
+
+        ; Image link: fetch image and return to --More--
+        jsr mouse_hide_cursor
+        lda #$FF
+        sta zp_mouse_prev_x
+        jsr http_save_base
+        lda rpp_link_num
+        jsr calc_link_addr
+        ldy #2                 ; skip "I:"
+        ldx #0
+?icp    lda (zp_tmp_ptr),y
+        sta img_src_buf,x
+        beq ?icpd
+        iny
+        inx
+        cpx #IMG_SRC_SIZE-1
+        bne ?icp
+        lda #0
+        sta img_src_buf,x
+?icpd   jsr img_fetch_single
+        ; Restore --More-- prompt and continue waiting
+        status_msg COL_YELLOW, m_more
+        lda #0
+        sta zp_mouse_btn
+        jmp ?wait
+
+?normal_click
+        ; Normal link — store pending and ABORT rendering (C=1)
+        lda rpp_link_num
         sta pending_link
         jsr mouse_hide_cursor
         lda #$FF
@@ -212,15 +254,19 @@
         rts
 
 ?click_ignore
-        ; Not a link — do nothing, just go back to wait
-        ; Do NOT set prev_x=$FF — cursor is properly tracked
-        jmp ?wait
+        ; Not a link — advance page (same as Space)
+        jsr mouse_hide_cursor
+        lda #$FF
+        sta zp_mouse_prev_x
+        jmp ?advance
 
 ?no_click
         ; Check keyboard (non-blocking via CH)
         lda CH
         cmp #KEY_NONE
-        beq ?wait              ; no input, loop
+        bne ?has_key
+        jmp ?wait              ; no input, loop
+?has_key
         ; Key available — kbd_get returns immediately via CIO
         jsr kbd_get
         cmp #CH_SPACE
@@ -255,6 +301,7 @@
 
 m_more    dta c' -- More -- (Spc/Q)',0
 m_loading dta c' Loading...',0
+rpp_link_num dta 0
 .endp
 
 ; ----------------------------------------------------------------------------
@@ -284,12 +331,7 @@ m_loading dta c' Loading...',0
 ; render_link_prefix - Output [N] for link
 ; ----------------------------------------------------------------------------
 .proc render_link_prefix
-        lda #'['
-        jsr render_out_char
-        lda zp_link_num
-        jsr render_number
-        lda #']'
-        jsr render_out_char
+        ; Link numbers removed — detection is via attr-encoded palette
         rts
 .endp
 

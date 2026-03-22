@@ -324,7 +324,7 @@ BCB_CONTENT_SCROLL_OFS = 63
         sta (zp_vbxe_base),y
 
         inx
-        cpx #32
+        cpx #64
         bne ?lnk
         rts
 

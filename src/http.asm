@@ -462,6 +462,33 @@ http_bytes_hi dta b(0)
         jsr http_ensure_prefix
         jsr http_url_tolower
         jsr http_save_base
+
+        ; Check if URL points to an image file
+        jsr http_check_img_ext
+        bcc ?not_img
+        ; Image URL: copy to img_src_buf (strip N: prefix) and fetch
+        ldy #0
+        lda url_buffer
+        cmp #'N'
+        bne ?ci_nb
+        lda url_buffer+1
+        cmp #':'
+        bne ?ci_nb
+        ldy #2
+?ci_nb  ldx #0
+?ci_cp  lda url_buffer,y
+        sta img_src_buf,x
+        beq ?ci_go
+        iny
+        inx
+        cpx #IMG_SRC_SIZE-1
+        bne ?ci_cp
+        lda #0
+        sta img_src_buf,x
+?ci_go  jsr img_fetch_single
+        rts
+
+?not_img
         ; Hide previous image if active
         lda img_active
         beq ?noimg
@@ -470,10 +497,104 @@ http_bytes_hi dta b(0)
         jsr render_reset
         jsr ui_clear_content
         jsr ui_show_url
+
         jsr http_get
-        ; Images are now fetched on-demand via [N]IMG link clicks
         ; Show end-of-page status on status bar
         jsr ui_status_end
+        rts
+.endp
+
+; ----------------------------------------------------------------------------
+; http_check_img_ext - Check if url_buffer ends with image extension
+; Output: C=1 if image (.png, .jpg, .gif), C=0 if not
+; ----------------------------------------------------------------------------
+.proc http_check_img_ext
+        ; Find last '.' in URL
+        ldy #0
+        ldx #$FF               ; X = position of last dot ($FF=none)
+?scan   lda url_buffer,y
+        beq ?check
+        cmp #'.'
+        bne ?next
+        tya
+        tax                    ; X = dot position
+?next   iny
+        bne ?scan
+?check  cpx #$FF
+        bne ?has_dot
+        clc
+        rts                    ; no dot found
+?has_dot
+        ; Y = end of URL, X = last dot
+        ; Compare extension (after dot) against known types
+        inx                    ; X = first char after dot
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'p'
+        beq ?p
+        cmp #'j'
+        beq ?j
+        cmp #'g'
+        beq ?g
+        jmp ?no
+?p      ; "png"
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'n'
+        bne ?no
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'g'
+        bne ?no
+        inx
+        lda url_buffer,x
+        beq ?yes               ; null after "png" = match
+        jmp ?no
+?j      ; "jpg" or "jpeg"
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'p'
+        bne ?no
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'g'
+        bne ?je
+        inx
+        lda url_buffer,x
+        beq ?yes               ; null after "jpg" = match
+        jmp ?no
+?je     cmp #'e'               ; jpeg
+        bne ?no
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'g'
+        bne ?no
+        inx
+        lda url_buffer,x
+        beq ?yes
+        jmp ?no
+?g      ; "gif"
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'i'
+        bne ?no
+        inx
+        lda url_buffer,x
+        jsr to_lower
+        cmp #'f'
+        bne ?no
+        inx
+        lda url_buffer,x
+        beq ?yes               ; null after "gif" = match
+?no     clc
+        rts
+?yes    sec
         rts
 .endp
 
@@ -516,3 +637,4 @@ http_bytes_hi dta b(0)
         bne ?lp
 ?done   rts
 .endp
+

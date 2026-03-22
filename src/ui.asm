@@ -39,7 +39,7 @@
         rts
 
 m_urlp  dta c'URL: ',0
-m_help  dta c' Mouse:Click link  U:URL  B:Back  Q:Quit',0
+m_help  dta c' Click:Link  U:URL  B:Back  Q:Quit',0
 .endp
 
 ; ----------------------------------------------------------------------------
@@ -102,7 +102,6 @@ m_help  dta c' Mouse:Click link  U:URL  B:Back  Q:Quit',0
         beq ?back
         cmp #'B'
         beq ?back
-
         jmp ?loop
 
         ; Q = return to welcome screen
@@ -504,3 +503,7 @@ m_end   dta c' -- End -- Q:Quit U:URL B:Back',0
         jsr vbxe_fill_row
         rts
 .endp
+
+; ----------------------------------------------------------------------------
+; ui_settings - Settings screen
+; P toggles proxy, ESC/Q exits

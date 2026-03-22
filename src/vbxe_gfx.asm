@@ -85,6 +85,10 @@ img_wr_bank    dta b(0)        ; MEMAC B bank number
         lda zp_rx_len
         beq ?done
 
+        ; Disable interrupts: IRQ/VBI handlers are above $4000,
+        ; MEMAC B maps VRAM over $4000-$7FFF — interrupt would crash!
+        sei
+
         ; Enable MEMAC B
         ldy #VBXE_MEMAC_B
         lda img_wr_bank
@@ -118,6 +122,10 @@ img_wr_bank    dta b(0)        ; MEMAC B bank number
 
         ; Disable MEMAC B
         memb_off
+
+        ; Re-enable interrupts
+        cli
+
 ?done   rts
 .endp
 
