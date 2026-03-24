@@ -20,10 +20,9 @@
 
 ### From SpartaDOS X (recommended)
 
-The fastest way to run the browser on real hardware. [SpartaDOS X](https://atariwiki.org/wiki/Wiki.jsp?page=SpartaDOS%20X) with FujiNet uses hi-SIO for high-speed transfers over the SIO bus, so the ~10 KB XEX loads almost instantly from a TNFS share.
+The fastest way to run the browser on real hardware. [SpartaDOS X](https://atariwiki.org/wiki/Wiki.jsp?page=SpartaDOS%20X) with FujiNet supports hi-SIO (high-speed SIO), so the ~10 KB XEX loads almost instantly.
 
-1. Mount a TNFS share on FujiNet (via FujiNet Config or `FCONFIG.COM`)
-2. From SDX command line, run the XEX: `browser.xex`
+At the SDX command line, just run: `browser.xex`
 
 ### From Altirra emulator
 
