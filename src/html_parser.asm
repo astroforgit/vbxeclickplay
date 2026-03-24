@@ -440,7 +440,9 @@ comment_dashes dta 0
         bne ?head_chk
         ldx skip_to_heading
         bne ?skip
-?emit   cmp #13
+?emit   ldx in_pre
+        bne ?pre_ch
+        cmp #13
         beq ?ws
         cmp #10
         beq ?ws
@@ -448,16 +450,16 @@ comment_dashes dta 0
         beq ?ws
         jsr render_char
         rts
-?ws     ldx in_pre
-        bne ?pre_ws
-        lda #CH_SPACE
+?ws     lda #CH_SPACE
         jsr render_char
 ?skip   rts
-?pre_ws cmp #10
+?pre_ch cmp #10
         beq ?pre_nl
-        rts                    ; CR in pre → skip
-?pre_nl jsr render_flush_word
-        jsr render_do_nl
+        cmp #13
+        beq ?skip              ; CR in pre → skip
+        jsr render_out_char    ; direct output, preserve spaces
+        rts
+?pre_nl jsr render_do_nl
         rts
 ?head_chk
         ; In <head> - only emit if inside <title>
