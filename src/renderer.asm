@@ -512,6 +512,24 @@ rpp_state_buf   .ds 15             ; save $84-$92 (cur_attr through entity_idx)
         rts
 .endp
 
+; ----------------------------------------------------------------------------
+; render_tbl_line - Draw table row separator (gray, full width)
+; ----------------------------------------------------------------------------
+.proc render_tbl_line
+        lda #ATTR_DECOR
+        sta zp_cur_attr
+        ldx #SCR_COLS
+?lp     lda #'-'
+        stx zp_tmp3
+        jsr render_out_char
+        ldx zp_tmp3
+        dex
+        bne ?lp
+        lda #ATTR_NORMAL
+        sta zp_cur_attr
+        rts
+.endp
+
 ; Renderer state
 last_was_sp dta 0
 title_len   dta 0

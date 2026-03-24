@@ -295,6 +295,7 @@ BCB_CONTENT_SCROLL_OFS = 63
         bne ?lp
 
         ; --- Gradient palette (indices 8-11) for title banner ---
+        ; CSEL=8 here (from main loop above)
         ldx #0
 ?grad   ldy #VBXE_CR
         lda grad_pal_r,x
@@ -315,6 +316,29 @@ BCB_CONTENT_SCROLL_OFS = 63
         inx
         cpx #4
         bne ?grad
+
+        ; --- Extra text colors (indices 12-15) ---
+        ; CSEL=12 here (from gradient loop: 3+9=12)
+        ldx #0
+?ext    ldy #VBXE_CR
+        lda ext_pal_r,x
+        sta (zp_vbxe_base),y
+        iny
+        lda ext_pal_g,x
+        sta (zp_vbxe_base),y
+        iny
+        lda ext_pal_b,x
+        sta (zp_vbxe_base),y
+
+        ldy #VBXE_CSEL
+        txa
+        clc
+        adc #13
+        sta (zp_vbxe_base),y
+
+        inx
+        cpx #4
+        bne ?ext
 
         ; Set palette entries $20-$3F to blue (link colors with embedded link#)
         ldy #VBXE_CSEL
@@ -349,7 +373,12 @@ pal_r dta   $00, $FF, $00, $FF, $00, $FF, $88, $FF
 pal_g dta   $00, $FF, $AA, $AA, $FF, $44, $88, $FF
 pal_b dta   $00, $FF, $FF, $00, $00, $44, $88, $00
 
-; Gradient: dark blue (top) → medium blue (bottom)
+;            cyan  pink  ltgray lime
+ext_pal_r dta $00,  $FF,  $BB,  $88
+ext_pal_g dta $DD,  $88,  $BB,  $FF
+ext_pal_b dta $FF,  $CC,  $BB,  $44
+
+; Gradient: dark blue (top) -> medium blue (bottom)
 grad_pal_r dta $10, $20, $30, $50
 grad_pal_g dta $10, $30, $60, $90
 grad_pal_b dta $40, $80, $C0, $FF

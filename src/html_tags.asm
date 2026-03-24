@@ -59,6 +59,12 @@
         beq ?joh
         cmp #TAG_H3
         beq ?joh
+        cmp #TAG_H4
+        beq ?joh
+        cmp #TAG_H5
+        beq ?joh
+        cmp #TAG_H6
+        beq ?joh
         cmp #TAG_P
         beq ?jop
         cmp #TAG_BR
@@ -79,6 +85,12 @@
         beq ?joital
         cmp #TAG_EM
         beq ?joital
+        cmp #TAG_U
+        beq ?jound
+        cmp #TAG_SUP
+        beq ?josup
+        cmp #TAG_SUB
+        beq ?josub
         cmp #TAG_TITLE
         jmp open_tag_more
 
@@ -90,6 +102,15 @@
 ?joli   jmp open_li
 ?jobold jmp open_bold
 ?joital jmp open_italic
+?jound  lda #ATTR_UNDERLINE
+        jsr render_set_attr
+        rts
+?josup  lda #ATTR_SUP
+        jsr render_set_attr
+        rts
+?josub  lda #ATTR_SUB
+        jsr render_set_attr
+        rts
 
 ?closing
         cmp #TAG_H1
@@ -97,6 +118,12 @@
         cmp #TAG_H2
         beq ?jch
         cmp #TAG_H3
+        beq ?jch
+        cmp #TAG_H4
+        beq ?jch
+        cmp #TAG_H5
+        beq ?jch
+        cmp #TAG_H6
         beq ?jch
         cmp #TAG_P
         beq ?jcp
@@ -114,6 +141,12 @@
         beq ?jci
         cmp #TAG_EM
         beq ?jci
+        cmp #TAG_U
+        beq ?jcattr
+        cmp #TAG_SUP
+        beq ?jcattr
+        cmp #TAG_SUB
+        beq ?jcattr
         cmp #TAG_TITLE
         jmp close_tag_more
 
@@ -123,6 +156,9 @@
 ?jcl    jmp close_list
 ?jcb    jmp close_bold
 ?jci    jmp close_italic
+?jcattr lda #ATTR_NORMAL
+        jsr render_set_attr
+        rts
 .endp
 
 ; Remaining open tag checks
@@ -144,6 +180,21 @@
         beq ?ohead
         cmp #TAG_BODY
         beq ?obody
+        ; HTML5 semantic tags — behave like div
+        cmp #TAG_NAV
+        beq ?odiv
+        cmp #TAG_ARTICLE
+        beq ?odiv
+        cmp #TAG_SECTION
+        beq ?odiv
+        cmp #TAG_ASIDE
+        beq ?odiv
+        cmp #TAG_HEADER
+        beq ?odiv
+        cmp #TAG_FOOTER
+        beq ?odiv
+        cmp #TAG_MAIN
+        beq ?odiv
         jmp open_tag_tbl
 
 ?otitle jsr render_flush_word
@@ -194,6 +245,21 @@
         beq ?chead
         cmp #TAG_DIV
         beq ?cdiv
+        ; HTML5 semantic close tags — behave like </div>
+        cmp #TAG_NAV
+        beq ?cdiv
+        cmp #TAG_ARTICLE
+        beq ?cdiv
+        cmp #TAG_SECTION
+        beq ?cdiv
+        cmp #TAG_ASIDE
+        beq ?cdiv
+        cmp #TAG_HEADER
+        beq ?cdiv
+        cmp #TAG_FOOTER
+        beq ?cdiv
+        cmp #TAG_MAIN
+        beq ?cdiv
         jmp close_tag_tbl
 
 ?ctitle lda #0
@@ -228,23 +294,35 @@
         cmp #TAG_TH
         beq ?oth
         cmp #TAG_BLOCKQUOTE
-        beq ?obq
+        beq ?jbq
         cmp #TAG_DT
-        beq ?odt
+        beq ?jdt
         cmp #TAG_DD
-        beq ?odd
+        beq ?jdd
         cmp #TAG_CODE
-        beq ?ocode
+        beq ?jcode
         cmp #TAG_PRE
-        beq ?opre
+        beq ?jpre
         rts
+?jbq    jmp ?obq
+?jdt    jmp ?odt
+?jdd    jmp ?odd
+?jcode  jmp ?ocode
+?jpre   jmp ?opre
 
 ?otable jsr render_flush_word
         jsr render_newline
+        jsr render_tbl_line
         lda #0
         sta td_count
         rts
 ?otr    jsr render_flush_word
+        ; Row separator (skip if first row, td_count=0)
+        lda td_count
+        beq ?otr_first
+        jsr render_newline
+        jsr render_tbl_line
+?otr_first
         jsr render_newline
         lda #0
         sta td_count
@@ -293,6 +371,8 @@
         rts
 ?opre   jsr render_flush_word
         jsr render_newline
+        lda #1
+        sta in_pre
         lda #ATTR_DECOR
         jsr render_set_attr
         rts
@@ -319,6 +399,8 @@ m_tbl_sep dta c' | ',0
         rts
 
 ?ctable jsr render_flush_word
+        jsr render_newline
+        jsr render_tbl_line
         jsr render_newline
         rts
 ?cth    lda #ATTR_NORMAL
@@ -348,6 +430,8 @@ m_tbl_sep dta c' | ',0
         rts
 ?cpre   jsr render_flush_word
         jsr render_newline
+        lda #0
+        sta in_pre
         lda #ATTR_NORMAL
         jsr render_set_attr
         rts
@@ -363,6 +447,7 @@ m_tbl_sep dta c' | ',0
         pha
         jsr render_flush_word
         jsr render_newline
+        jsr render_newline         ; blank line above heading
         lda #1
         sta zp_in_heading
         pla
@@ -370,11 +455,23 @@ m_tbl_sep dta c' | ',0
         beq ?h1
         cmp #TAG_H2
         beq ?h2
+        cmp #TAG_H4
+        beq ?h4
+        cmp #TAG_H5
+        beq ?h5
+        cmp #TAG_H6
+        beq ?h6
         lda #ATTR_H3
         jmp ?set
 ?h1     lda #ATTR_H1
         jmp ?set
 ?h2     lda #ATTR_H2
+        jmp ?set
+?h4     lda #ATTR_H4
+        jmp ?set
+?h5     lda #ATTR_H5
+        jmp ?set
+?h6     lda #ATTR_H6
 ?set    jsr render_set_attr
         rts
 .endp

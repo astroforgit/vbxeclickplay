@@ -48,6 +48,19 @@ TAG_DD         = 31
 TAG_CODE       = 32
 TAG_HEAD       = 33
 TAG_BODY       = 34
+TAG_H4         = 35
+TAG_H5         = 36
+TAG_H6         = 37
+TAG_U          = 38
+TAG_SUP        = 39
+TAG_SUB        = 40
+TAG_NAV        = 41
+TAG_ARTICLE    = 42
+TAG_SECTION    = 43
+TAG_ASIDE      = 44
+TAG_HEADER     = 45
+TAG_FOOTER     = 46
+TAG_MAIN       = 47
 
 TAG_BUF_SIZE   = 16
 ATTR_BUF_SIZE  = 16
@@ -65,6 +78,7 @@ ENTITY_BUF_SZ  = 8
         sta zp_in_skip
         sta is_closing
         sta in_title
+        sta in_pre
         sta img_src_len
         sta utf8_skip
         sta td_count
@@ -434,9 +448,17 @@ comment_dashes dta 0
         beq ?ws
         jsr render_char
         rts
-?ws     lda #CH_SPACE
+?ws     ldx in_pre
+        bne ?pre_ws
+        lda #CH_SPACE
         jsr render_char
 ?skip   rts
+?pre_ws cmp #10
+        beq ?pre_nl
+        rts                    ; CR in pre → skip
+?pre_nl jsr render_flush_word
+        jsr render_do_nl
+        rts
 ?head_chk
         ; In <head> - only emit if inside <title>
         ldx in_title
@@ -459,6 +481,7 @@ comment_dashes dta 0
 ; State variables
 is_closing     dta 0
 in_title       dta 0
+in_pre         dta 0          ; 1 = inside <pre>, preserve newlines
 utf8_skip      dta 0          ; bytes remaining to skip in UTF-8 sequence
 td_count       dta 0          ; table cell count in current row
 zp_in_head     dta 0          ; 1 = inside <head>, skip content except <title>

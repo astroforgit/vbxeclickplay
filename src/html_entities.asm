@@ -6,7 +6,7 @@
 ; lookup_tag - Find tag ID from tag_name_buf
 ; Output: A = tag ID
 ; ============================================================================
-NUM_TAGS = 34
+NUM_TAGS = 47
 
 .proc lookup_tag
         ldx #0
@@ -68,6 +68,19 @@ ts_dd     dta c'dd',0
 ts_code   dta c'code',0
 ts_head   dta c'head',0
 ts_body   dta c'body',0
+ts_h4     dta c'h4',0
+ts_h5     dta c'h5',0
+ts_h6     dta c'h6',0
+ts_u      dta c'u',0
+ts_sup    dta c'sup',0
+ts_sub    dta c'sub',0
+ts_nav    dta c'nav',0
+ts_article dta c'article',0
+ts_section dta c'section',0
+ts_aside  dta c'aside',0
+ts_header_tag dta c'header',0
+ts_footer dta c'footer',0
+ts_main   dta c'main',0
 
 tag_tbl_lo
         dta <ts_h1, <ts_h2, <ts_h3, <ts_p
@@ -79,6 +92,10 @@ tag_tbl_lo
         dta <ts_table, <ts_tr, <ts_td, <ts_th
         dta <ts_blockquote, <ts_dt, <ts_dd, <ts_code
         dta <ts_head, <ts_body
+        dta <ts_h4, <ts_h5, <ts_h6, <ts_u
+        dta <ts_sup, <ts_sub, <ts_nav, <ts_article
+        dta <ts_section, <ts_aside, <ts_header_tag, <ts_footer
+        dta <ts_main
 
 tag_tbl_hi
         dta >ts_h1, >ts_h2, >ts_h3, >ts_p
@@ -90,6 +107,10 @@ tag_tbl_hi
         dta >ts_table, >ts_tr, >ts_td, >ts_th
         dta >ts_blockquote, >ts_dt, >ts_dd, >ts_code
         dta >ts_head, >ts_body
+        dta >ts_h4, >ts_h5, >ts_h6, >ts_u
+        dta >ts_sup, >ts_sub, >ts_nav, >ts_article
+        dta >ts_section, >ts_aside, >ts_header_tag, >ts_footer
+        dta >ts_main
 
 tag_ids dta TAG_H1, TAG_H2, TAG_H3, TAG_P
         dta TAG_BR, TAG_A, TAG_UL, TAG_OL
@@ -100,6 +121,10 @@ tag_ids dta TAG_H1, TAG_H2, TAG_H3, TAG_P
         dta TAG_TABLE, TAG_TR, TAG_TD, TAG_TH
         dta TAG_BLOCKQUOTE, TAG_DT, TAG_DD, TAG_CODE
         dta TAG_HEAD, TAG_BODY
+        dta TAG_H4, TAG_H5, TAG_H6, TAG_U
+        dta TAG_SUP, TAG_SUB, TAG_NAV, TAG_ARTICLE
+        dta TAG_SECTION, TAG_ASIDE, TAG_HEADER, TAG_FOOTER
+        dta TAG_MAIN
 
 ; ============================================================================
 ; Entity decoding

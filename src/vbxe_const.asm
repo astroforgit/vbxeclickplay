@@ -109,6 +109,10 @@ COL_GREEN      = 4
 COL_RED        = 5
 COL_GRAY       = 6
 COL_YELLOW     = 7
+COL_CYAN       = 12   ; h4 headings
+COL_PINK       = 13   ; underline
+COL_LTGRAY     = 14   ; h5/h6 headings, sup/sub
+COL_LIME       = 15   ; sub
 
 ATTR_NORMAL    = COL_WHITE
 ATTR_LINK      = COL_BLUE     ; basic link color (for UI elements)
@@ -117,11 +121,17 @@ ATTR_HEADING   = COL_ORANGE
 ATTR_H1        = COL_YELLOW
 ATTR_H2        = COL_ORANGE
 ATTR_H3        = COL_GREEN
+ATTR_H4        = COL_CYAN
+ATTR_H5        = COL_LTGRAY
+ATTR_H6        = COL_LTGRAY
 ATTR_URL       = COL_GREEN
 ATTR_ERROR     = COL_RED
 ATTR_DECOR     = COL_GRAY
 ATTR_HILINK    = COL_YELLOW
 ATTR_BOLD      = COL_WHITE
+ATTR_UNDERLINE = COL_PINK
+ATTR_SUP       = COL_GRAY
+ATTR_SUB       = COL_LIME
 
 ; ----------------------------------------------------------------------------
 ; Atari System Equates
