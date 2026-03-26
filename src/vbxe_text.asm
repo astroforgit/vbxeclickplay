@@ -128,21 +128,6 @@ row_addr_hi
 .endp
 
 ; ----------------------------------------------------------------------------
-; vbxe_newline - Move cursor to start of next line, scroll if needed
-; ----------------------------------------------------------------------------
-.proc vbxe_newline
-        lda #0
-        sta zp_cursor_col
-        inc zp_cursor_row
-        lda zp_cursor_row
-        cmp #SCR_ROWS
-        bcc ?ok
-        dec zp_cursor_row
-        jsr vbxe_scroll_up
-?ok     rts
-.endp
-
-; ----------------------------------------------------------------------------
 ; vbxe_clear_row - Clear one row (A=row number)
 ; ----------------------------------------------------------------------------
 .proc vbxe_clear_row
@@ -166,17 +151,6 @@ row_addr_hi
         bne ?lp
 
         memb_off
-        rts
-.endp
-
-; ----------------------------------------------------------------------------
-; vbxe_scroll_content - Scroll content area (rows 2-22) up by 1 via blitter
-; Uses chained BCBs: scroll rows 3-22 up + clear row 22
-; No MEMAC B needed - blitter works directly with VRAM addresses
-; ----------------------------------------------------------------------------
-.proc vbxe_scroll_content
-        blit_start (VRAM_BCB + BCB_CONTENT_SCROLL_OFS)
-        blit_wait
         rts
 .endp
 

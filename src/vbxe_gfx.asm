@@ -6,37 +6,24 @@
 
 ; Image VRAM layout (after font data at $2000-$2FFF)
 VRAM_IMG_BASE  = $3000         ; Image storage starts here
-IMG_MAX_WIDTH  = 320           ; Max width = VBXE standard mode
 
 ; Image state
 img_active     dta b(0)        ; 1 = image on screen
 
 ; Working variables for current image
 img_height     dta b(0)
-img_width      dta a(0)
 img_vram       dta b(0),b(0),b(0)
 
 ; Write pointer for pixel streaming
 img_wr_bank    dta b(0)        ; MEMAC B bank number
 
 ; ----------------------------------------------------------------------------
-; vbxe_img_reset - Reset image state for new page
-; ----------------------------------------------------------------------------
-.proc vbxe_img_reset
-        lda #0
-        sta img_active
-        rts
-.endp
-
-; ----------------------------------------------------------------------------
 ; vbxe_img_alloc - Allocate VRAM for image (always at VRAM_IMG_BASE)
 ; Input: A=height, X=width lo, Y=width hi
-; Output: C=0 ok, img_vram/img_width/img_height set
+; Output: C=0 ok, img_vram/img_height set
 ; ----------------------------------------------------------------------------
 .proc vbxe_img_alloc
         sta img_height
-        stx img_width
-        sty img_width+1
         ; Always start at VRAM_IMG_BASE (overwrite previous image)
         lda #<VRAM_IMG_BASE
         sta img_vram
@@ -298,7 +285,7 @@ pb_read        dta b(0),b(0),b(0)   ; 24-bit bytes read so far
 
 ; ----------------------------------------------------------------------------
 ; vbxe_img_show_fullscreen - Show current image fullscreen
-; Uses img_vram, img_width, img_height (set by alloc)
+; Uses img_vram, img_height (set by alloc)
 ; XDL: init(24 border) + GMON(image) + TMON(status bar) + END
 ; Status bar shows last text row (STATUS_ROW) below the image
 ; ----------------------------------------------------------------------------
@@ -487,8 +474,7 @@ img_remaining dta b(0)
         memb_on 0
         jsr setup_xdl
         memb_off
-        jsr setup_palette
-        rts
+        jmp setup_palette
 .endp
 
 ; ============================================================================

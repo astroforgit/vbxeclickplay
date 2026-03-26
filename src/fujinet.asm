@@ -8,12 +8,10 @@ fn_cur_unit    dta FN_UNIT     ; current N: unit (1=page, 2=image)
 FN_CMD_OPEN    = 'O'
 FN_CMD_CLOSE   = 'C'
 FN_CMD_READ    = 'R'
-FN_CMD_WRITE   = 'W'
 FN_CMD_STATUS  = 'S'
 SIO_READ       = $40
 SIO_WRITE      = $80
 SIO_NONE       = $00
-FN_HTTP_GET    = 12
 FN_OPEN_READ   = 4
 FN_TRANS_NONE  = 0
 FN_TIMEOUT     = 30

@@ -353,6 +353,9 @@ img_pix_cnt  dta b(0),b(0),b(0)  ; 24-bit pixel byte counter
 ; Called when user clicks on [N]IMG link
 ; ----------------------------------------------------------------------------
 .proc img_fetch_single
+        ; Save page URL (img_resolve_and_build_url overwrites url_buffer)
+        jsr img_save_url
+
         status_msg COL_YELLOW, m_step1
 
         ; Resolve relative URL and build vbxe.php converter URL
@@ -443,15 +446,16 @@ img_pix_cnt  dta b(0),b(0),b(0)  ; 24-bit pixel byte counter
         ; Restore text display
         jsr vbxe_img_hide
         jsr setup_palette
-        jsr ui_status_done
-        rts
+        jsr img_restore_url
+        jmp ui_status_done
 
 ?e_open jsr fn_close
+        jsr img_restore_url
         lda #<me_open
         ldx #>me_open
-        jsr ui_show_error
-        rts
+        jmp ui_show_error
 ?e_hdr  jsr fn_close
+        jsr img_restore_url
         ; Patch error code digit into message string
         lda img_err_code
         clc
@@ -463,34 +467,25 @@ img_pix_cnt  dta b(0),b(0),b(0)  ; 24-bit pixel byte counter
         lsr
         lsr
         lsr
-        jsr ?hex
+        jsr nibble_to_hex
         sta me_hdr_h
         lda img_fn_err
         and #$0F
-        jsr ?hex
+        jsr nibble_to_hex
         sta me_hdr_h+1
         lda #<me_hdr
         ldx #>me_hdr
-        jsr ui_show_error
-        rts
-?hex    cmp #10
-        bcc ?dig
-        clc
-        adc #'A'-10
-        rts
-?dig    clc
-        adc #'0'
-        rts
+        jmp ui_show_error
 ?e_alloc jsr fn_close
+        jsr img_restore_url
         lda #<me_alloc
         ldx #>me_alloc
-        jsr ui_show_error
-        rts
+        jmp ui_show_error
 ?e_pal  jsr fn_close
+        jsr img_restore_url
         lda #<me_pal
         ldx #>me_pal
-        jsr ui_show_error
-        rts
+        jmp ui_show_error
 
 m_imgview dta c' Image - press any key',0
 m_step1  dta c' IMG: resolving URL...',0
@@ -504,6 +499,36 @@ me_hdr_n dta c'? FN=$'
 me_hdr_h dta c'??',0
 me_alloc dta c'IMG err: VRAM alloc',0
 me_pal   dta c'IMG err: palette',0
+.endp
+
+; ----------------------------------------------------------------------------
+; img_save_url / img_restore_url - Save/restore url_buffer around image fetch
+; (img_resolve_and_build_url overwrites url_buffer with converter URL)
+; ----------------------------------------------------------------------------
+.proc img_save_url
+        ldy #0
+?lp     lda url_buffer,y
+        sta url_save_buf,y
+        iny
+        bne ?lp
+        lda url_length
+        sta url_save_len
+        lda url_length+1
+        sta url_save_len+1
+        rts
+.endp
+
+.proc img_restore_url
+        ldy #0
+?lp     lda url_save_buf,y
+        sta url_buffer,y
+        iny
+        bne ?lp
+        lda url_save_len
+        sta url_length
+        lda url_save_len+1
+        sta url_length+1
+        rts
 .endp
 
 ; Image URL prefix/suffix (global, used by img_resolve_and_build_url)

@@ -24,8 +24,7 @@
         jsr vbxe_print
 
         lda #ATTR_NORMAL
-        jsr vbxe_setattr
-        rts
+        jmp vbxe_setattr
 
 m_urlp  dta c'URL: ',0
 .endp
@@ -58,8 +57,6 @@ m_urlp  dta c'URL: ',0
         lda #KEY_NONE
         sta CH
         jsr mouse_hide_cursor
-        lda #$FF
-        sta zp_mouse_prev_x
         jsr ui_follow_link
         jsr ?chk_pending
         jmp ?loop
@@ -85,6 +82,10 @@ m_urlp  dta c'URL: ',0
         beq ?back
         cmp #'B'
         beq ?back
+        cmp #'p'
+        beq ?proxy
+        cmp #'P'
+        beq ?proxy
         jmp ?loop
 
         ; Q = return to welcome screen
@@ -121,6 +122,13 @@ m_urlp  dta c'URL: ',0
 ?back_done
         lda #$FF
         sta zp_mouse_prev_x
+        jmp ?loop
+
+?proxy  ; Toggle proxy mode and refresh welcome screen
+        lda use_proxy
+        eor #1
+        sta use_proxy
+        jsr show_welcome
         jmp ?loop
 
         ; Check if user pressed a link number during --More--
@@ -233,8 +241,7 @@ m_go    dta c'Go to: ',0
         lda #0
         sta img_src_buf,x
 ?icpd   jsr img_fetch_single
-        jsr ui_status_end      ; restore "-- End --" bar after image view
-        rts
+        jmp ui_status_end      ; restore "-- End --" bar after image view
 
 ?normal_link
         ldy #0
@@ -252,13 +259,11 @@ m_go    dta c'Go to: ',0
 
         jsr http_resolve_url   ; resolve relative URLs from links
         jsr history_push
-        jsr http_navigate
-        rts
+        jmp http_navigate
 
 ?bad    lda #<m_badlnk
         ldx #>m_badlnk
-        jsr ui_show_error
-        rts
+        jmp ui_show_error
 
 m_badlnk dta c'Invalid link number',0
 .endp
@@ -278,10 +283,30 @@ m_badlnk dta c'Invalid link number',0
         lda #<ui_init.m_urlp
         ldx #>ui_init.m_urlp
         jsr vbxe_print
+        ; Check if URL starts with proxy prefix — if so, skip it
+        ; proxy_prefix = "N:https://turiecfoto.sk/proxy.php?url=" (38 chars)
+        ldy #0
+?chk    lda proxy_prefix,y
+        beq ?show_bare         ; end of prefix = full match, skip it
+        cmp url_buffer,y
+        bne ?show_full         ; mismatch = not proxied, show full URL
+        iny
+        bne ?chk
+?show_full
         lda #<url_buffer
         ldx #>url_buffer
-        jsr vbxe_print
-        rts
+        jmp vbxe_print
+?show_bare
+        ; Y = length of proxy prefix, print from url_buffer+Y
+        tya
+        clc
+        adc #<url_buffer
+        pha
+        lda #0
+        adc #>url_buffer
+        tax
+        pla
+        jmp vbxe_print
 .endp
 
 ; ----------------------------------------------------------------------------
@@ -299,8 +324,7 @@ m_badlnk dta c'Invalid link number',0
         ldx #>title_buf
         jsr vbxe_print
         lda #ATTR_NORMAL
-        jsr vbxe_setattr
-        rts
+        jmp vbxe_setattr
 .endp
 
 ; ----------------------------------------------------------------------------
@@ -353,8 +377,7 @@ m_badlnk dta c'Invalid link number',0
         ; Clear status bar after error dismiss
         lda #STATUS_ROW
         ldx #COL_BLACK
-        jsr vbxe_fill_row
-        rts
+        jmp vbxe_fill_row
 
 m_err   dta c'ERROR: ',0
 .endp
@@ -446,8 +469,7 @@ m_load  dta c' Loading...',0
         pla
 ?do_ones clc
         adc #'0'
-        jsr vbxe_putchar
-        rts
+        jmp vbxe_putchar
 
 m_prog  dta c' Loading... ',0
 m_kb    dta c'kB',0
@@ -487,8 +509,7 @@ m_end   dta c' -- End -- Q:Quit U:URL B:Back',0
 .proc ui_status_error
         lda #STATUS_ROW
         ldx #COL_RED
-        jsr vbxe_fill_row
-        rts
+        jmp vbxe_fill_row
 .endp
 
 ; ----------------------------------------------------------------------------

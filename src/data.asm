@@ -30,5 +30,9 @@ link_urls      .ds LINK_URLS_SZ
 ; Base URL for relative link resolution (up to last '/')
 base_url       .ds URL_BUF_SIZE
 
+; URL backup for image fetch (url_buffer gets overwritten by converter URL)
+url_save_buf   .ds URL_BUF_SIZE
+url_save_len   dta a(0)
+
 ; Image palette buffer (768 bytes = 256 colors * 3 bytes RGB)
 img_pal_buf    .ds 768

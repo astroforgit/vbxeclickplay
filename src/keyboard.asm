@@ -15,7 +15,6 @@ ICAX2   = $034B         ; Aux 2
 
 CIO_OPEN   = $03
 CIO_GET    = $07
-CIO_CLOSE  = $0C
 
 ; IOCB #1 offset (for K: device)
 KIOCB   = $10
@@ -24,7 +23,6 @@ KIOCB   = $10
 ATASCII_EOL = $9B       ; Return/Enter
 ATASCII_ESC = $1B       ; Escape
 ATASCII_BS  = $7E       ; Backspace/Delete
-ATASCII_TAB = $7F       ; Tab
 ATASCII_SP  = $20       ; Space
 
 ; ----------------------------------------------------------------------------
@@ -43,8 +41,7 @@ ATASCII_SP  = $20       ; Space
         sta ICBAL,x
         lda #>kdev_name
         sta ICBAH,x
-        jsr CIOV
-        rts
+        jmp CIOV
 
 kdev_name dta c'K:',$9B
 .endp
@@ -61,9 +58,8 @@ kdev_name dta c'K:',$9B
         lda #0
         sta ICBLL,x
         sta ICBLH,x
-        jsr CIOV
+        jmp CIOV
         ; A = ATASCII character
-        rts
 .endp
 
 ; ----------------------------------------------------------------------------

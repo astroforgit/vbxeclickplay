@@ -10,7 +10,6 @@
 
 VBXE_VCTL      = $40   ; VIDEO_CONTROL (R/W)
 VBXE_CORE_VER  = $40   ; CORE_VERSION (R) - same offset, read = version
-VBXE_MINOR_VER = $41   ; MINOR_REVISION (R)
 
 VBXE_XDL_ADR0  = $41   ; XDL address low byte (W)
 VBXE_XDL_ADR1  = $42   ; XDL address mid byte (W)
@@ -23,24 +22,13 @@ VBXE_CG        = $47   ; Color Green component
 VBXE_CB        = $48   ; Color Blue component
 
 VBXE_BL_ADR0   = $50   ; BCB address low
-VBXE_BL_ADR1   = $51   ; BCB address mid
-VBXE_BL_ADR2   = $52   ; BCB address high
 VBXE_BLITTER   = $53   ; Write $01=start, Read: non-zero=busy
 
 VBXE_MEMAC_B   = $5D   ; MEMAC B control (window $4000-$7FFF)
-VBXE_MEMAC_A   = $5E   ; MEMAC A control
-VBXE_MEMAC_AS  = $5F   ; MEMAC A bank select
 
 ; VIDEO_CONTROL bits
 VC_XDL_ENABLED = $01
 VC_XCOLOR      = $02
-VC_NO_TRANS    = $04
-
-; MEMAC B values
-MEMB_BANK0_ON  = $80   ; Bank 0, CPU access enabled
-MEMB_BANK1_ON  = $81
-MEMB_BANK2_ON  = $82
-MEMB_DISABLED  = $00
 
 FX_CORE_VER    = $10   ; Expected CORE_VERSION for FX core
 
@@ -50,17 +38,11 @@ FX_CORE_VER    = $10   ; Expected CORE_VERSION for FX core
 XDLC_TMON     = $0001
 XDLC_GMON     = $0002
 XDLC_OVOFF    = $0004
-XDLC_MAPON    = $0008
 XDLC_MAPOFF   = $0010
 XDLC_RPTL     = $0020
 XDLC_OVADR    = $0040
-XDLC_OVSCRL   = $0080
 XDLC_CHBASE   = $0100
-XDLC_MAPADR   = $0200
-XDLC_MAPPAR   = $0400
 XDLC_OVATT    = $0800
-XDLC_HR       = $1000
-XDLC_LR       = $2000
 XDLC_END      = $8000
 
 ; ----------------------------------------------------------------------------
@@ -71,8 +53,6 @@ VRAM_BCB       = $1300  ; BCB blocks (after screen)
 VRAM_PATTERN   = $1380  ; Fill pattern (2 bytes)
 VRAM_XDL       = $1400  ; XDL
 VRAM_FONT      = $2000  ; Font: 256*8 = 2048 bytes
-VRAM_FONT_INV  = $2800  ; Inverse font
-VRAM_PAGE_BUF  = $14000 ; Page buffer for HTML download (bank 5+)
 PAGE_BUF_BANK  = 5      ; VRAM $14000 >> 14 = 5
 
 ; CPU addresses when MEMAC B bank 0 active ($4000 + VRAM offset)
@@ -87,7 +67,6 @@ MEMB_FONT      = $6000
 SCR_COLS       = 80
 SCR_ROWS       = 29
 SCR_STRIDE     = 160    ; 80 chars + 80 attrs
-VRAM_SCREEN_SZ = SCR_ROWS * SCR_STRIDE
 CHBASE_VAL     = 4      ; VRAM_FONT / $800
 
 ; Content area (derived from SCR_ROWS)
@@ -124,11 +103,8 @@ ATTR_H3        = COL_GREEN
 ATTR_H4        = COL_CYAN
 ATTR_H5        = COL_LTGRAY
 ATTR_H6        = COL_LTGRAY
-ATTR_URL       = COL_GREEN
 ATTR_ERROR     = COL_RED
 ATTR_DECOR     = COL_GRAY
-ATTR_HILINK    = COL_YELLOW
-ATTR_BOLD      = COL_WHITE
 ATTR_UNDERLINE = COL_PINK
 ATTR_SUP       = COL_GRAY
 ATTR_SUB       = COL_LIME
@@ -137,17 +113,10 @@ ATTR_SUB       = COL_LIME
 ; Atari System Equates
 ; ----------------------------------------------------------------------------
 RTCLOK     = $0012
-VDSLST     = $0200
 SDMCTL     = $022F
-SDLSTL     = $0230
 CHBAS      = $02F4
-CRSINH     = $02F0
 CH         = $02FC
-CONSOL     = $D01F
 PORTA      = $D300
-PORTB      = $D301
-NMIEN      = $D40E
-WSYNC      = $D40A
 SIOV       = $E459
 COLDSV     = $E477
 PAL        = $D014         ; PAL/NTSC flag ($01=PAL, other=NTSC)
@@ -169,10 +138,7 @@ DVSTAT     = $02EA
 
 ; Keyboard codes
 KEY_RETURN = $0C
-KEY_ESC    = $1C
-KEY_TAB    = $2C
 KEY_SPACE  = $21
-KEY_DELETE = $34
 KEY_NONE   = $FF
 
 CH_SPACE   = $20

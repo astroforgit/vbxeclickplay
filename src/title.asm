@@ -115,8 +115,25 @@
         dex
         bne ?fl2
 
-        ; === Press U prompt (row 21, centered) ===
-        lda #21
+        ; === Proxy status (row 20) ===
+        lda #20
+        ldx #25
+        jsr vbxe_setpos
+        lda use_proxy
+        beq ?poff
+        lda #COL_GREEN
+        jsr vbxe_setattr
+        lda #<tw_pon
+        ldx #>tw_pon
+        jmp ?pshow
+?poff   lda #ATTR_DECOR
+        jsr vbxe_setattr
+        lda #<tw_poff
+        ldx #>tw_poff
+?pshow  jsr vbxe_print
+
+        ; === Press U prompt (row 22, centered) ===
+        lda #22
         ldx #27
         jsr vbxe_setpos
         lda #ATTR_LINK
@@ -125,8 +142,8 @@
         ldx #>tw_press_u
         jsr vbxe_print
 
-        ; === Author (row 23, centered) ===
-        lda #23
+        ; === Author (row 24, centered) ===
+        lda #24
         ldx #15
         jsr vbxe_setpos
         lda #ATTR_DECOR
@@ -136,8 +153,7 @@
         jsr vbxe_print
 
         lda #ATTR_NORMAL
-        jsr vbxe_setattr
-        rts
+        jmp vbxe_setattr
 .endp
 
 ; Title screen strings
@@ -148,5 +164,7 @@ tw_ctrl_hdr dta c'Controls:',0
 tw_ctrl1    dta c'U - Enter URL              B - Back',0
 tw_ctrl2    dta c'H - Skip to heading        Q - Quit page',0
 tw_ctrl3    dta c'Space/Return - Next page   Click - follow link',0
-tw_ctrl4    dta c'Images: click IMG link to view fullscreen',0
+tw_ctrl4    dta c'P - Toggle proxy (fast)    IMG links: click to view',0
 tw_press_u  dta c'Press U to start browsing.',0
+tw_pon      dta c'Proxy: ON  (P to toggle)',0
+tw_poff     dta c'Proxy: OFF (P to toggle)',0

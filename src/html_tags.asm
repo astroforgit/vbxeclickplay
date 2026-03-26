@@ -2,23 +2,27 @@
 ; HTML Tag Handlers - open/close tag actions, attribute processing, link storage
 ; ============================================================================
 
+; Current tag ID - saved before dispatch for handlers that need it
+current_tag_id dta 0
+
 ; ============================================================================
-; process_tag - Handle parsed tag (split into open/close sub-procs)
+; process_tag - Handle parsed tag via jump table dispatch
 ; ============================================================================
 .proc process_tag
         jsr lookup_tag
+        sta current_tag_id
 
         ; In skip mode (script/style), only process their
         ; closing tags - ignore everything else inside the block
         ldx zp_in_skip
         beq ?not_skip
         ldx is_closing
-        beq ?skip_ret
+        beq ?ret
         cmp #TAG_SCRIPT
         beq ?cls
         cmp #TAG_STYLE
         beq ?cls
-?skip_ret rts
+?ret    rts
 ?cls    lda #0
         sta zp_in_skip
         rts
@@ -28,429 +32,464 @@
         ; If a known content tag appears, auto-clear head mode
         ; (safety for pages without explicit <body>)
         ldx zp_in_head
-        beq ?full
+        beq ?dispatch
         cmp #TAG_TITLE
-        beq ?full
+        beq ?dispatch
         cmp #TAG_SCRIPT
-        beq ?full
+        beq ?dispatch
         cmp #TAG_STYLE
-        beq ?full
+        beq ?dispatch
         cmp #TAG_HEAD
-        beq ?full
+        beq ?dispatch
         cmp #TAG_BODY
-        beq ?full
+        beq ?dispatch
         cmp #TAG_UNKNOWN
-        beq ?skip_in_head     ; meta/link etc. - ignore in head
+        beq ?ret              ; meta/link etc. - ignore in head
         ; Known content tag (p, div, h1...) - page has no <body>
-        pha
         lda #0
         sta zp_in_head
-        pla
-        jmp ?full
-?skip_in_head rts
 
-?full   ldx is_closing
-        bne ?closing
-
-        ; Opening tags - use jump table approach
-        cmp #TAG_H1
-        beq ?joh
-        cmp #TAG_H2
-        beq ?joh
-        cmp #TAG_H3
-        beq ?joh
-        cmp #TAG_H4
-        beq ?joh
-        cmp #TAG_H5
-        beq ?joh
-        cmp #TAG_H6
-        beq ?joh
-        cmp #TAG_P
-        beq ?jop
-        cmp #TAG_BR
-        beq ?jop
-        cmp #TAG_A
-        beq ?joa
-        cmp #TAG_UL
-        beq ?joul
-        cmp #TAG_OL
-        beq ?jool
-        cmp #TAG_LI
-        beq ?joli
-        cmp #TAG_B
-        beq ?jobold
-        cmp #TAG_STRONG
-        beq ?jobold
-        cmp #TAG_I
-        beq ?joital
-        cmp #TAG_EM
-        beq ?joital
-        cmp #TAG_U
-        beq ?jound
-        cmp #TAG_SUP
-        beq ?josup
-        cmp #TAG_SUB
-        beq ?josub
-        cmp #TAG_TITLE
-        jmp open_tag_more
-
-?joh    jmp open_heading
-?jop    jmp open_para
-?joa    jmp open_link
-?joul   jmp open_ul
-?jool   jmp open_ol
-?joli   jmp open_li
-?jobold jmp open_bold
-?joital jmp open_italic
-?jound  lda #ATTR_UNDERLINE
-        jsr render_set_attr
-        rts
-?josup  lda #ATTR_SUP
-        jsr render_set_attr
-        rts
-?josub  lda #ATTR_SUB
-        jsr render_set_attr
-        rts
-
-?closing
-        cmp #TAG_H1
-        beq ?jch
-        cmp #TAG_H2
-        beq ?jch
-        cmp #TAG_H3
-        beq ?jch
-        cmp #TAG_H4
-        beq ?jch
-        cmp #TAG_H5
-        beq ?jch
-        cmp #TAG_H6
-        beq ?jch
-        cmp #TAG_P
-        beq ?jcp
-        cmp #TAG_A
-        beq ?jca
-        cmp #TAG_UL
-        beq ?jcl
-        cmp #TAG_OL
-        beq ?jcl
-        cmp #TAG_B
-        beq ?jcb
-        cmp #TAG_STRONG
-        beq ?jcb
-        cmp #TAG_I
-        beq ?jci
-        cmp #TAG_EM
-        beq ?jci
-        cmp #TAG_U
-        beq ?jcattr
-        cmp #TAG_SUP
-        beq ?jcattr
-        cmp #TAG_SUB
-        beq ?jcattr
-        cmp #TAG_TITLE
-        jmp close_tag_more
-
-?jch    jmp close_heading
-?jcp    jmp close_para
-?jca    jmp close_link
-?jcl    jmp close_list
-?jcb    jmp close_bold
-?jci    jmp close_italic
-?jcattr lda #ATTR_NORMAL
-        jsr render_set_attr
-        rts
+?dispatch
+        ldx current_tag_id
+        lda is_closing
+        bne ?close
+        ; --- Open tag dispatch ---
+        lda otbl_hi,x
+        sta zp_tmp_ptr+1
+        lda otbl_lo,x
+        sta zp_tmp_ptr
+        jmp (zp_tmp_ptr)
+?close  ; --- Close tag dispatch ---
+        lda ctbl_hi,x
+        sta zp_tmp_ptr+1
+        lda ctbl_lo,x
+        sta zp_tmp_ptr
+        jmp (zp_tmp_ptr)
 .endp
 
-; Remaining open tag checks
-.proc open_tag_more
-        beq ?otitle
-        cmp #TAG_SCRIPT
-        beq ?oskip
-        cmp #TAG_STYLE
-        beq ?oskip
-        cmp #TAG_IMG
-        beq ?oimg
-        cmp #TAG_HR
-        beq ?ohr
-        cmp #TAG_DIV
-        beq ?odiv
-        cmp #TAG_NOSCRIPT
-        beq ?onoscript
-        cmp #TAG_HEAD
-        beq ?ohead
-        cmp #TAG_BODY
-        beq ?obody
-        ; HTML5 semantic tags — behave like div
-        cmp #TAG_NAV
-        beq ?odiv
-        cmp #TAG_ARTICLE
-        beq ?odiv
-        cmp #TAG_SECTION
-        beq ?odiv
-        cmp #TAG_ASIDE
-        beq ?odiv
-        cmp #TAG_HEADER
-        beq ?odiv
-        cmp #TAG_FOOTER
-        beq ?odiv
-        cmp #TAG_MAIN
-        beq ?odiv
-        jmp open_tag_tbl
+; Handler for tags with no action
+nop_tag rts
 
-?otitle jsr render_flush_word
+; ============================================================================
+; Jump tables - 48 entries each (TAG_UNKNOWN=0 .. TAG_MAIN=47)
+; ============================================================================
+otbl_lo dta <nop_tag           ; 0  UNKNOWN
+        dta <open_heading      ; 1  H1
+        dta <open_heading      ; 2  H2
+        dta <open_heading      ; 3  H3
+        dta <open_para         ; 4  P
+        dta <open_para         ; 5  BR
+        dta <open_link         ; 6  A
+        dta <open_ul           ; 7  UL
+        dta <open_ol           ; 8  OL
+        dta <open_li           ; 9  LI
+        dta <open_bold         ; 10 B
+        dta <open_bold         ; 11 STRONG
+        dta <open_italic       ; 12 I
+        dta <open_italic       ; 13 EM
+        dta <open_title        ; 14 TITLE
+        dta <open_skip         ; 15 SCRIPT
+        dta <open_skip         ; 16 STYLE
+        dta <open_img          ; 17 IMG
+        dta <nop_tag           ; 18 INPUT
+        dta <nop_tag           ; 19 FORM
+        dta <open_div          ; 20 DIV
+        dta <nop_tag           ; 21 SPAN
+        dta <open_pre          ; 22 PRE
+        dta <open_hr           ; 23 HR
+        dta <nop_tag           ; 24 NOSCRIPT
+        dta <open_table        ; 25 TABLE
+        dta <open_tr           ; 26 TR
+        dta <open_td           ; 27 TD
+        dta <open_th           ; 28 TH
+        dta <open_bq           ; 29 BLOCKQUOTE
+        dta <open_dt           ; 30 DT
+        dta <open_dd           ; 31 DD
+        dta <open_code         ; 32 CODE
+        dta <open_head         ; 33 HEAD
+        dta <open_body         ; 34 BODY
+        dta <open_heading      ; 35 H4
+        dta <open_heading      ; 36 H5
+        dta <open_heading      ; 37 H6
+        dta <open_underline    ; 38 U
+        dta <open_sup          ; 39 SUP
+        dta <open_sub          ; 40 SUB
+        dta <open_div          ; 41 NAV
+        dta <open_div          ; 42 ARTICLE
+        dta <open_div          ; 43 SECTION
+        dta <open_div          ; 44 ASIDE
+        dta <open_div          ; 45 HEADER
+        dta <open_div          ; 46 FOOTER
+        dta <open_div          ; 47 MAIN
+
+otbl_hi dta >nop_tag           ; 0  UNKNOWN
+        dta >open_heading      ; 1  H1
+        dta >open_heading      ; 2  H2
+        dta >open_heading      ; 3  H3
+        dta >open_para         ; 4  P
+        dta >open_para         ; 5  BR
+        dta >open_link         ; 6  A
+        dta >open_ul           ; 7  UL
+        dta >open_ol           ; 8  OL
+        dta >open_li           ; 9  LI
+        dta >open_bold         ; 10 B
+        dta >open_bold         ; 11 STRONG
+        dta >open_italic       ; 12 I
+        dta >open_italic       ; 13 EM
+        dta >open_title        ; 14 TITLE
+        dta >open_skip         ; 15 SCRIPT
+        dta >open_skip         ; 16 STYLE
+        dta >open_img          ; 17 IMG
+        dta >nop_tag           ; 18 INPUT
+        dta >nop_tag           ; 19 FORM
+        dta >open_div          ; 20 DIV
+        dta >nop_tag           ; 21 SPAN
+        dta >open_pre          ; 22 PRE
+        dta >open_hr           ; 23 HR
+        dta >nop_tag           ; 24 NOSCRIPT
+        dta >open_table        ; 25 TABLE
+        dta >open_tr           ; 26 TR
+        dta >open_td           ; 27 TD
+        dta >open_th           ; 28 TH
+        dta >open_bq           ; 29 BLOCKQUOTE
+        dta >open_dt           ; 30 DT
+        dta >open_dd           ; 31 DD
+        dta >open_code         ; 32 CODE
+        dta >open_head         ; 33 HEAD
+        dta >open_body         ; 34 BODY
+        dta >open_heading      ; 35 H4
+        dta >open_heading      ; 36 H5
+        dta >open_heading      ; 37 H6
+        dta >open_underline    ; 38 U
+        dta >open_sup          ; 39 SUP
+        dta >open_sub          ; 40 SUB
+        dta >open_div          ; 41 NAV
+        dta >open_div          ; 42 ARTICLE
+        dta >open_div          ; 43 SECTION
+        dta >open_div          ; 44 ASIDE
+        dta >open_div          ; 45 HEADER
+        dta >open_div          ; 46 FOOTER
+        dta >open_div          ; 47 MAIN
+
+ctbl_lo dta <nop_tag           ; 0  UNKNOWN
+        dta <close_heading     ; 1  H1
+        dta <close_heading     ; 2  H2
+        dta <close_heading     ; 3  H3
+        dta <close_para        ; 4  P
+        dta <nop_tag           ; 5  BR (no close)
+        dta <close_link        ; 6  A
+        dta <close_list        ; 7  UL
+        dta <close_list        ; 8  OL
+        dta <nop_tag           ; 9  LI (no close)
+        dta <close_bold        ; 10 B
+        dta <close_bold        ; 11 STRONG
+        dta <close_italic      ; 12 I
+        dta <close_italic      ; 13 EM
+        dta <close_title       ; 14 TITLE
+        dta <close_skip        ; 15 SCRIPT
+        dta <close_skip        ; 16 STYLE
+        dta <nop_tag           ; 17 IMG (no close)
+        dta <nop_tag           ; 18 INPUT
+        dta <nop_tag           ; 19 FORM
+        dta <close_div         ; 20 DIV
+        dta <nop_tag           ; 21 SPAN
+        dta <close_pre         ; 22 PRE
+        dta <nop_tag           ; 23 HR (no close)
+        dta <nop_tag           ; 24 NOSCRIPT
+        dta <close_table       ; 25 TABLE
+        dta <nop_tag           ; 26 TR
+        dta <nop_tag           ; 27 TD
+        dta <close_th          ; 28 TH
+        dta <close_bq          ; 29 BLOCKQUOTE
+        dta <close_dt          ; 30 DT
+        dta <close_dd          ; 31 DD
+        dta <close_code        ; 32 CODE
+        dta <close_head        ; 33 HEAD
+        dta <nop_tag           ; 34 BODY
+        dta <close_heading     ; 35 H4
+        dta <close_heading     ; 36 H5
+        dta <close_heading     ; 37 H6
+        dta <close_italic      ; 38 U   (= ATTR_NORMAL)
+        dta <close_italic      ; 39 SUP (= ATTR_NORMAL)
+        dta <close_italic      ; 40 SUB (= ATTR_NORMAL)
+        dta <close_div         ; 41 NAV
+        dta <close_div         ; 42 ARTICLE
+        dta <close_div         ; 43 SECTION
+        dta <close_div         ; 44 ASIDE
+        dta <close_div         ; 45 HEADER
+        dta <close_div         ; 46 FOOTER
+        dta <close_div         ; 47 MAIN
+
+ctbl_hi dta >nop_tag           ; 0  UNKNOWN
+        dta >close_heading     ; 1  H1
+        dta >close_heading     ; 2  H2
+        dta >close_heading     ; 3  H3
+        dta >close_para        ; 4  P
+        dta >nop_tag           ; 5  BR
+        dta >close_link        ; 6  A
+        dta >close_list        ; 7  UL
+        dta >close_list        ; 8  OL
+        dta >nop_tag           ; 9  LI
+        dta >close_bold        ; 10 B
+        dta >close_bold        ; 11 STRONG
+        dta >close_italic      ; 12 I
+        dta >close_italic      ; 13 EM
+        dta >close_title       ; 14 TITLE
+        dta >close_skip        ; 15 SCRIPT
+        dta >close_skip        ; 16 STYLE
+        dta >nop_tag           ; 17 IMG
+        dta >nop_tag           ; 18 INPUT
+        dta >nop_tag           ; 19 FORM
+        dta >close_div         ; 20 DIV
+        dta >nop_tag           ; 21 SPAN
+        dta >close_pre         ; 22 PRE
+        dta >nop_tag           ; 23 HR
+        dta >nop_tag           ; 24 NOSCRIPT
+        dta >close_table       ; 25 TABLE
+        dta >nop_tag           ; 26 TR
+        dta >nop_tag           ; 27 TD
+        dta >close_th          ; 28 TH
+        dta >close_bq          ; 29 BLOCKQUOTE
+        dta >close_dt          ; 30 DT
+        dta >close_dd          ; 31 DD
+        dta >close_code        ; 32 CODE
+        dta >close_head        ; 33 HEAD
+        dta >nop_tag           ; 34 BODY
+        dta >close_heading     ; 35 H4
+        dta >close_heading     ; 36 H5
+        dta >close_heading     ; 37 H6
+        dta >close_italic      ; 38 U
+        dta >close_italic      ; 39 SUP
+        dta >close_italic      ; 40 SUB
+        dta >close_div         ; 41 NAV
+        dta >close_div         ; 42 ARTICLE
+        dta >close_div         ; 43 SECTION
+        dta >close_div         ; 44 ASIDE
+        dta >close_div         ; 45 HEADER
+        dta >close_div         ; 46 FOOTER
+        dta >close_div         ; 47 MAIN
+
+; ============================================================================
+; Open tag handlers (extracted from old dispatch procs)
+; ============================================================================
+
+.proc open_title
+        jsr render_flush_word
         lda #1
         sta in_title
         rts
-?oskip  lda #1
+.endp
+
+.proc open_skip
+        lda #1
         sta zp_in_skip
         rts
-?onoscript rts                 ; show noscript content (we don't run JS)
-?ohead  lda #1
-        sta zp_in_head
-        rts
-?obody  lda #0
-        sta zp_in_head         ; clear head skip on <body>
-        sta http_bytes_lo      ; reset download counter so limit
-        sta http_bytes_hi      ; applies to body content only
-        rts
-?oimg   jsr render_flush_word
+.endp
+
+.proc open_img
+        jsr render_flush_word
         lda img_src_len
         beq ?nourl
         jsr store_img_as_link
 ?nourl  rts
-?ohr    jsr render_flush_word
+.endp
+
+.proc open_hr
+        jsr render_flush_word
         jsr render_newline
         jsr render_hr_line
-        jsr render_newline
-        rts
-?odiv   jsr render_flush_word
-        ; Only line-break if we have content on current line
-        ; (avoids blank line spam from deeply nested divs)
-        lda zp_render_col
-        beq ?dskip
-        jsr render_do_nl
-?dskip  rts
+        jmp render_newline
 .endp
 
-; Remaining close tag checks
-.proc close_tag_more
-        beq ?ctitle
-        cmp #TAG_SCRIPT
-        beq ?cskip
-        cmp #TAG_STYLE
-        beq ?cskip
-        cmp #TAG_NOSCRIPT
-        beq ?cnoscript
-        cmp #TAG_HEAD
-        beq ?chead
-        cmp #TAG_DIV
-        beq ?cdiv
-        ; HTML5 semantic close tags — behave like </div>
-        cmp #TAG_NAV
-        beq ?cdiv
-        cmp #TAG_ARTICLE
-        beq ?cdiv
-        cmp #TAG_SECTION
-        beq ?cdiv
-        cmp #TAG_ASIDE
-        beq ?cdiv
-        cmp #TAG_HEADER
-        beq ?cdiv
-        cmp #TAG_FOOTER
-        beq ?cdiv
-        cmp #TAG_MAIN
-        beq ?cdiv
-        jmp close_tag_tbl
+.proc open_div
+        jsr render_flush_word
+        lda zp_render_col
+        beq ?skip
+        jmp render_do_nl
+?skip   rts
+.endp
 
-?ctitle lda #0
-        sta in_title
-        ldx title_len
-        sta title_buf,x        ; null-terminate title
-        rts
-?cskip  lda #0
-        sta zp_in_skip
-        lda #PS_NORMAL
-        sta zp_parse_state
-        rts
-?cnoscript rts                 ; noscript close - nothing to do
-?chead  lda #0
+.proc open_head
+        lda #1
         sta zp_in_head
         rts
-?cdiv   jsr render_flush_word
-        lda zp_render_col
-        beq ?dskip
-        jsr render_do_nl
-?dskip  rts
 .endp
 
-; --- Table, blockquote, dt/dd, code, pre open tags ---
-.proc open_tag_tbl
-        cmp #TAG_TABLE
-        beq ?otable
-        cmp #TAG_TR
-        beq ?otr
-        cmp #TAG_TD
-        beq ?otd
-        cmp #TAG_TH
-        beq ?oth
-        cmp #TAG_BLOCKQUOTE
-        beq ?jbq
-        cmp #TAG_DT
-        beq ?jdt
-        cmp #TAG_DD
-        beq ?jdd
-        cmp #TAG_CODE
-        beq ?jcode
-        cmp #TAG_PRE
-        beq ?jpre
+.proc open_body
+        lda #0
+        sta zp_in_head
+        sta http_bytes_lo
+        sta http_bytes_hi
         rts
-?jbq    jmp ?obq
-?jdt    jmp ?odt
-?jdd    jmp ?odd
-?jcode  jmp ?ocode
-?jpre   jmp ?opre
+.endp
 
-?otable jsr render_flush_word
+open_underline
+        lda #ATTR_UNDERLINE
+        .byte $2C              ; BIT abs - skip next 2 bytes
+open_sup
+        lda #ATTR_SUP
+        .byte $2C              ; BIT abs - skip next 2 bytes
+open_sub
+        lda #ATTR_SUB
+        jmp render_set_attr
+
+.proc open_table
+        jsr render_flush_word
         jsr render_newline
         jsr render_tbl_line
         lda #0
         sta td_count
         rts
-?otr    jsr render_flush_word
-        ; Row separator (skip if first row, td_count=0)
+.endp
+
+.proc open_tr
+        jsr render_flush_word
         lda td_count
-        beq ?otr_first
+        beq ?first
         jsr render_newline
         jsr render_tbl_line
-?otr_first
-        jsr render_newline
+?first  jsr render_newline
         lda #0
         sta td_count
         rts
-?otd    jsr render_flush_word
+.endp
+
+.proc open_td
+        jsr render_flush_word
         lda td_count
-        beq ?td_first
+        beq ?first
         lda #<m_tbl_sep
         ldx #>m_tbl_sep
         jsr render_string
-?td_first
-        inc td_count
+?first  inc td_count
         rts
-?oth    jsr render_flush_word
+.endp
+
+.proc open_th
+        jsr render_flush_word
         lda td_count
-        beq ?th_first
+        beq ?first
         lda #<m_tbl_sep
         ldx #>m_tbl_sep
         jsr render_string
-?th_first
-        inc td_count
+?first  inc td_count
         lda #ATTR_H3
-        jsr render_set_attr
-        rts
-?obq    jsr render_flush_word
+        jmp render_set_attr
+.endp
+
+m_tbl_sep dta c' | ',0
+
+.proc open_bq
+        jsr render_flush_word
         jsr render_newline
         lda zp_indent
         clc
         adc #2
         sta zp_indent
         rts
-?odt    jsr render_flush_word
+.endp
+
+.proc open_dt
+        jsr render_flush_word
         jsr render_newline
         lda #ATTR_H3
-        jsr render_set_attr
-        rts
-?odd    jsr render_flush_word
-        jsr render_newline
-        lda zp_indent
-        clc
-        adc #2
-        sta zp_indent
-        rts
-?ocode  lda #ATTR_DECOR
-        jsr render_set_attr
-        rts
-?opre   jsr render_flush_word
+        jmp render_set_attr
+.endp
+
+open_dd = open_bq
+
+.proc open_code
+        lda #ATTR_DECOR
+        jmp render_set_attr
+.endp
+
+.proc open_pre
+        jsr render_flush_word
         jsr render_newline
         lda #1
         sta in_pre
         lda #ATTR_DECOR
-        jsr render_set_attr
-        rts
-
-m_tbl_sep dta c' | ',0
+        jmp render_set_attr
 .endp
 
-; --- Table, blockquote, dt/dd, code, pre close tags ---
-.proc close_tag_tbl
-        cmp #TAG_TABLE
-        beq ?ctable
-        cmp #TAG_TH
-        beq ?cth
-        cmp #TAG_BLOCKQUOTE
-        beq ?cbq
-        cmp #TAG_DT
-        beq ?cdt
-        cmp #TAG_DD
-        beq ?cdd
-        cmp #TAG_CODE
-        beq ?ccode
-        cmp #TAG_PRE
-        beq ?cpre
-        rts
+; ============================================================================
+; Close tag handlers (extracted from old dispatch procs)
+; ============================================================================
 
-?ctable jsr render_flush_word
+.proc close_title
+        lda #0
+        sta in_title
+        ldx title_len
+        sta title_buf,x
+        rts
+.endp
+
+.proc close_skip
+        lda #0
+        sta zp_in_skip
+        lda #PS_NORMAL
+        sta zp_parse_state
+        rts
+.endp
+
+close_div = open_div
+
+.proc close_head
+        lda #0
+        sta zp_in_head
+        rts
+.endp
+
+.proc close_table
+        jsr render_flush_word
         jsr render_newline
         jsr render_tbl_line
-        jsr render_newline
-        rts
-?cth    lda #ATTR_NORMAL
-        jsr render_set_attr
-        rts
-?cbq    jsr render_flush_word
+        jmp render_newline
+.endp
+
+.proc close_bq
+        jsr render_flush_word
         jsr render_newline
         lda zp_indent
         sec
         sbc #2
-        bcs ?bq_ok
+        bcs ?ok
         lda #0
-?bq_ok  sta zp_indent
+?ok     sta zp_indent
         rts
-?cdt    lda #ATTR_NORMAL
-        jsr render_set_attr
-        rts
-?cdd    lda zp_indent
+.endp
+
+.proc close_dd
+        lda zp_indent
         sec
         sbc #2
-        bcs ?dd_ok
+        bcs ?ok
         lda #0
-?dd_ok  sta zp_indent
+?ok     sta zp_indent
         rts
-?ccode  lda #ATTR_NORMAL
-        jsr render_set_attr
-        rts
-?cpre   jsr render_flush_word
+.endp
+
+.proc close_pre
+        jsr render_flush_word
         jsr render_newline
         lda #0
         sta in_pre
         lda #ATTR_NORMAL
-        jsr render_set_attr
-        rts
+        jmp render_set_attr
 .endp
 
-; Tag action procs
+; ============================================================================
+; Tag action procs (existing, open_heading modified to use current_tag_id)
+; ============================================================================
 .proc open_heading
-        ; Clear skip-to-heading flag when heading found
-        pha
         lda #0
         sta skip_to_heading
-        pla
-        pha
         jsr render_flush_word
         jsr render_newline
         jsr render_newline         ; blank line above heading
         lda #1
         sta zp_in_heading
-        pla
+        lda current_tag_id
         cmp #TAG_H1
         beq ?h1
         cmp #TAG_H2
@@ -462,24 +501,22 @@ m_tbl_sep dta c' | ',0
         cmp #TAG_H6
         beq ?h6
         lda #ATTR_H3
-        jmp ?set
+        .byte $2C              ; BIT abs - skip next 2 bytes
 ?h1     lda #ATTR_H1
-        jmp ?set
+        .byte $2C
 ?h2     lda #ATTR_H2
-        jmp ?set
+        .byte $2C
 ?h4     lda #ATTR_H4
-        jmp ?set
+        .byte $2C
 ?h5     lda #ATTR_H5
-        jmp ?set
+        .byte $2C
 ?h6     lda #ATTR_H6
-?set    jsr render_set_attr
-        rts
+        jmp render_set_attr
 .endp
 
 .proc open_para
         jsr render_flush_word
-        jsr render_newline
-        rts
+        jmp render_newline
 .endp
 
 .proc open_link
@@ -529,8 +566,7 @@ m_tbl_sep dta c' | ',0
 .proc open_li
         jsr render_flush_word
         jsr render_newline
-        jsr render_list_bullet
-        rts
+        jmp render_list_bullet
 .endp
 
 .proc open_bold
@@ -541,8 +577,7 @@ m_tbl_sep dta c' | ',0
 
 .proc open_italic
         lda #ATTR_DECOR
-        jsr render_set_attr
-        rts
+        jmp render_set_attr
 .endp
 
 .proc close_heading
@@ -551,23 +586,17 @@ m_tbl_sep dta c' | ',0
         sta zp_in_heading
         lda #ATTR_NORMAL
         jsr render_set_attr
-        jsr render_newline
-        rts
+        jmp render_newline
 .endp
 
-.proc close_para
-        jsr render_flush_word
-        jsr render_newline
-        rts
-.endp
+close_para = open_para
 
 .proc close_link
         jsr render_flush_word
         lda #0
         sta zp_in_link
         lda #ATTR_NORMAL
-        jsr render_set_attr
-        rts
+        jmp render_set_attr
 .endp
 
 .proc close_list
@@ -590,9 +619,13 @@ m_tbl_sep dta c' | ',0
 
 .proc close_italic
         lda #ATTR_NORMAL
-        jsr render_set_attr
-        rts
+        jmp render_set_attr
 .endp
+
+; Aliases for identical close handlers (reset attr to normal)
+close_th = close_italic
+close_dt = close_italic
+close_code = close_italic
 
 ; ============================================================================
 ; process_attr
@@ -611,8 +644,7 @@ m_tbl_sep dta c' | ',0
         lda attr_name_buf+3
         cmp #'f'
         bne ?chk_src
-        jsr store_link_url
-        rts
+        jmp store_link_url
 
 ?chk_src
         ; Check "src" attribute (for <img> tags)

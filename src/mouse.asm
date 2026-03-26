@@ -126,8 +126,7 @@ STUB_VBI_EXIT   = STUB_BASE + 44
         ldy #<STUB_VBI_ENTRY
         ldx #>STUB_VBI_ENTRY
         lda #7
-        jsr SETVBV
-        rts
+        jmp SETVBV
 .endp
 
 ; ----------------------------------------------------------------------------
@@ -448,8 +447,7 @@ mouse_old_y     dta 0          ; old Y bits, pre-shifted <<2
         lda #COL_RED
         ldy mouse_col_off
         iny
-        jsr vbxe_write_vram
-        rts
+        jmp vbxe_write_vram
 .endp
 
 ; ----------------------------------------------------------------------------
@@ -468,8 +466,7 @@ mouse_old_y     dta 0          ; old Y bits, pre-shifted <<2
         lda mouse_saved_attr
         ldy mouse_col_off
         iny
-        jsr vbxe_write_vram
-        rts
+        jmp vbxe_write_vram
 .endp
 
 mouse_saved_char dta 0

@@ -344,16 +344,26 @@ parse_chunk_done
         jmp parse_loop_re
 .endp
 
-; --- Skip mode (script/style) ---
+; --- Skip mode (script/style) - fast scan for '<' ---
 .proc parse_skipmode
+        ; A already has current byte from parse_loop_re
         cmp #'<'
-        bne ?jlp
-        lda #PS_IN_TAG
+        beq ?found
+        ; Fast scan: skip remaining bytes until '<' (tight loop)
+        ldy chunk_idx
+?scan   cpy zp_rx_len
+        beq ?done              ; end of chunk, exit
+        lda rx_buffer,y
+        iny
+        cmp #'<'
+        bne ?scan              ; ~10 cycles per byte vs ~40 in main loop
+        sty chunk_idx
+?found  lda #PS_IN_TAG
         sta zp_parse_state
         lda #0
         sta zp_tag_idx
         sta is_closing
-?jlp    jmp parse_loop_re
+?done   jmp parse_loop_re
 .endp
 
 ; --- HTML comment mode (<!-- ... -->) ---
@@ -429,8 +439,7 @@ comment_dashes dta 0
 ; html_flush / html_emit_char
 ; ============================================================================
 .proc html_flush
-        jsr render_flush_word
-        rts
+        jmp render_flush_word
 .endp
 
 .proc html_emit_char
@@ -448,19 +457,16 @@ comment_dashes dta 0
         beq ?ws
         cmp #9
         beq ?ws
-        jsr render_char
-        rts
+        jmp render_char
 ?ws     lda #CH_SPACE
-        jsr render_char
+        jmp render_char
 ?skip   rts
 ?pre_ch cmp #10
         beq ?pre_nl
         cmp #13
         beq ?skip              ; CR in pre → skip
-        jsr render_out_char    ; direct output, preserve spaces
-        rts
-?pre_nl jsr render_do_nl
-        rts
+        jmp render_out_char    ; direct output, preserve spaces
+?pre_nl jmp render_do_nl
 ?head_chk
         ; In <head> - only emit if inside <title>
         ldx in_title

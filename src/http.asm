@@ -18,7 +18,10 @@
         bcc ?opened
         jmp ?open_err
 ?opened
+        lda #1
+        sta dl_active
         lda #0
+        sta img_deferred
         sta http_idle_cnt
         sta http_bytes_lo
         sta http_bytes_hi
@@ -102,9 +105,9 @@
         bne ?nc_t
         inc pb_total+2
 ?nc_t
-        ; 255kB download limit
-        lda http_bytes_hi
-        cmp #255
+        ; 400kB download limit (pb_total+2 >= 6 = 384kB+)
+        lda pb_total+2
+        cmp #7
         bcs ?done
 
         ; Check keyboard abort
@@ -151,11 +154,24 @@
         jmp ?rdlp
 
 ?done   jsr fn_close
+        lda #0
+        sta dl_active
+        ; Check if user clicked IMG during download
+        lda img_deferred
+        beq ?no_defer
+        lda #0
+        sta img_deferred
+        lda #KEY_NONE
+        sta CH                 ; clear auto-repeat from --More--
+        jsr img_fetch_single
+?no_defer
         clc
         rts
 
 ?open_err
         jsr fn_close
+        lda #0
+        sta dl_active
         jsr ui_status_error
         lda #<m_operr
         ldx #>m_operr
@@ -166,30 +182,24 @@
 ?rd_err lda zp_fn_error
         sta m_rderr_code
         jsr fn_close
+        lda #0
+        sta dl_active
         jsr ui_status_error
         lda m_rderr_code
         lsr
         lsr
         lsr
         lsr
-        jsr ?hex
+        jsr nibble_to_hex
         sta m_rderr_hex
         lda m_rderr_code
         and #$0F
-        jsr ?hex
+        jsr nibble_to_hex
         sta m_rderr_hex+1
         lda #<m_rderr
         ldx #>m_rderr
         jsr ui_show_error
         sec
-        rts
-?hex    cmp #10
-        bcc ?dig
-        clc
-        adc #'A'-10
-        rts
-?dig    clc
-        adc #'0'
         rts
 
 m_operr dta c'Connection failed - check URL (press key)',0
@@ -205,6 +215,12 @@ http_bytes_hi dta b(0)
 ; Used internally by http_download
 http_remain_lo dta b(0)
 http_remain_hi dta b(0)
+; Download active flag (1=N1: open for page download, 0=closed)
+; MUST be below $4000 — MEMAC B safe
+dl_active   dta b(0)
+; Deferred image fetch (1=user clicked IMG during download, fetch after close)
+; MUST be below $4000 — MEMAC B safe
+img_deferred dta b(0)
 
 ; ----------------------------------------------------------------------------
 ; http_render - Render HTML from VRAM page buffer (Phase 2)
@@ -275,34 +291,12 @@ http_remain_hi dta b(0)
         bne ?done
         jmp ?loop
 
-?done   jsr html_flush
-        rts
+?done   jmp html_flush
 
 pb_chunk_size    dta b(0)
 pb_rd_save_bank  dta b(0)
 pb_rd_save_lo    dta b(0)
 pb_rd_save_hi    dta b(0)
-.endp
-
-; ----------------------------------------------------------------------------
-; http_set_url - Copy URL string to url_buffer (A=lo, X=hi)
-; ----------------------------------------------------------------------------
-.proc http_set_url
-        sta zp_tmp_ptr
-        stx zp_tmp_ptr+1
-        ldy #0
-?lp     lda (zp_tmp_ptr),y
-        sta url_buffer,y
-        beq ?done
-        iny
-        cpy #URL_BUF_SIZE-1
-        bne ?lp
-        lda #0
-        sta url_buffer,y
-?done   sty url_length
-        lda #0
-        sta url_length+1
-        rts
 .endp
 
 ; ----------------------------------------------------------------------------
@@ -313,8 +307,8 @@ pb_rd_save_hi    dta b(0)
         jsr http_ensure_prefix
         jsr http_url_tolower
         jsr http_save_base
-
-        ; Check if URL points to an image file
+        ; Check if URL points to an image file BEFORE proxy
+        ; (proxy would wrap URL, breaking image extension detection)
         jsr http_check_img_ext
         bcc ?not_img
         ; Image URL: copy to img_src_buf (strip N: prefix) and fetch
@@ -336,10 +330,10 @@ pb_rd_save_hi    dta b(0)
         bne ?ci_cp
         lda #0
         sta img_src_buf,x
-?ci_go  jsr img_fetch_single
-        rts
+?ci_go  jmp img_fetch_single
 
 ?not_img
+        jsr http_apply_proxy
         ; Hide previous image if active
         lda img_active
         beq ?noimg
@@ -378,12 +372,10 @@ pb_rd_save_hi    dta b(0)
         jsr fn_close
         jsr html_reset
         jsr render_reset
-        jsr show_welcome
-        rts
+        jmp show_welcome
 
 ?skip_render
-        jsr ui_status_end
-        rts
+        jmp ui_status_end
 
 m_nodata dta c'Empty response - check URL (press key)',0
 .endp

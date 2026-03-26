@@ -139,8 +139,7 @@
 ; ----------------------------------------------------------------------------
 .proc render_newline
         jsr render_flush_word
-        jsr render_do_nl
-        rts
+        jmp render_do_nl
 .endp
 
 ; ----------------------------------------------------------------------------
@@ -237,8 +236,6 @@
 
         ; Image link: fetch image and return to --More--
         jsr mouse_hide_cursor
-        lda #$FF
-        sta zp_mouse_prev_x
         ; DON'T call http_save_base here — base_url was set
         ; in http_navigate and must stay intact for subsequent images
         lda rpp_link_num
@@ -254,7 +251,21 @@
         bne ?icp
         lda #0
         sta img_src_buf,x
-?icpd   ; Save ALL parser+renderer state before image fetch
+?icpd   ; Check if download is still active (N1: open)
+        lda dl_active
+        beq ?img_now
+        ; Download active — defer image fetch until after fn_close
+        lda #1
+        sta img_deferred
+        status_msg COL_CYAN, m_img_queued
+        wait_frames 75         ; ~1.5s
+        status_msg COL_YELLOW, m_more
+        lda #0
+        sta zp_mouse_btn
+        jmp ?wait
+
+?img_now
+        ; Save ALL parser+renderer state before image fetch
         ; (img_fetch_single may clobber ZP vars via status_msg, SIO, etc.)
         lda chunk_idx
         sta rpp_saved_cidx
@@ -319,8 +330,6 @@
         lda rpp_link_num
         sta pending_link
         jsr mouse_hide_cursor
-        lda #$FF
-        sta zp_mouse_prev_x
         sec
         rts
 
@@ -331,8 +340,6 @@
         bne ?click_nop         ; click on page content = do nothing
         ; Click on --More-- bar = advance page
         jsr mouse_hide_cursor
-        lda #$FF
-        sta zp_mouse_prev_x
         jmp ?advance
 ?click_nop
         jmp ?wait
@@ -363,8 +370,6 @@
 ?key_next
         ; Keyboard: hide cursor first, then advance
         jsr mouse_hide_cursor
-        lda #$FF
-        sta zp_mouse_prev_x
 
 ?advance
         ; Restore status bar to loading
@@ -375,8 +380,6 @@
 ?key_heading
         ; Skip to next heading - set flag, advance without pause
         jsr mouse_hide_cursor
-        lda #$FF
-        sta zp_mouse_prev_x
         lda #1
         sta skip_to_heading
         status_msg COL_YELLOW, m_skipping
@@ -384,13 +387,13 @@
 
 ?key_quit
         jsr mouse_hide_cursor
-        lda #$FF
-        sta zp_mouse_prev_x
-        sta pending_link       ; $FF = no pending link
+        lda #$FF               ; $FF = no pending link
+        sta pending_link
         sec
         rts
 
 m_more    dta c' -- Next page: Spc  Skip: H  Quit: Q --',0
+m_img_queued dta c' IMG queued after download',0
 m_skipping dta c' Skipping to heading...',0
 m_loading dta c' Loading...',0
 rpp_link_num    dta 0
@@ -417,13 +420,8 @@ rpp_state_buf   .ds 15             ; save $84-$92 (cur_attr through entity_idx)
 ?done   rts
 .endp
 
-; ----------------------------------------------------------------------------
-; render_set_attr - Set text attribute (A = color index)
-; ----------------------------------------------------------------------------
-.proc render_set_attr
-        sta zp_cur_attr
-        rts
-.endp
+; render_set_attr = vbxe_setattr (identical: sta zp_cur_attr / rts)
+render_set_attr = vbxe_setattr
 
 ; ----------------------------------------------------------------------------
 ; render_number - Output number 0-99 as ASCII digits
@@ -448,8 +446,7 @@ rpp_state_buf   .ds 15             ; save $84-$92 (cur_attr through entity_idx)
 
 ?one    clc
         adc #'0'
-        jsr render_out_char
-        rts
+        jmp render_out_char
 .endp
 
 ; ----------------------------------------------------------------------------
@@ -464,8 +461,7 @@ rpp_state_buf   .ds 15             ; save $84-$92 (cur_attr through entity_idx)
         lda #'*'
         jsr render_out_char
         lda #CH_SPACE
-        jsr render_out_char
-        rts
+        jmp render_out_char
 
 ?num    inc zp_list_item
         lda zp_list_item
@@ -473,8 +469,7 @@ rpp_state_buf   .ds 15             ; save $84-$92 (cur_attr through entity_idx)
         lda #'.'
         jsr render_out_char
         lda #CH_SPACE
-        jsr render_out_char
-        rts
+        jmp render_out_char
 .endp
 
 ; ----------------------------------------------------------------------------
@@ -512,23 +507,8 @@ rpp_state_buf   .ds 15             ; save $84-$92 (cur_attr through entity_idx)
         rts
 .endp
 
-; ----------------------------------------------------------------------------
-; render_tbl_line - Draw table row separator (gray, full width)
-; ----------------------------------------------------------------------------
-.proc render_tbl_line
-        lda #ATTR_DECOR
-        sta zp_cur_attr
-        ldx #SCR_COLS
-?lp     lda #'-'
-        stx zp_tmp3
-        jsr render_out_char
-        ldx zp_tmp3
-        dex
-        bne ?lp
-        lda #ATTR_NORMAL
-        sta zp_cur_attr
-        rts
-.endp
+; render_tbl_line = render_hr_line (identical code)
+render_tbl_line = render_hr_line
 
 ; Renderer state
 last_was_sp dta 0

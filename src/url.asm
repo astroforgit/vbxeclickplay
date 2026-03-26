@@ -443,3 +443,116 @@
         bne ?lp
 ?done   rts
 .endp
+
+; ----------------------------------------------------------------------------
+; nibble_to_hex - Convert low nibble (0-15) in A to ASCII hex char
+; Input: A = 0-15. Output: A = '0'-'9' or 'A'-'F'
+; Note: exploits carry from CMP: C=1 when A>=10, C=0 when A<10
+; ----------------------------------------------------------------------------
+.proc nibble_to_hex
+        cmp #10
+        bcc ?dig
+        adc #'A'-11          ; C=1 from CMP, so adds 'A'-10
+        rts
+?dig    adc #'0'             ; C=0 from CMP, so adds '0'
+        rts
+.endp
+
+; ----------------------------------------------------------------------------
+; Proxy mode
+; ----------------------------------------------------------------------------
+use_proxy  dta b(0)           ; 0=direct, 1=proxy
+
+; ----------------------------------------------------------------------------
+; http_apply_proxy - Wrap url_buffer with proxy prefix
+; Only called when use_proxy=1. Strips N: and http:// from original URL,
+; builds: N:https://turiecfoto.sk/proxy.php?url= + bare_url
+; ----------------------------------------------------------------------------
+.proc http_apply_proxy
+        lda use_proxy
+        bne ?go
+        rts
+?go
+        ; Skip if URL already has proxy prefix (prevent double wrap)
+        ; Check for "proxy" substring in first 60 chars
+        ldy #0
+?chk    lda url_buffer,y
+        beq ?ok                ; end of string, no proxy found - proceed
+        cmp #'p'
+        bne ?cn
+        lda url_buffer+1,y
+        cmp #'r'
+        bne ?cn
+        lda url_buffer+2,y
+        cmp #'o'
+        bne ?cn
+        lda url_buffer+3,y
+        cmp #'x'
+        bne ?cn
+        rts                    ; "prox" found - already proxied, skip
+?cn     iny
+        cpy #60
+        bne ?chk
+?ok
+        ; Find start of bare URL (skip N: and http://)
+        ldy #0
+        lda url_buffer
+        cmp #'N'
+        bne ?bare
+        lda url_buffer+1
+        cmp #':'
+        bne ?bare
+        ldy #2                 ; skip "N:"
+        lda url_buffer+2
+        cmp #'h'
+        bne ?bare
+        lda url_buffer+6
+        cmp #'/'
+        bne ?bare
+        ldy #9                 ; skip "N:http://"
+        ; Check for https (extra s)
+        lda url_buffer+5
+        cmp #'s'
+        bne ?bare
+        iny                    ; skip "N:https://"
+
+?bare   ; Y = start of bare URL in url_buffer
+        ; Copy bare URL to rx_buffer (temp)
+        ldx #0
+?cp1    lda url_buffer,y
+        sta rx_buffer,x
+        beq ?cp1d
+        iny
+        inx
+        cpx #200
+        bne ?cp1
+        lda #0
+        sta rx_buffer,x
+?cp1d
+        ; Copy proxy prefix to url_buffer
+        ldy #0
+?pfx    lda proxy_prefix,y
+        beq ?pfxd
+        sta url_buffer,y
+        iny
+        bne ?pfx
+?pfxd   ; Y = length of prefix
+        ; Append bare URL from rx_buffer
+        ldx #0
+?cp2    lda rx_buffer,x
+        sta url_buffer,y
+        beq ?upd
+        iny
+        inx
+        cpy #URL_BUF_SIZE-1
+        bne ?cp2
+        lda #0
+        sta url_buffer,y
+?upd    sty url_length
+        lda #0
+        sta url_length+1
+?done   rts
+
+.endp
+
+proxy_prefix dta c'N:https://turiecfoto.sk/proxy.php?url=',0
