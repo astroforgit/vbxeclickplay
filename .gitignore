@@ -20,3 +20,7 @@ vbxe-examples/
 mads.exe
 TODO_DOMA.md
 forum.txt
+src/validator/
+src/asm_validator.py
+tools/
+atariage.md

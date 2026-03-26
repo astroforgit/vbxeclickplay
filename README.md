@@ -2,18 +2,18 @@
 
 80-column web browser for Atari 8-bit computers with VBXE graphics expansion, FujiNet networking, and ST mouse support.
 
-![screenshot](https://img.shields.io/badge/status-alpha-orange)
+![screenshot](https://img.shields.io/badge/status-beta-blue)
 
 ## Status
 
-**Alpha 55** — early development, testing on real hardware. Help is welcome!
+**Beta 01** — functional browser, testing on real hardware. Help is welcome!
 
 ## Requirements
 
 - Atari 800XL/130XE or compatible (64KB RAM minimum)
 - [VBXE](http://lotharek.pl/productdetail.php?id=46) (VideoBoard XE) — FX core
 - [FujiNet](https://fujinet.online/) — WiFi multi-peripheral with N: device HTTP support
-- Atari ST mouse in joystick port 2
+- Atari ST mouse in joystick port 2 (optional — keyboard navigation also supported)
 - Emulator: [Altirra](https://www.virtualdub.org/altirra.html) with VBXE + FujiNet-PC
 
 ## Running
@@ -32,22 +32,27 @@ At the SDX command line, just run: `browser.xex`
 
 ## Features
 
-- **80×29 text display** — VBXE overlay mode with 8-color palette and per-character attributes
+- **80×29 text display** — VBXE overlay mode with 11-color palette and per-character attributes
 - **GMON gradient title screen** — graphical blue gradient banner using VBXE graphics mode
 - **ST mouse** — point and click on links, works during browsing and page scrolling (`--More--` prompt)
-- **HTML rendering** — 34 tags including headings (h1–h3), paragraphs, links, lists (ul/ol with bullets and numbering), bold, italic, tables, blockquotes, code/pre, definition lists (dt/dd), images
+- **TAB navigation** — cycle through visible links with TAB, follow with RETURN (no mouse needed)
+- **HTML rendering** — 48 tags including headings (h1–h6), paragraphs, links, lists (ul/ol with bullets and numbering), bold, italic, underline, superscript, subscript, tables, blockquotes, code/pre, definition lists (dt/dd), horizontal rules, images, HTML5 semantic tags (article, section, nav, header, footer, main, aside)
 - **HTML entity decoding** — `&amp;` `&lt;` `&gt;` `&nbsp;` `&quot;` and numeric `&#NNN;`
 - **HTML comment support** — `<!-- -->` properly parsed and skipped
 - **UTF-8 filtering** — multi-byte sequences skipped gracefully
-- **Image viewing** — inline images shown as clickable `[N]IMG` links, fullscreen 256-color display (up to 320×192) via server-side converter
+- **Image viewing** — inline images shown as clickable `[N]IMG` links, fullscreen centered 256-color display (up to 320×208) via server-side converter
 - **Up to 64 links per page** with palette-encoded link detection, recycled on each page scroll
 - **Word wrapping** — intelligent wrapping at word boundaries with indentation support
 - **Skip to heading** — press H during `--More--` prompt to jump past navigation menus to next heading
-- **URL navigation** with address bar, auto-prefix (`N:http://`), and case normalization
+- **Built-in search** — type a query (without `.`) in URL bar to search the web
+- **URL navigation** with address bar, auto-prefix, and case normalization
 - **Relative URL resolution** — links and images resolved against base URL
 - **History** — back navigation with scroll position preservation (16 entries)
+- **Optional proxy mode** — toggle with P key, strips scripts/styles for cleaner pages
 - **VRAM page buffer** — entire page downloaded to VRAM ($14000+), then rendered offline. N1: is free for image downloads during rendering
+- **HTTP/HTTPS support** — FujiNet handles TLS natively
 - **Optimized HTTP** — skips redundant FujiNet STATUS calls during bulk transfer
+- **PAL/NTSC detection** — auto-adapts timing for both TV systems
 - **CRT overscan border** — 8-scanline top border ensures URL bar is visible on real TVs
 - **Build timestamps** — welcome screen shows build date and time
 
@@ -56,11 +61,14 @@ At the SDX command line, just run: `browser.xex`
 | Input | Action |
 |-------|--------|
 | **Mouse click** | Follow link / view image |
-| **U** | Enter URL |
+| **TAB** | Cycle to next link on screen |
+| **Return** | Follow selected link / scroll next page |
+| **Space** | Scroll to next page |
+| **U** | Enter URL (or search query) |
 | **B** | Back (history) |
 | **H** | Skip to next heading (during `--More--`) |
+| **P** | Toggle proxy mode |
 | **Q** | Quit / return to welcome screen |
-| **Space / Return** | Scroll to next page |
 
 ## Building
 
@@ -90,8 +98,8 @@ mads src/browser.asm -o:bin/browser.xex -l:bin/browser.lab
 | `fujinet.asm` | FujiNet N: device SIO layer (open, status, read, close) |
 | `http.asm` | HTTP workflow: two-phase download (network→VRAM) + render (VRAM→parser) |
 | `url.asm` | URL normalization, prefix handling, base URL extraction, relative URL resolution |
-| `html_parser.asm` | Streaming byte-by-byte HTML parser (6 states: text, tag, entity, attr name/value, comment) |
-| `html_tags.asm` | Tag handlers (34 tags), attribute extraction (href, src), link/image storage |
+| `html_parser.asm` | Streaming byte-by-byte HTML parser (7 states: text, tag, entity, attr name/value, skip, comment) |
+| `html_tags.asm` | Tag handlers (48 tags), attribute extraction (href, src), link/image storage |
 | `html_entities.asm` | Tag name lookup table, HTML entity decoding (named + numeric) |
 | `renderer.asm` | Text layout: word wrapping, indentation, pagination, `--More--` prompt, skip-to-heading |
 | `keyboard.asm` | Keyboard input via CIO K: device, line editing with backspace/escape |
@@ -101,10 +109,11 @@ mads src/browser.asm -o:bin/browser.xex -l:bin/browser.lab
 | `mouse.asm` | ST mouse driver: Timer 1 IRQ (quadrature sampling) + VBI (cursor), MEMAC B safe |
 | `title.asm` | Welcome screen layout and strings |
 | `data.asm` | Version string, large buffer allocations ($8800+) |
+| `build_stamp.asm` | Auto-generated build timestamp (created by `build.sh`) |
 
 ## Image Support
 
-Images on web pages appear as clickable `[N]IMG` links in blue. Clicking downloads the image through a server-side converter that resizes and converts to VBXE 256-color format (up to 320×192 pixels), then displays fullscreen. Press any key to return to the page.
+Images on web pages appear as clickable `[N]IMG` links in blue. Clicking downloads the image through a server-side converter that resizes, centers on a black canvas, and converts to VBXE 256-color format (up to 320×208 pixels), then displays fullscreen. Press any key to return to the page.
 
 The browser uses a two-phase architecture: the HTML page is first downloaded entirely into the VRAM page buffer, then N1: is closed. During rendering, image clicks reopen N1: for the converter — no second FujiNet connection needed. After viewing an image, the parser continues from the exact position in the buffered page.
 
