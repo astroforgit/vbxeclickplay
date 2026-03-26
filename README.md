@@ -40,7 +40,7 @@ At the SDX command line, just run: `browser.xex`
 - **HTML entity decoding** — `&amp;` `&lt;` `&gt;` `&nbsp;` `&quot;` and numeric `&#NNN;`
 - **HTML comment support** — `<!-- -->` properly parsed and skipped
 - **UTF-8 filtering** — multi-byte sequences skipped gracefully
-- **Image viewing** — inline images shown as clickable `[N]IMG` links, fullscreen centered 256-color display (up to 320×208) via server-side converter
+- **Image viewing** — inline images shown as clickable `[N]IMG` links, fullscreen centered 248-color display (up to 320×208) via server-side converter
 - **Up to 64 links per page** with palette-encoded link detection, recycled on each page scroll
 - **Word wrapping** — intelligent wrapping at word boundaries with indentation support
 - **Skip to heading** — press H during `--More--` prompt to jump past navigation menus to next heading
@@ -113,7 +113,7 @@ mads src/browser.asm -o:bin/browser.xex -l:bin/browser.lab
 
 ## Image Support
 
-Images on web pages appear as clickable `[N]IMG` links in blue. Clicking downloads the image through a server-side converter that resizes, centers on a black canvas, and converts to VBXE 256-color format (up to 320×208 pixels), then displays fullscreen. Press any key to return to the page.
+Images on web pages appear as clickable `[N]IMG` links in blue. Clicking downloads the image through a server-side converter that resizes, centers on a black canvas, and converts to VBXE 248-color format (up to 320×208 pixels), then displays fullscreen. Press any key to return to the page.
 
 The browser uses a two-phase architecture: the HTML page is first downloaded entirely into the VRAM page buffer, then N1: is closed. During rendering, image clicks reopen N1: for the converter — no second FujiNet connection needed. After viewing an image, the parser continues from the exact position in the buffered page.
 
