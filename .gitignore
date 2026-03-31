@@ -24,3 +24,12 @@ src/validator/
 src/asm_validator.py
 tools/
 atariage.md
+-e 
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# OS files
+.DS_Store
+Thumbs.db

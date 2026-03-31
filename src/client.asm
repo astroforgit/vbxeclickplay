@@ -1,0 +1,1189 @@
+; Atari XEX header is generated automatically by MADS with -o:*.xex
+
+        icl 'vbxe_const.asm'
+
+CIOV    = $E456
+ICCOM   = $0342
+ICBAL   = $0344
+ICBAH   = $0345
+ICBLL   = $0348
+ICBLH   = $0349
+
+VIEW_TIMEOUT = 240
+READ_LIMIT   = 96
+KEY_D        = $3A
+DEMO_HEIGHT  = 200
+
+        org $2000
+
+main
+        lda #$22
+        sta SDMCTL
+        jsr clear_debug
+        jsr copy_text_url_to_buffer
+        jsr show_banner
+        jsr fetch_text_payload
+        bcc text_ok
+        jsr report_failure
+fail_loop
+        jmp fail_loop
+
+text_ok
+        jsr report_text_success
+        jsr wait_for_start_key
+
+        jsr detect_vbxe
+        bcc no_vbxe
+
+        lda demo_mode
+        bne start_demo
+
+        lda #<msg_loading_image
+        ldx #>msg_loading_image
+        ldy #msg_loading_image_end-msg_loading_image
+        jsr print_record
+
+        lda #0
+        sta slide_index
+
+load_slide
+        jsr clear_debug
+        jsr copy_slide_url_to_buffer
+        jsr fetch_room_image
+        bcc image_ok
+        jsr report_failure
+        jmp fail_loop
+
+no_vbxe
+        lda #$11
+        sta debug_stage
+        jsr report_failure
+        jmp fail_loop
+
+start_demo
+        lda #<msg_generating_demo
+        ldx #>msg_generating_demo
+        ldy #msg_generating_demo_end-msg_generating_demo
+        jsr print_record
+        jsr generate_demo_image
+        jmp image_ok
+
+image_ok
+        lda #0
+        sta SDMCTL
+        jsr show_fullscreen
+image_loop
+        jsr wait_for_any_key
+        lda demo_mode
+        bne demo_next
+        inc slide_index
+        jmp load_slide
+
+demo_next
+        jsr generate_demo_image
+        jmp image_ok
+
+clear_debug
+        lda #0
+        sta debug_stage
+        sta debug_dstats
+        sta debug_fn_error
+        sta debug_connected
+        sta debug_bytes_lo
+        sta debug_bytes_hi
+        sta debug_timeout_ctr
+        sta debug_rx_len
+        sta zp_rx_len
+        sta img_pal_leftover
+        sta demo_mode
+        rts
+
+show_banner
+        lda #<msg_title
+        ldx #>msg_title
+        ldy #msg_title_end-msg_title
+        jsr print_record
+        lda #<msg_text_url
+        ldx #>msg_text_url
+        ldy #msg_text_url_end-msg_text_url
+        jsr print_record
+        lda #<text_url_string
+        ldx #>text_url_string
+        ldy #text_url_string_end-text_url_string-1
+        jsr print_record
+        lda #<msg_wait_text
+        ldx #>msg_wait_text
+        ldy #msg_wait_text_end-msg_wait_text
+        jsr print_record
+        rts
+
+wait_for_start_key
+        lda #0
+        sta demo_mode
+        lda #KEY_NONE
+        sta CH
+wait_start_loop
+        lda CH
+        cmp #KEY_SPACE
+        beq wait_space_done
+        cmp #CH_SPACE
+        beq wait_space_done
+        cmp #KEY_D
+        beq wait_demo_done
+        cmp #KEY_NONE
+        beq wait_start_loop
+        lda #KEY_NONE
+        sta CH
+        jmp wait_start_loop
+wait_space_done
+        lda #0
+        sta demo_mode
+        lda #KEY_NONE
+        sta CH
+        rts
+wait_demo_done
+        lda #1
+        sta demo_mode
+        lda #KEY_NONE
+        sta CH
+        rts
+
+wait_for_any_key
+        lda #KEY_NONE
+        sta CH
+wait_any_loop
+        lda CH
+        cmp #KEY_NONE
+        beq wait_any_loop
+        lda #KEY_NONE
+        sta CH
+        rts
+
+copy_text_url_to_buffer
+        lda #<text_url_string
+        sta zp_tmp_ptr
+        lda #>text_url_string
+        sta zp_tmp_ptr+1
+        jmp copy_string_to_buffer
+
+copy_slide_url_to_buffer
+        lda slide_index
+        lsr
+        lsr
+        lsr
+        lsr
+        jsr nibble_to_hex
+        sta slide_url_hex_hi
+
+        lda slide_index
+        jsr nibble_to_hex
+        sta slide_url_hex_lo
+
+        lda #<slide_url_string
+        sta zp_tmp_ptr
+        lda #>slide_url_string
+        sta zp_tmp_ptr+1
+        jmp copy_string_to_buffer
+
+copy_string_to_buffer
+        lda #0
+        tay
+copy_url_clear_loop
+        sta url_buffer,y
+        iny
+        bne copy_url_clear_loop
+
+        ldy #0
+copy_url_copy_loop
+        lda (zp_tmp_ptr),y
+        sta url_buffer,y
+        beq copy_url_done
+        iny
+        bne copy_url_copy_loop
+copy_url_done
+        rts
+
+fetch_text_payload
+        lda #1
+        sta debug_stage
+        jsr fn_open
+        lda DSTATS
+        sta debug_dstats
+        bcc text_open_ok
+        jmp text_fail
+
+text_open_ok
+        lda #VIEW_TIMEOUT
+        sta debug_timeout_ctr
+
+text_wait
+        lda #2
+        sta debug_stage
+        jsr poll_status
+        bcc text_status_ok
+        jmp text_fail_close
+
+text_status_ok
+        lda debug_fn_error
+        bmi text_status_fatal
+        jmp text_check_bytes
+
+text_status_fatal
+        cmp #136
+        beq text_fail_close
+        jmp text_fail_close
+
+text_check_bytes
+        lda debug_bytes_hi
+        bne text_read
+        lda debug_bytes_lo
+        bne text_read
+        lda debug_connected
+        beq text_fail_close
+        dec debug_timeout_ctr
+        beq text_fail_close
+        jsr wait_one_frame
+        jmp text_wait
+
+text_read
+        lda #3
+        sta debug_stage
+        lda debug_bytes_hi
+        beq text_read_lo
+        lda #READ_LIMIT
+        bne text_read_set
+
+text_read_lo
+        lda debug_bytes_lo
+        cmp #READ_LIMIT
+        bcc text_read_set
+        lda #READ_LIMIT
+
+text_read_set
+        sta zp_fn_bytes_lo
+        lda #0
+        sta zp_fn_bytes_hi
+        jsr fn_read
+        lda DSTATS
+        sta debug_dstats
+        bcc text_read_ok
+        jmp text_fail_close
+
+text_read_ok
+        lda zp_rx_len
+        sta debug_rx_len
+        jsr sanitize_rx_buffer
+        jsr fn_close
+        clc
+        rts
+
+text_fail_close
+        jsr fn_close
+text_fail
+        sec
+        rts
+
+poll_status
+        jsr fn_status
+        lda DSTATS
+        sta debug_dstats
+        lda zp_fn_error
+        sta debug_fn_error
+        lda zp_fn_connected
+        sta debug_connected
+        lda zp_fn_bytes_lo
+        sta debug_bytes_lo
+        lda zp_fn_bytes_hi
+        sta debug_bytes_hi
+        rts
+
+wait_one_frame
+        lda RTCLOK+2
+wait_one_frame_loop
+        cmp RTCLOK+2
+        beq wait_one_frame_loop
+        rts
+
+sanitize_rx_buffer
+        ldx #0
+sanitize_loop
+        cpx zp_rx_len
+        beq sanitize_done
+        lda rx_buffer,x
+        cmp #13
+        beq sanitize_nl
+        cmp #10
+        beq sanitize_nl
+        cmp #32
+        bcc sanitize_dot
+        cmp #127
+        bcs sanitize_dot
+        jmp sanitize_next
+
+sanitize_nl
+        lda #ATASCII_RET
+        bne sanitize_store
+
+sanitize_dot
+        lda #'.'
+
+sanitize_store
+        sta rx_buffer,x
+
+sanitize_next
+        inx
+        jmp sanitize_loop
+sanitize_done
+        rts
+
+fetch_room_image
+        lda #$12
+        sta debug_stage
+        jsr fn_open
+        lda DSTATS
+        sta debug_dstats
+        bcc fetch_open_ok
+        jmp fetch_fail
+
+fetch_open_ok
+        lda #$13
+        sta debug_stage
+        jsr read_header_chunk
+        bcc fetch_header_ok
+        jmp fetch_fail_close
+
+fetch_header_ok
+        lda img_height
+        sta debug_rx_len
+
+        lda #$14
+        sta debug_stage
+        jsr read_palette_stream
+        bcc fetch_palette_ok
+        jmp fetch_fail_close
+
+fetch_palette_ok
+        jsr init_image_write
+        lda img_pal_leftover
+        sta zp_rx_len
+        jsr write_pixel_chunk
+
+        lda #$15
+        sta debug_stage
+        jsr read_pixels_stream
+        bcc fetch_pixels_ok
+        jmp fetch_fail_close
+
+fetch_pixels_ok
+        jsr fn_close
+        lda #<img_pal_buf
+        sta zp_tmp_ptr
+        lda #>img_pal_buf
+        sta zp_tmp_ptr+1
+        jsr set_image_palette
+        clc
+        rts
+
+fetch_fail_close
+        jsr fn_close
+fetch_fail
+        sec
+        rts
+
+read_header_chunk
+        lda #VIEW_TIMEOUT
+        sta debug_timeout_ctr
+
+        lda #3
+        sta zp_fn_bytes_lo
+        sta debug_bytes_lo
+        lda #0
+        sta zp_fn_bytes_hi
+        sta debug_bytes_hi
+        jsr fn_read
+        lda DSTATS
+        sta debug_dstats
+        bcc hdr_read_ok
+
+hdr_wait
+        jsr poll_status
+        bcc hdr_status_ok
+        jmp hdr_err
+
+hdr_status_ok
+        lda debug_fn_error
+        beq hdr_check_bytes
+        cmp #136
+        beq hdr_err
+        cmp #128
+        bcs hdr_err
+
+hdr_check_bytes
+        lda debug_bytes_hi
+        bne hdr_ready
+        lda debug_bytes_lo
+        cmp #3
+        bcs hdr_ready
+        lda debug_connected
+        beq hdr_err
+        dec debug_timeout_ctr
+        beq hdr_err
+        jsr wait_one_frame
+        jmp hdr_wait
+
+hdr_ready
+        lda #3
+        sta zp_fn_bytes_lo
+        lda #0
+        sta zp_fn_bytes_hi
+        jsr fn_read
+        lda DSTATS
+        sta debug_dstats
+        bcc hdr_read_ok
+        jmp hdr_err
+
+hdr_read_ok
+        lda rx_buffer
+        sta img_width
+        lda rx_buffer+1
+        sta img_width+1
+        lda rx_buffer+2
+        sta img_height
+
+        lda img_width+1
+        cmp #2
+        bcc hdr_chk_lo
+        beq hdr_chk_hi
+        jmp hdr_err
+
+hdr_chk_hi
+        lda img_width
+        cmp #$41
+        bcs hdr_err
+        jmp hdr_chk_h
+
+hdr_chk_lo
+        lda img_width
+        cmp #8
+        bcc hdr_err
+
+hdr_chk_h
+        lda img_height
+        cmp #8
+        bcc hdr_err
+        cmp #209
+        bcs hdr_err
+        clc
+        rts
+hdr_err
+        sec
+        rts
+
+read_palette_stream
+        lda #<img_pal_buf
+        sta zp_tmp_ptr
+        lda #>img_pal_buf
+        sta zp_tmp_ptr+1
+        lda #0
+        sta img_pal_count
+        sta img_pal_count+1
+        sta img_pal_leftover
+        lda #VIEW_TIMEOUT
+        sta debug_timeout_ctr
+
+pal_wait
+        jsr poll_status
+        bcc pal_status_ok
+        jmp pal_err
+
+pal_status_ok
+        lda debug_fn_error
+        cmp #136
+        beq pal_err
+        cmp #128
+        bcs pal_err
+        lda debug_bytes_lo
+        ora debug_bytes_hi
+        beq pal_no_data
+
+        jsr fn_read
+        lda DSTATS
+        sta debug_dstats
+        bcc pal_read_ok
+        jmp pal_err
+
+pal_no_data
+        dec debug_timeout_ctr
+        beq pal_err
+        jsr wait_one_frame
+        jmp pal_wait
+
+pal_read_ok
+        lda zp_rx_len
+        beq pal_wait
+        lda #VIEW_TIMEOUT
+        sta debug_timeout_ctr
+
+        ldy #0
+pal_copy
+        cpy zp_rx_len
+        beq pal_check_done
+        lda rx_buffer,y
+        sty zp_tmp3
+        ldy #0
+        sta (zp_tmp_ptr),y
+        ldy zp_tmp3
+        inc zp_tmp_ptr
+        bne pal_ptr_ok
+        inc zp_tmp_ptr+1
+pal_ptr_ok
+        inc img_pal_count
+        bne pal_count_ok
+        inc img_pal_count+1
+pal_count_ok
+        lda img_pal_count+1
+        cmp #3
+        bcs pal_done
+        iny
+        jmp pal_copy
+
+pal_check_done
+        jmp pal_wait
+
+pal_done
+        iny
+        cpy zp_rx_len
+        bcs pal_no_left
+        ldx #0
+pal_shift
+        lda rx_buffer,y
+        sta rx_buffer,x
+        iny
+        inx
+        cpy zp_rx_len
+        bcc pal_shift
+        stx img_pal_leftover
+        clc
+        rts
+
+pal_no_left
+        lda #0
+        sta img_pal_leftover
+        clc
+        rts
+pal_err
+        lda #0
+        sta img_pal_leftover
+        sec
+        rts
+
+read_pixels_stream
+        lda #VIEW_TIMEOUT
+        sta debug_timeout_ctr
+pix_wait
+        jsr poll_status
+        bcc pix_status_ok
+        jmp pix_err
+
+pix_status_ok
+        lda debug_fn_error
+        bmi pix_status_fatal
+        jmp pix_check_data
+
+pix_status_fatal
+        cmp #136
+        beq pix_done
+        jmp pix_err
+
+pix_check_data
+        lda debug_connected
+        beq pix_done
+        lda debug_bytes_lo
+        ora debug_bytes_hi
+        bne pix_read
+        dec debug_timeout_ctr
+        beq pix_done
+        jsr wait_one_frame
+        jmp pix_wait
+
+pix_read
+        jsr fn_read
+        lda DSTATS
+        sta debug_dstats
+        bcc pix_read_ok
+        jmp pix_done
+
+pix_read_ok
+        lda zp_rx_len
+        beq pix_wait
+        lda #VIEW_TIMEOUT
+        sta debug_timeout_ctr
+        jsr write_pixel_chunk
+        jmp pix_wait
+
+pix_done
+        clc
+        rts
+pix_err
+        sec
+        rts
+
+init_image_write
+        lda #<VRAM_IMG_BASE
+        sta img_vram
+        lda #>VRAM_IMG_BASE
+        sta img_vram+1
+        lda #0
+        sta img_vram+2
+
+        lda img_vram+2
+        asl
+        asl
+        sta img_wr_bank
+        lda img_vram+1
+        asl
+        rol img_wr_bank
+        asl
+        rol img_wr_bank
+
+        lda img_vram
+        sta zp_img_ptr
+        lda img_vram+1
+        and #$3F
+        ora #$40
+        sta zp_img_ptr+1
+        rts
+
+write_pixel_chunk
+        lda zp_rx_len
+        beq write_done
+
+        sei
+        lda img_wr_bank
+        ora #$80
+        sta zp_memb_shadow
+        ldy #VBXE_MEMAC_B
+        sta (zp_vbxe_base),y
+
+        ldx #0
+write_loop
+        ldy #0
+        lda rx_buffer,x
+        sta (zp_img_ptr),y
+        inc zp_img_ptr
+        bne write_next
+        inc zp_img_ptr+1
+        lda zp_img_ptr+1
+        cmp #$80
+        bne write_next
+        lda #$40
+        sta zp_img_ptr+1
+        inc img_wr_bank
+        lda img_wr_bank
+        ora #$80
+        sta zp_memb_shadow
+        ldy #VBXE_MEMAC_B
+        sta (zp_vbxe_base),y
+
+write_next
+        inx
+        cpx zp_rx_len
+        bne write_loop
+        memb_off
+        cli
+write_done
+        rts
+
+generate_demo_image
+        lda demo_phase
+        clc
+        adc #$11
+        sta demo_phase
+
+        lda #DEMO_HEIGHT
+        sta img_height
+        jsr init_image_write
+        jsr build_demo_palette
+
+        lda #0
+        sta demo_row
+demo_row_loop
+        lda #0
+        sta demo_x_base
+        lda #160
+        sta demo_chunk_len
+        jsr fill_demo_chunk
+
+        lda #160
+        sta demo_x_base
+        lda #160
+        sta demo_chunk_len
+        jsr fill_demo_chunk
+
+        inc demo_row
+        lda demo_row
+        cmp #DEMO_HEIGHT
+        bne demo_row_loop
+
+        lda #<img_pal_buf
+        sta zp_tmp_ptr
+        lda #>img_pal_buf
+        sta zp_tmp_ptr+1
+        jsr set_image_palette
+        rts
+
+build_demo_palette
+        lda #<img_pal_buf
+        sta zp_tmp_ptr
+        lda #>img_pal_buf
+        sta zp_tmp_ptr+1
+        ldx #0
+demo_pal_loop
+        txa
+        ldy #0
+        sta (zp_tmp_ptr),y
+        txa
+        asl
+        ldy #1
+        sta (zp_tmp_ptr),y
+        txa
+        eor #$FF
+        ldy #2
+        sta (zp_tmp_ptr),y
+        clc
+        lda zp_tmp_ptr
+        adc #3
+        sta zp_tmp_ptr
+        bcc demo_pal_next
+        inc zp_tmp_ptr+1
+demo_pal_next
+        inx
+        bne demo_pal_loop
+        rts
+
+fill_demo_chunk
+        ldx #0
+demo_fill_loop
+        txa
+        clc
+        adc demo_x_base
+        eor demo_row
+        clc
+        adc demo_phase
+        ora #8
+        sta rx_buffer,x
+        inx
+        cpx demo_chunk_len
+        bne demo_fill_loop
+        stx zp_rx_len
+        jmp write_pixel_chunk
+
+set_image_palette
+        ldy #VBXE_PSEL
+        lda #1
+        sta (zp_vbxe_base),y
+
+        ldy #VBXE_CSEL
+        lda #8
+        sta (zp_vbxe_base),y
+
+        clc
+        lda zp_tmp_ptr
+        adc #24
+        sta zp_tmp_ptr
+        bcc pal_skip_ok
+        inc zp_tmp_ptr+1
+pal_skip_ok
+        ldx #8
+setpal_loop
+        ldy #0
+        lda (zp_tmp_ptr),y
+        ldy #VBXE_CR
+        sta (zp_vbxe_base),y
+        ldy #1
+        lda (zp_tmp_ptr),y
+        ldy #VBXE_CG
+        sta (zp_vbxe_base),y
+        ldy #2
+        lda (zp_tmp_ptr),y
+        ldy #VBXE_CB
+        sta (zp_vbxe_base),y
+        clc
+        lda zp_tmp_ptr
+        adc #3
+        sta zp_tmp_ptr
+        bcc setpal_next
+        inc zp_tmp_ptr+1
+setpal_next
+        inx
+        bne setpal_loop
+        rts
+
+detect_vbxe
+        lda #<$D600
+        sta zp_vbxe_base
+        lda #>$D600
+        sta zp_vbxe_base+1
+        ldy #VBXE_CORE_VER
+        lda #0
+        sta (zp_vbxe_base),y
+        lda (zp_vbxe_base),y
+        cmp #FX_CORE_VER
+        beq dv_ok
+
+        lda #<$D700
+        sta zp_vbxe_base
+        lda #>$D700
+        sta zp_vbxe_base+1
+        ldy #VBXE_CORE_VER
+        lda #0
+        sta (zp_vbxe_base),y
+        lda (zp_vbxe_base),y
+        cmp #FX_CORE_VER
+        beq dv_ok
+        clc
+        rts
+dv_ok
+        sec
+        rts
+
+show_fullscreen
+        memb_on 0
+        ldx #0
+
+        lda #<(XDLC_OVOFF|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT)
+        sta MEMB_XDL,x
+        inx
+        lda #>(XDLC_OVOFF|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT)
+        sta MEMB_XDL,x
+        inx
+        lda #24-1
+        sta MEMB_XDL,x
+        inx
+        lda #<VRAM_SCREEN
+        sta MEMB_XDL,x
+        inx
+        lda #>VRAM_SCREEN
+        sta MEMB_XDL,x
+        inx
+        lda #0
+        sta MEMB_XDL,x
+        inx
+        lda #<SCR_STRIDE
+        sta MEMB_XDL,x
+        inx
+        lda #>SCR_STRIDE
+        sta MEMB_XDL,x
+        inx
+        lda #CHBASE_VAL
+        sta MEMB_XDL,x
+        inx
+        lda #$11
+        sta MEMB_XDL,x
+        inx
+        lda #$FF
+        sta MEMB_XDL,x
+        inx
+
+        lda #<(XDLC_GMON|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_OVATT)
+        sta MEMB_XDL,x
+        inx
+        lda #>(XDLC_GMON|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_OVATT)
+        sta MEMB_XDL,x
+        inx
+        lda img_height
+        sec
+        sbc #1
+        sta MEMB_XDL,x
+        inx
+        lda img_vram
+        sta MEMB_XDL,x
+        inx
+        lda img_vram+1
+        sta MEMB_XDL,x
+        inx
+        lda img_vram+2
+        sta MEMB_XDL,x
+        inx
+        lda #<320
+        sta MEMB_XDL,x
+        inx
+        lda #>320
+        sta MEMB_XDL,x
+        inx
+        lda #$11
+        sta MEMB_XDL,x
+        inx
+        lda #$FF
+        sta MEMB_XDL,x
+        inx
+
+        lda #<(XDLC_OVOFF|XDLC_END)
+        sta MEMB_XDL,x
+        inx
+        lda #>(XDLC_OVOFF|XDLC_END)
+        sta MEMB_XDL,x
+
+        memb_off
+
+        ldy #VBXE_XDL_ADR0
+        lda #<VRAM_XDL
+        sta (zp_vbxe_base),y
+        iny
+        lda #>VRAM_XDL
+        sta (zp_vbxe_base),y
+        iny
+        lda #0
+        sta (zp_vbxe_base),y
+
+        ldy #VBXE_VCTL
+        lda #VC_XDL_ENABLED|VC_XCOLOR
+        sta (zp_vbxe_base),y
+        rts
+
+print_record
+        sta ICBAL
+        stx ICBAH
+        sty ICBLL
+        lda #0
+        sta ICBLH
+        lda #$09
+        sta ICCOM
+        ldx #0
+        jmp CIOV
+
+nibble_to_hex
+        and #$0F
+        cmp #10
+        bcc nibble_digit
+        clc
+        adc #6
+nibble_digit
+        clc
+        adc #'0'
+        rts
+
+write_dbg_hex
+        pha
+        lsr
+        lsr
+        lsr
+        lsr
+        jsr nibble_to_hex
+        sta dbg_line,x
+        inx
+        pla
+        and #$0F
+        jsr nibble_to_hex
+        sta dbg_line,x
+        rts
+
+report_failure
+        lda #$22
+        sta SDMCTL
+
+        lda debug_stage
+        cmp #$11
+        beq report_no_vbxe
+        cmp #$12
+        bcs report_img_fail
+
+        lda #<msg_text_fail
+        ldx #>msg_text_fail
+        ldy #msg_text_fail_end-msg_text_fail
+        jsr print_record
+        jmp report_stage
+
+report_no_vbxe
+        lda #<msg_no_vbxe
+        ldx #>msg_no_vbxe
+        ldy #msg_no_vbxe_end-msg_no_vbxe
+        jsr print_record
+        jmp report_dbg
+
+report_img_fail
+        lda #<msg_img_fail
+        ldx #>msg_img_fail
+        ldy #msg_img_fail_end-msg_img_fail
+        jsr print_record
+
+report_stage
+        lda debug_stage
+        cmp #1
+        bne report_stage_2
+        lda #<msg_stage_text_open
+        ldx #>msg_stage_text_open
+        ldy #msg_stage_text_open_end-msg_stage_text_open
+        jsr print_record
+        jmp report_dbg
+report_stage_2
+        cmp #2
+        bne report_stage_3
+        lda #<msg_stage_text_wait
+        ldx #>msg_stage_text_wait
+        ldy #msg_stage_text_wait_end-msg_stage_text_wait
+        jsr print_record
+        jmp report_dbg
+report_stage_3
+        cmp #3
+        bne report_stage_4
+        lda #<msg_stage_text_read
+        ldx #>msg_stage_text_read
+        ldy #msg_stage_text_read_end-msg_stage_text_read
+        jsr print_record
+        jmp report_dbg
+report_stage_4
+        cmp #$12
+        bne report_stage_5
+        lda #<msg_stage_img_open
+        ldx #>msg_stage_img_open
+        ldy #msg_stage_img_open_end-msg_stage_img_open
+        jsr print_record
+        jmp report_dbg
+report_stage_5
+        cmp #$13
+        bne report_stage_6
+        lda #<msg_stage_hdr
+        ldx #>msg_stage_hdr
+        ldy #msg_stage_hdr_end-msg_stage_hdr
+        jsr print_record
+        jmp report_dbg
+report_stage_6
+        cmp #$14
+        bne report_stage_7
+        lda #<msg_stage_pal
+        ldx #>msg_stage_pal
+        ldy #msg_stage_pal_end-msg_stage_pal
+        jsr print_record
+        jmp report_dbg
+report_stage_7
+        cmp #$15
+        bne report_dbg
+        lda #<msg_stage_pix
+        ldx #>msg_stage_pix
+        ldy #msg_stage_pix_end-msg_stage_pix
+        jsr print_record
+
+report_dbg
+        lda debug_stage
+        ldx #3
+        jsr write_dbg_hex
+        lda debug_dstats
+        ldx #9
+        jsr write_dbg_hex
+        lda debug_fn_error
+        ldx #15
+        jsr write_dbg_hex
+        lda debug_connected
+        ldx #21
+        jsr write_dbg_hex
+        lda debug_bytes_lo
+        ldx #27
+        jsr write_dbg_hex
+        lda debug_bytes_hi
+        ldx #33
+        jsr write_dbg_hex
+        lda debug_rx_len
+        ldx #39
+        jsr write_dbg_hex
+        lda #<dbg_line
+        ldx #>dbg_line
+        ldy #dbg_line_end-dbg_line
+        jsr print_record
+        rts
+
+report_text_success
+        lda #<msg_text_ok
+        ldx #>msg_text_ok
+        ldy #msg_text_ok_end-msg_text_ok
+        jsr print_record
+        jsr report_dbg
+        lda #<msg_payload
+        ldx #>msg_payload
+        ldy #msg_payload_end-msg_payload
+        jsr print_record
+        lda #<rx_buffer
+        ldx #>rx_buffer
+        ldy debug_rx_len
+        jsr print_record
+        lda #<msg_press_space
+        ldx #>msg_press_space
+        ldy #msg_press_space_end-msg_press_space
+        jsr print_record
+        rts
+
+        icl 'fujinet.asm'
+
+text_url_string  dta c'N:http://127.0.0.1:3000/',0
+text_url_string_end
+slide_url_string dta c'N:http://127.0.0.1:3000/slide/'
+slide_url_hex_hi dta c'0'
+slide_url_hex_lo dta c'0',0
+slide_url_string_end
+
+msg_title            dta c'FujiNet demo: text then image', ATASCII_RET
+msg_title_end
+msg_text_url         dta c'Text URL:', ATASCII_RET
+msg_text_url_end
+msg_wait_text        dta c'Fetching text...', ATASCII_RET
+msg_wait_text_end
+msg_text_ok          dta c'Text received from server', ATASCII_RET
+msg_text_ok_end
+msg_text_fail        dta c'Text fetch failed', ATASCII_RET
+msg_text_fail_end
+msg_img_fail         dta c'Image fetch failed', ATASCII_RET
+msg_img_fail_end
+msg_no_vbxe          dta c'VBXE not detected', ATASCII_RET
+msg_no_vbxe_end
+msg_payload          dta c'Payload:', ATASCII_RET
+msg_payload_end
+msg_press_space      dta c'Press SPACE for slideshow or D for demo', ATASCII_RET
+msg_press_space_end
+msg_loading_image    dta c'Loading image...', ATASCII_RET
+msg_loading_image_end
+msg_generating_demo  dta c'Generating demo image...', ATASCII_RET
+msg_generating_demo_end
+msg_stage_text_open  dta c'Stage: OPEN TEXT', ATASCII_RET
+msg_stage_text_open_end
+msg_stage_text_wait  dta c'Stage: WAIT TEXT', ATASCII_RET
+msg_stage_text_wait_end
+msg_stage_text_read  dta c'Stage: READ TEXT', ATASCII_RET
+msg_stage_text_read_end
+msg_stage_img_open   dta c'Stage: OPEN IMAGE', ATASCII_RET
+msg_stage_img_open_end
+msg_stage_hdr        dta c'Stage: READ HEADER', ATASCII_RET
+msg_stage_hdr_end
+msg_stage_pal        dta c'Stage: READ PALETTE', ATASCII_RET
+msg_stage_pal_end
+msg_stage_pix        dta c'Stage: READ PIXELS', ATASCII_RET
+msg_stage_pix_end
+dbg_line             dta c'ST=00 DS=00 FE=00 CN=00 BL=00 BH=00 RX=00', ATASCII_RET
+dbg_line_end
+
+        org $8800
+debug_stage       dta b(0)
+debug_dstats      dta b(0)
+debug_fn_error    dta b(0)
+debug_connected   dta b(0)
+debug_bytes_lo    dta b(0)
+debug_bytes_hi    dta b(0)
+debug_timeout_ctr dta b(0)
+debug_rx_len      dta b(0)
+img_width         dta b(0),b(0)
+img_pal_count     dta b(0),b(0)
+img_pal_leftover  dta b(0)
+img_height        dta b(0)
+img_vram          dta b(0),b(0),b(0)
+img_wr_bank       dta b(0)
+slide_index       dta b(0)
+demo_mode         dta b(0)
+demo_phase        dta b(0)
+demo_row          dta b(0)
+demo_x_base       dta b(0)
+demo_chunk_len    dta b(0)
+
+url_buffer  .ds 256
+rx_buffer   .ds 256
+img_pal_buf .ds 768
+
+        run main

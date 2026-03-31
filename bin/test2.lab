@@ -1,0 +1,7 @@
+mads 2.1.7
+Source: test2.asm
+     1 				        opt h+
+     2 				        org $3000
+     3 FFFF> 3000-3006> 78	start   sei
+     4 3001 60			        rts
+     5 3002 74 65 73 74 00	msg     dta c'test',0

@@ -48,6 +48,7 @@ XDLC_END      = $8000
 ; ----------------------------------------------------------------------------
 ; VBXE VRAM Layout
 ; ----------------------------------------------------------------------------
+VRAM_IMG_BASE  = $8000  ; Image viewer: pixel data start (fits 320x240 @8bpp within 128KB VRAM)
 VRAM_SCREEN    = $0000  ; Screen: SCR_ROWS*160 bytes (4800 for 30 rows)
 VRAM_BCB       = $1300  ; BCB blocks (after screen)
 VRAM_PATTERN   = $1380  ; Fill pattern (2 bytes)
@@ -114,9 +115,26 @@ ATTR_SUB       = COL_LIME
 ; ----------------------------------------------------------------------------
 RTCLOK     = $0012
 SDMCTL     = $022F
+STICK1     = $0279
 CHBAS      = $02F4
 CH         = $02FC
+DMACTL     = $D400
+HPOSP0     = $D000
+SIZEP0     = $D008
+COLPM0     = $D012
+STRIG0     = $D010
+STRIG1     = $D011
+PRIOR      = $D01B
+GRACTL     = $D01D
+PMBASE     = $D407
 PORTA      = $D300
+POKMSK     = $0010
+IRQEN      = $D20E
+AUDF2      = $D202
+AUDC2      = $D203
+AUDCTL     = $D208
+STIMER     = $D209
+VTIMR2     = $0212
 SIOV       = $E459
 COLDSV     = $E477
 PAL        = $D014         ; PAL/NTSC flag ($01=PAL, other=NTSC)

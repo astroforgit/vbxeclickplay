@@ -17,7 +17,7 @@ echo "msg_welcome     dta c'$MSG',0" >> src/build_stamp.asm
 echo "msg_welcome_col = $COL" >> src/build_stamp.asm
 
 echo "Assembling VBXE Web Browser..."
-./mads.exe src/browser.asm -o:bin/browser.xex -l:bin/browser.lab -t:bin/browser.lst
+mads src/browser.asm -o:bin/browser.xex -l:bin/browser.lab -t:bin/browser.lst
 
 if [ $? -eq 0 ]; then
     echo "Build successful: bin/browser.xex"

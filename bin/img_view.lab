@@ -1,0 +1,1660 @@
+mads 2.1.7
+Source: client.asm
+     1 				; Atari XEX header is generated automatically by MADS with -o:*.xex
+     2
+     3 				        icl 'vbxe_const.asm'
+Source: vbxe_const.asm
+     1 				; ============================================================================
+     2 				; VBXE Constants, Register Offsets, and Macros
+     3 				; For VBXE Web Browser - Atari XE/XL
+     4 				; Assembler: MADS
+     5 				; ============================================================================
+     6
+     7 				; ----------------------------------------------------------------------------
+     8 				; VBXE Register Offsets (from base $D640 or $D740)
+     9 				; ----------------------------------------------------------------------------
+    10
+    11 = 0040			VBXE_VCTL      = $40   ; VIDEO_CONTROL (R/W)
+    12 = 0040			VBXE_CORE_VER  = $40   ; CORE_VERSION (R) - same offset, read = version
+    13
+    14 = 0041			VBXE_XDL_ADR0  = $41   ; XDL address low byte (W)
+    15 = 0042			VBXE_XDL_ADR1  = $42   ; XDL address mid byte (W) — not used (INY from ADR0), kept for HW reference
+    16 = 0043			VBXE_XDL_ADR2  = $43   ; XDL address high byte (W) — not used (INY from ADR0), kept for HW reference
+    17
+    18 = 0044			VBXE_CSEL      = $44   ; Color Select (index 0-255)
+    19 = 0045			VBXE_PSEL      = $45   ; Palette Select (0=playfield, 1=overlay)
+    20 = 0046			VBXE_CR        = $46   ; Color Red component
+    21 = 0047			VBXE_CG        = $47   ; Color Green component
+    22 = 0048			VBXE_CB        = $48   ; Color Blue component
+    23
+    24 = 0050			VBXE_BL_ADR0   = $50   ; BCB address low
+    25 = 0053			VBXE_BLITTER   = $53   ; Write $01=start, Read: non-zero=busy
+    26
+    27 = 005D			VBXE_MEMAC_B   = $5D   ; MEMAC B control (window $4000-$7FFF)
+    28
+    29 				; VIDEO_CONTROL bits
+    30 = 0001			VC_XDL_ENABLED = $01
+    31 = 0002			VC_XCOLOR      = $02
+    32
+    33 = 0010			FX_CORE_VER    = $10   ; Expected CORE_VERSION for FX core
+    34
+    35 				; ----------------------------------------------------------------------------
+    36 				; XDL Control Word Flags
+    37 				; ----------------------------------------------------------------------------
+    38 = 0001			XDLC_TMON     = $0001
+    39 = 0002			XDLC_GMON     = $0002
+    40 = 0004			XDLC_OVOFF    = $0004
+    41 = 0010			XDLC_MAPOFF   = $0010
+    42 = 0020			XDLC_RPTL     = $0020
+    43 = 0040			XDLC_OVADR    = $0040
+    44 = 0100			XDLC_CHBASE   = $0100
+    45 = 0800			XDLC_OVATT    = $0800
+    46 = 8000			XDLC_END      = $8000
+    47
+    48 				; ----------------------------------------------------------------------------
+    49 				; VBXE VRAM Layout
+    50 				; ----------------------------------------------------------------------------
+    51 = 8000			VRAM_IMG_BASE  = $8000  ; Image viewer: pixel data start (fits 320x240 @8bpp within 128KB VRAM)
+    52 = 0000			VRAM_SCREEN    = $0000  ; Screen: SCR_ROWS*160 bytes (4800 for 30 rows)
+    53 = 1300			VRAM_BCB       = $1300  ; BCB blocks (after screen)
+    54 = 1380			VRAM_PATTERN   = $1380  ; Fill pattern (2 bytes)
+    55 = 1400			VRAM_XDL       = $1400  ; XDL
+    56 = 2000			VRAM_FONT      = $2000  ; Font: 256*8 = 2048 bytes
+    57 = 0005			PAGE_BUF_BANK  = 5      ; VRAM $14000 >> 14 = 5
+    58
+    59 				; CPU addresses when MEMAC B bank 0 active ($4000 + VRAM offset)
+    60 = 4000			MEMB_BASE      = $4000
+    61 = 4000			MEMB_SCREEN    = $4000
+    62 = 5300			MEMB_BCB       = $5300
+    63 = 5380			MEMB_PATTERN   = $5380
+    64 = 5400			MEMB_XDL       = $5400
+    65 = 6000			MEMB_FONT      = $6000
+    66
+    67 				; Screen dimensions
+    68 = 0050			SCR_COLS       = 80
+    69 = 001D			SCR_ROWS       = 29
+    70 = 00A0			SCR_STRIDE     = 160    ; 80 chars + 80 attrs
+    71 = 0004			CHBASE_VAL     = 4      ; VRAM_FONT / $800
+    72
+    73 				; Content area (derived from SCR_ROWS)
+    74 = 0002			CONTENT_TOP    = 2
+    75 = 001A			CONTENT_BOT    = SCR_ROWS - 3
+    76 = 0019			CONTENT_ROWS   = SCR_ROWS - 4
+    77 = 0000			URL_ROW        = 0
+    78 = 0001			TITLE_ROW      = 1
+    79 = 001B			STATUS_ROW     = SCR_ROWS - 2
+    80
+    81 				; ----------------------------------------------------------------------------
+    82 				; Color Palette Indices (overlay palette 1)
+    83 				; ----------------------------------------------------------------------------
+    84 = 0000			COL_BLACK      = 0
+    85 = 0001			COL_WHITE      = 1
+    86 = 0002			COL_BLUE       = 2
+    87 = 0003			COL_ORANGE     = 3
+    88 = 0004			COL_GREEN      = 4
+    89 = 0005			COL_RED        = 5
+    90 = 0006			COL_GRAY       = 6
+    91 = 0007			COL_YELLOW     = 7
+    92 = 000C			COL_CYAN       = 12   ; h4 headings
+    93 = 000D			COL_PINK       = 13   ; underline
+    94 = 000E			COL_LTGRAY     = 14   ; h5/h6 headings, sup/sub
+    95 = 000F			COL_LIME       = 15   ; sub
+    96
+    97 = 0001			ATTR_NORMAL    = COL_WHITE
+    98 = 0002			ATTR_LINK      = COL_BLUE     ; basic link color (for UI elements)
+    99 = 0020			ATTR_LINK_BASE = $20          ; link attrs: $20+link_num (palette $20-$5F = blue)
+   100 = 0003			ATTR_HEADING   = COL_ORANGE
+   101 = 0007			ATTR_H1        = COL_YELLOW
+   102 = 0003			ATTR_H2        = COL_ORANGE
+   103 = 0004			ATTR_H3        = COL_GREEN
+   104 = 000C			ATTR_H4        = COL_CYAN
+   105 = 000E			ATTR_H5        = COL_LTGRAY
+   106 = 000E			ATTR_H6        = COL_LTGRAY
+   107 = 0005			ATTR_ERROR     = COL_RED
+   108 = 0006			ATTR_DECOR     = COL_GRAY
+   109 = 000D			ATTR_UNDERLINE = COL_PINK
+   110 = 0006			ATTR_SUP       = COL_GRAY
+   111 = 000F			ATTR_SUB       = COL_LIME
+   112
+   113 				; ----------------------------------------------------------------------------
+   114 				; Atari System Equates
+   115 				; ----------------------------------------------------------------------------
+   116 = 0012			RTCLOK     = $0012
+   117 = 022F			SDMCTL     = $022F
+   118 = 02F4			CHBAS      = $02F4
+   119 = 02FC			CH         = $02FC
+   120 = D300			PORTA      = $D300
+   121 = E459			SIOV       = $E459
+   122 = E477			COLDSV     = $E477
+   123 = D014			PAL        = $D014         ; PAL/NTSC flag ($01=PAL, other=NTSC)
+   124
+   125 				; SIO DCB
+   126 = 0300			DDEVIC     = $0300
+   127 = 0301			DUNIT      = $0301
+   128 = 0302			DCOMND     = $0302
+   129 = 0303			DSTATS     = $0303
+   130 = 0304			DBUFLO     = $0304
+   131 = 0305			DBUFHI     = $0305
+   132 = 0306			DTIMLO     = $0306
+   133 = 0308			DBYTLO     = $0308
+   134 = 0309			DBYTHI     = $0309
+   135 = 030A			DAUX1      = $030A
+   136 = 030B			DAUX2      = $030B
+   137
+   138 = 02EA			DVSTAT     = $02EA
+   139
+   140 				; Keyboard codes
+   141 = 000C			KEY_RETURN = $0C
+   142 = 0021			KEY_SPACE  = $21
+   143 = 00FF			KEY_NONE   = $FF
+   144 = 007F			ATASCII_TAB = $7F              ; TAB key via CIO K: (ATASCII)
+   145 = 009B			ATASCII_RET = 155              ; Return via CIO K: (ATASCII)
+   146
+   147 = 0020			CH_SPACE   = $20
+   148
+   149 				; ----------------------------------------------------------------------------
+   150 				; Zero-Page Variables ($80-$AF)
+   151 				; ----------------------------------------------------------------------------
+   152 = 0080			zp_vbxe_base  = $80   ; 2 bytes
+   153 = 0082			zp_cursor_row = $82
+   154 = 0083			zp_cursor_col = $83
+   155 = 0084			zp_cur_attr   = $84
+   156 = 0085			zp_scr_ptr    = $85   ; 2 bytes
+   157 = 0087			zp_tmp_ptr    = $87   ; 2 bytes
+   158 = 0089			zp_tmp_ptr2   = $89   ; 2 bytes
+   159 = 008B			zp_tmp1       = $8B
+   160 = 008C			zp_tmp2       = $8C
+   161 = 008D			zp_tmp3       = $8D
+   162
+   163 = 008E			zp_parse_state = $8E
+   164 = 008F			zp_tag_idx     = $8F
+   165 = 0090			zp_attr_idx    = $90
+   166 = 0091			zp_val_idx     = $91
+   167 = 0092			zp_entity_idx  = $92
+   168
+   169 = 0093			zp_render_col  = $93
+   170 = 0094			zp_render_row  = $94
+   171 = 0095			zp_word_len    = $95
+   172 = 0096			zp_indent      = $96
+   173 = 0097			zp_in_link     = $97
+   174 = 0098			zp_link_num    = $98
+   175 				; $99-$9B free (removed: zp_in_heading, zp_in_list, zp_in_bold — write-only)
+   176 = 009C			zp_in_skip     = $9C
+   177 = 009D			zp_list_type   = $9D
+   178 = 009E			zp_list_item   = $9E
+   179
+   180 = 009F			zp_fn_connected = $9F
+   181 = 00A0			zp_fn_error    = $A0
+   182 = 00A1			zp_fn_bytes_lo = $A1
+   183 = 00A2			zp_fn_bytes_hi = $A2
+   184 = 00A3			zp_rx_len      = $A3
+   185
+   186 = 00A4			zp_cur_link    = $A4
+   187 = 00A5			zp_scroll_pos  = $A5   ; 2 bytes
+   188 				; $A7-$A8 free (removed: zp_page_lines — write-only)
+   189 = 00A9			zp_hist_ptr    = $A9   ; 1 byte - history stack index (0-7)
+   190 				; $AA free (removed: zp_fn_got_data — never referenced)
+   191 = 00AB			zp_img_ptr     = $AB   ; 2 bytes - image write pointer (MEMAC B window)
+   192 = 00AD			zp_memb_shadow = $AD   ; MEMAC B shadow for NMI-safe restore
+   193 = 00AE			zp_tirq_saved  = $AE   ; Timer IRQ: saved shadow value
+   194 = 00AF			zp_vbi_saved   = $AF   ; VBI: saved shadow value
+   195
+   196 				; Page buffer pointers ($B8-$BB, after mouse $B0-$B7)
+   197 = 00B8			zp_pb_wr_ptr   = $B8   ; 2B write pointer (MEMAC B window $4000-$7FFF)
+   198 = 00BA			zp_pb_rd_ptr   = $BA   ; 2B read pointer
+   199
+   200 				; TAB navigation ($BC)
+   201 = 00BC			zp_tab_link    = $BC   ; currently selected link via TAB ($FF = none)
+   202
+   203 				; ----------------------------------------------------------------------------
+   204 				; Macros
+   205 				; ----------------------------------------------------------------------------
+   206
+   207 				; MEMAC B macros with shadow variable for interrupt-safe restore.
+   208 				; IMPORTANT: Code using these macros MUST be below $4000!
+   209 				; When MEMAC B is active, $4000-$7FFF reads VRAM, not RAM.
+   210 				; Interrupt handlers use stubs at page 6 to disable/restore MEMAC B.
+   211 				memb_on .macro
+   212 				        lda #$80+:1
+   213 				        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+   214 				        ldy #VBXE_MEMAC_B
+   215 				        sta (zp_vbxe_base),y
+   216 				        .endm
+   217
+   218 				memb_off .macro
+   219 				        lda #0
+   220 				        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+   221 				        ldy #VBXE_MEMAC_B
+   222 				        sta (zp_vbxe_base),y
+   223 				        .endm
+   224
+   225 				; Show message on status bar: :1=color, :2=message address
+   226 				; Expands to subroutine call (9 bytes) instead of inline (31 bytes)
+   227 				status_msg .macro
+   228 				        ldy #:1
+   229 				        lda #<:2
+   230 				        ldx #>:2
+   231 				        jsr status_msg_sub
+   232 				        .endm
+   233
+   234 				; Wait N frames (RTCLOK-based delay): :1=frame count
+   235 				; Expands to subroutine call (5 bytes) instead of inline (13 bytes)
+   236 				wait_frames .macro
+   237 				        ldx #:1
+   238 				        jsr wait_frames_sub
+   239 				        .endm
+   240
+   241 				blit_start .macro
+   242 				        ldy #VBXE_BL_ADR0
+   243 				        lda #<:1
+   244 				        sta (zp_vbxe_base),y
+   245 				        iny
+   246 				        lda #>:1
+   247 				        sta (zp_vbxe_base),y
+   248 				        iny
+   249 				        lda #0
+   250 				        sta (zp_vbxe_base),y
+   251 				        iny
+   252 				        lda #1
+   253 				        sta (zp_vbxe_base),y
+   254 				        .endm
+   255
+   256 				blit_wait .macro
+   257 				        ldy #VBXE_BLITTER
+   258 				?bw     lda (zp_vbxe_base),y
+   259 				        bne ?bw
+   260 				        .endm
+     4
+     5 = E456			CIOV    = $E456
+     6 = 0342			ICCOM   = $0342
+     7 = 0344			ICBAL   = $0344
+     8 = 0345			ICBAH   = $0345
+     9 = 0348			ICBLL   = $0348
+    10 = 0349			ICBLH   = $0349
+    11
+    12 = 00F0			VIEW_TIMEOUT = 240
+    13 = 0060			READ_LIMIT   = 96
+    14 = 003A			KEY_D        = $3A
+    15 = 00C8			DEMO_HEIGHT  = 200
+    16
+    17 				        org $2000
+    18
+    19 				main
+    20 FFFF> 2000-2A9D> A9 22	        lda #$22
+    21 2002 8D 2F 02		        sta SDMCTL
+    22 2005 20 7E 20		        jsr clear_debug
+    23 2008 20 13 21		        jsr copy_text_url_to_buffer
+    24 200B 20 A1 20		        jsr show_banner
+    25 200E 20 55 21		        jsr fetch_text_payload
+    26 2011 90 06		        bcc text_ok
+    27 2013 20 98 26		        jsr report_failure
+    28 2016			fail_loop
+    29 2016 4C 16 20		        jmp fail_loop
+    30
+    31 2019			text_ok
+    32 2019 20 7B 27		        jsr report_text_success
+    33 201C 20 C6 20		        jsr wait_for_start_key
+    34
+    35 201F 20 78 25		        jsr detect_vbxe
+    36 2022 90 24		        bcc no_vbxe
+    37
+    38 2024 AD 13 88		        lda demo_mode
+    39 2027 D0 2A		        bne start_demo
+    40
+    41 2029 A9 CB		        lda #<msg_loading_image
+    42 202B A2 29		        ldx #>msg_loading_image
+    43 202D A0 11		        ldy #msg_loading_image_end-msg_loading_image
+    44 202F 20 5D 26		        jsr print_record
+    45
+    46 2032 A9 00		        lda #0
+    47 2034 8D 12 88		        sta slide_index
+    48
+    49 2037			load_slide
+    50 2037 20 7E 20		        jsr clear_debug
+    51 203A 20 1E 21		        jsr copy_slide_url_to_buffer
+    52 203D 20 2F 22		        jsr fetch_room_image
+    53 2040 90 20		        bcc image_ok
+    54 2042 20 98 26		        jsr report_failure
+    55 2045 4C 16 20		        jmp fail_loop
+    56
+    57 2048			no_vbxe
+    58 2048 A9 11		        lda #$11
+    59 204A 8D 00 88		        sta debug_stage
+    60 204D 20 98 26		        jsr report_failure
+    61 2050 4C 16 20		        jmp fail_loop
+    62
+    63 2053			start_demo
+    64 2053 A9 DC		        lda #<msg_generating_demo
+    65 2055 A2 29		        ldx #>msg_generating_demo
+    66 2057 A0 19		        ldy #msg_generating_demo_end-msg_generating_demo
+    67 2059 20 5D 26		        jsr print_record
+    68 205C 20 A6 24		        jsr generate_demo_image
+    69 205F 4C 62 20		        jmp image_ok
+    70
+    71 2062			image_ok
+    72 2062 A9 00		        lda #0
+    73 2064 8D 2F 02		        sta SDMCTL
+    74 2067 20 A4 25		        jsr show_fullscreen
+    75 206A			image_loop
+    76 206A 20 01 21		        jsr wait_for_any_key
+    77 206D AD 13 88		        lda demo_mode
+    78 2070 D0 06		        bne demo_next
+    79 2072 EE 12 88		        inc slide_index
+    80 2075 4C 37 20		        jmp load_slide
+    81
+    82 2078			demo_next
+    83 2078 20 A6 24		        jsr generate_demo_image
+    84 207B 4C 62 20		        jmp image_ok
+    85
+    86 207E			clear_debug
+    87 207E A9 00		        lda #0
+    88 2080 8D 00 88		        sta debug_stage
+    89 2083 8D 01 88		        sta debug_dstats
+    90 2086 8D 02 88		        sta debug_fn_error
+    91 2089 8D 03 88		        sta debug_connected
+    92 208C 8D 04 88		        sta debug_bytes_lo
+    93 208F 8D 05 88		        sta debug_bytes_hi
+    94 2092 8D 06 88		        sta debug_timeout_ctr
+    95 2095 8D 07 88		        sta debug_rx_len
+    96 2098 85 A3		        sta zp_rx_len
+    97 209A 8D 0C 88		        sta img_pal_leftover
+    98 209D 8D 13 88		        sta demo_mode
+    99 20A0 60			        rts
+   100
+   101 20A1			show_banner
+   102 20A1 A9 10		        lda #<msg_title
+   103 20A3 A2 29		        ldx #>msg_title
+   104 20A5 A0 1E		        ldy #msg_title_end-msg_title
+   105 20A7 20 5D 26		        jsr print_record
+   106 20AA A9 2E		        lda #<msg_text_url
+   107 20AC A2 29		        ldx #>msg_text_url
+   108 20AE A0 0A		        ldy #msg_text_url_end-msg_text_url
+   109 20B0 20 5D 26		        jsr print_record
+   110 20B3 A9 D6		        lda #<text_url_string
+   111 20B5 A2 28		        ldx #>text_url_string
+   112 20B7 A0 18		        ldy #text_url_string_end-text_url_string-1
+   113 20B9 20 5D 26		        jsr print_record
+   114 20BC A9 38		        lda #<msg_wait_text
+   115 20BE A2 29		        ldx #>msg_wait_text
+   116 20C0 A0 11		        ldy #msg_wait_text_end-msg_wait_text
+   117 20C2 20 5D 26		        jsr print_record
+   118 20C5 60			        rts
+   119
+   120 20C6			wait_for_start_key
+   121 20C6 A9 00		        lda #0
+   122 20C8 8D 13 88		        sta demo_mode
+   123 20CB A9 FF		        lda #KEY_NONE
+   124 20CD 8D FC 02		        sta CH
+   125 20D0			wait_start_loop
+   126 20D0 AD FC 02		        lda CH
+   127 20D3 C9 21		        cmp #KEY_SPACE
+   128 20D5 F0 14		        beq wait_space_done
+   129 20D7 C9 20		        cmp #CH_SPACE
+   130 20D9 F0 10		        beq wait_space_done
+   131 20DB C9 3A		        cmp #KEY_D
+   132 20DD F0 17		        beq wait_demo_done
+   133 20DF C9 FF		        cmp #KEY_NONE
+   134 20E1 F0 ED		        beq wait_start_loop
+   135 20E3 A9 FF		        lda #KEY_NONE
+   136 20E5 8D FC 02		        sta CH
+   137 20E8 4C D0 20		        jmp wait_start_loop
+   138 20EB			wait_space_done
+   139 20EB A9 00		        lda #0
+   140 20ED 8D 13 88		        sta demo_mode
+   141 20F0 A9 FF		        lda #KEY_NONE
+   142 20F2 8D FC 02		        sta CH
+   143 20F5 60			        rts
+   144 20F6			wait_demo_done
+   145 20F6 A9 01		        lda #1
+   146 20F8 8D 13 88		        sta demo_mode
+   147 20FB A9 FF		        lda #KEY_NONE
+   148 20FD 8D FC 02		        sta CH
+   149 2100 60			        rts
+   150
+   151 2101			wait_for_any_key
+   152 2101 A9 FF		        lda #KEY_NONE
+   153 2103 8D FC 02		        sta CH
+   154 2106			wait_any_loop
+   155 2106 AD FC 02		        lda CH
+   156 2109 C9 FF		        cmp #KEY_NONE
+   157 210B F0 F9		        beq wait_any_loop
+   158 210D A9 FF		        lda #KEY_NONE
+   159 210F 8D FC 02		        sta CH
+   160 2112 60			        rts
+   161
+   162 2113			copy_text_url_to_buffer
+   163 2113 A9 D6		        lda #<text_url_string
+   164 2115 85 87		        sta zp_tmp_ptr
+   165 2117 A9 28		        lda #>text_url_string
+   166 2119 85 88		        sta zp_tmp_ptr+1
+   167 211B 4C 3F 21		        jmp copy_string_to_buffer
+   168
+   169 211E			copy_slide_url_to_buffer
+   170 211E AD 12 88		        lda slide_index
+   171 2121 4A			        lsr
+   172 2122 4A			        lsr
+   173 2123 4A			        lsr
+   174 2124 4A			        lsr
+   175 2125 20 75 26		        jsr nibble_to_hex
+   176 2128 8D 0D 29		        sta slide_url_hex_hi
+   177
+   178 212B AD 12 88		        lda slide_index
+   179 212E 20 75 26		        jsr nibble_to_hex
+   180 2131 8D 0E 29		        sta slide_url_hex_lo
+   181
+   182 2134 A9 EF		        lda #<slide_url_string
+   183 2136 85 87		        sta zp_tmp_ptr
+   184 2138 A9 28		        lda #>slide_url_string
+   185 213A 85 88		        sta zp_tmp_ptr+1
+   186 213C 4C 3F 21		        jmp copy_string_to_buffer
+   187
+   188 213F			copy_string_to_buffer
+   189 213F A9 00		        lda #0
+   190 2141 A8			        tay
+   191 2142			copy_url_clear_loop
+   192 2142 99 18 88		        sta url_buffer,y
+   193 2145 C8			        iny
+   194 2146 D0 FA		        bne copy_url_clear_loop
+   195
+   196 2148 A0 00		        ldy #0
+   197 214A			copy_url_copy_loop
+   198 214A B1 87		        lda (zp_tmp_ptr),y
+   199 214C 99 18 88		        sta url_buffer,y
+   200 214F F0 03		        beq copy_url_done
+   201 2151 C8			        iny
+   202 2152 D0 F6		        bne copy_url_copy_loop
+   203 2154			copy_url_done
+   204 2154 60			        rts
+   205
+   206 2155			fetch_text_payload
+   207 2155 A9 01		        lda #1
+   208 2157 8D 00 88		        sta debug_stage
+   209 215A 20 A5 27		        jsr fn_open
+   210 215D AD 03 03		        lda DSTATS
+   211 2160 8D 01 88		        sta debug_dstats
+   212 2163 90 03		        bcc text_open_ok
+   213 2165 4C DE 21		        jmp text_fail
+   214
+   215 2168			text_open_ok
+   216 2168 A9 F0		        lda #VIEW_TIMEOUT
+   217 216A 8D 06 88		        sta debug_timeout_ctr
+   218
+   219 216D			text_wait
+   220 216D A9 02		        lda #2
+   221 216F 8D 00 88		        sta debug_stage
+   222 2172 20 E0 21		        jsr poll_status
+   223 2175 90 03		        bcc text_status_ok
+   224 2177 4C DB 21		        jmp text_fail_close
+   225
+   226 217A			text_status_ok
+   227 217A AD 02 88		        lda debug_fn_error
+   228 217D 30 03		        bmi text_status_fatal
+   229 217F 4C 89 21		        jmp text_check_bytes
+   230
+   231 2182			text_status_fatal
+   232 2182 C9 88		        cmp #136
+   233 2184 F0 55		        beq text_fail_close
+   234 2186 4C DB 21		        jmp text_fail_close
+   235
+   236 2189			text_check_bytes
+   237 2189 AD 05 88		        lda debug_bytes_hi
+   238 218C D0 15		        bne text_read
+   239 218E AD 04 88		        lda debug_bytes_lo
+   240 2191 D0 10		        bne text_read
+   241 2193 AD 03 88		        lda debug_connected
+   242 2196 F0 43		        beq text_fail_close
+   243 2198 CE 06 88		        dec debug_timeout_ctr
+   244 219B F0 3E		        beq text_fail_close
+   245 219D 20 FE 21		        jsr wait_one_frame
+   246 21A0 4C 6D 21		        jmp text_wait
+   247
+   248 21A3			text_read
+   249 21A3 A9 03		        lda #3
+   250 21A5 8D 00 88		        sta debug_stage
+   251 21A8 AD 05 88		        lda debug_bytes_hi
+   252 21AB F0 04		        beq text_read_lo
+   253 21AD A9 60		        lda #READ_LIMIT
+   254 21AF D0 09		        bne text_read_set
+   255
+   256 21B1			text_read_lo
+   257 21B1 AD 04 88		        lda debug_bytes_lo
+   258 21B4 C9 60		        cmp #READ_LIMIT
+   259 21B6 90 02		        bcc text_read_set
+   260 21B8 A9 60		        lda #READ_LIMIT
+   261
+   262 21BA			text_read_set
+   263 21BA 85 A1		        sta zp_fn_bytes_lo
+   264 21BC A9 00		        lda #0
+   265 21BE 85 A2		        sta zp_fn_bytes_hi
+   266 21C0 20 3D 28		        jsr fn_read
+   267 21C3 AD 03 03		        lda DSTATS
+   268 21C6 8D 01 88		        sta debug_dstats
+   269 21C9 90 03		        bcc text_read_ok
+   270 21CB 4C DB 21		        jmp text_fail_close
+   271
+   272 21CE			text_read_ok
+   273 21CE A5 A3		        lda zp_rx_len
+   274 21D0 8D 07 88		        sta debug_rx_len
+   275 21D3 20 05 22		        jsr sanitize_rx_buffer
+   276 21D6 20 A5 28		        jsr fn_close
+   277 21D9 18			        clc
+   278 21DA 60			        rts
+   279
+   280 21DB			text_fail_close
+   281 21DB 20 A5 28		        jsr fn_close
+   282 21DE			text_fail
+   283 21DE 38			        sec
+   284 21DF 60			        rts
+   285
+   286 21E0			poll_status
+   287 21E0 20 E9 27		        jsr fn_status
+   288 21E3 AD 03 03		        lda DSTATS
+   289 21E6 8D 01 88		        sta debug_dstats
+   290 21E9 A5 A0		        lda zp_fn_error
+   291 21EB 8D 02 88		        sta debug_fn_error
+   292 21EE A5 9F		        lda zp_fn_connected
+   293 21F0 8D 03 88		        sta debug_connected
+   294 21F3 A5 A1		        lda zp_fn_bytes_lo
+   295 21F5 8D 04 88		        sta debug_bytes_lo
+   296 21F8 A5 A2		        lda zp_fn_bytes_hi
+   297 21FA 8D 05 88		        sta debug_bytes_hi
+   298 21FD 60			        rts
+   299
+   300 21FE			wait_one_frame
+   301 21FE A5 14		        lda RTCLOK+2
+   302 2200			wait_one_frame_loop
+   303 2200 C5 14		        cmp RTCLOK+2
+   304 2202 F0 FC		        beq wait_one_frame_loop
+   305 2204 60			        rts
+   306
+   307 2205			sanitize_rx_buffer
+   308 2205 A2 00		        ldx #0
+   309 2207			sanitize_loop
+   310 2207 E4 A3		        cpx zp_rx_len
+   311 2209 F0 23		        beq sanitize_done
+   312 220B BD 18 89		        lda rx_buffer,x
+   313 220E C9 0D		        cmp #13
+   314 2210 F0 0F		        beq sanitize_nl
+   315 2212 C9 0A		        cmp #10
+   316 2214 F0 0B		        beq sanitize_nl
+   317 2216 C9 20		        cmp #32
+   318 2218 90 0B		        bcc sanitize_dot
+   319 221A C9 7F		        cmp #127
+   320 221C B0 07		        bcs sanitize_dot
+   321 221E 4C 2A 22		        jmp sanitize_next
+   322
+   323 2221			sanitize_nl
+   324 2221 A9 9B		        lda #ATASCII_RET
+   325 2223 D0 02		        bne sanitize_store
+   326
+   327 2225			sanitize_dot
+   328 2225 A9 2E		        lda #'.'
+   329
+   330 2227			sanitize_store
+   331 2227 9D 18 89		        sta rx_buffer,x
+   332
+   333 222A			sanitize_next
+   334 222A E8			        inx
+   335 222B 4C 07 22		        jmp sanitize_loop
+   336 222E			sanitize_done
+   337 222E 60			        rts
+   338
+   339 222F			fetch_room_image
+   340 222F A9 12		        lda #$12
+   341 2231 8D 00 88		        sta debug_stage
+   342 2234 20 A5 27		        jsr fn_open
+   343 2237 AD 03 03		        lda DSTATS
+   344 223A 8D 01 88		        sta debug_dstats
+   345 223D 90 03		        bcc fetch_open_ok
+   346 223F 4C 8D 22		        jmp fetch_fail
+   347
+   348 2242			fetch_open_ok
+   349 2242 A9 13		        lda #$13
+   350 2244 8D 00 88		        sta debug_stage
+   351 2247 20 8F 22		        jsr read_header_chunk
+   352 224A 90 03		        bcc fetch_header_ok
+   353 224C 4C 8A 22		        jmp fetch_fail_close
+   354
+   355 224F			fetch_header_ok
+   356 224F AD 0D 88		        lda img_height
+   357 2252 8D 07 88		        sta debug_rx_len
+   358
+   359 2255 A9 14		        lda #$14
+   360 2257 8D 00 88		        sta debug_stage
+   361 225A 20 32 23		        jsr read_palette_stream
+   362 225D 90 03		        bcc fetch_palette_ok
+   363 225F 4C 8A 22		        jmp fetch_fail_close
+   364
+   365 2262			fetch_palette_ok
+   366 2262 20 2F 24		        jsr init_image_write
+   367 2265 AD 0C 88		        lda img_pal_leftover
+   368 2268 85 A3		        sta zp_rx_len
+   369 226A 20 60 24		        jsr write_pixel_chunk
+   370
+   371 226D A9 15		        lda #$15
+   372 226F 8D 00 88		        sta debug_stage
+   373 2272 20 DA 23		        jsr read_pixels_stream
+   374 2275 90 03		        bcc fetch_pixels_ok
+   375 2277 4C 8A 22		        jmp fetch_fail_close
+   376
+   377 227A			fetch_pixels_ok
+   378 227A 20 A5 28		        jsr fn_close
+   379 227D A9 18		        lda #<img_pal_buf
+   380 227F 85 87		        sta zp_tmp_ptr
+   381 2281 A9 8A		        lda #>img_pal_buf
+   382 2283 85 88		        sta zp_tmp_ptr+1
+   383 2285 20 38 25		        jsr set_image_palette
+   384 2288 18			        clc
+   385 2289 60			        rts
+   386
+   387 228A			fetch_fail_close
+   388 228A 20 A5 28		        jsr fn_close
+   389 228D			fetch_fail
+   390 228D 38			        sec
+   391 228E 60			        rts
+   392
+   393 228F			read_header_chunk
+   394 228F A9 F0		        lda #VIEW_TIMEOUT
+   395 2291 8D 06 88		        sta debug_timeout_ctr
+   396
+   397 2294 A9 03		        lda #3
+   398 2296 85 A1		        sta zp_fn_bytes_lo
+   399 2298 8D 04 88		        sta debug_bytes_lo
+   400 229B A9 00		        lda #0
+   401 229D 85 A2		        sta zp_fn_bytes_hi
+   402 229F 8D 05 88		        sta debug_bytes_hi
+   403 22A2 20 3D 28		        jsr fn_read
+   404 22A5 AD 03 03		        lda DSTATS
+   405 22A8 8D 01 88		        sta debug_dstats
+   406 22AB 90 47		        bcc hdr_read_ok
+   407
+   408 22AD			hdr_wait
+   409 22AD 20 E0 21		        jsr poll_status
+   410 22B0 90 03		        bcc hdr_status_ok
+   411 22B2 4C 30 23		        jmp hdr_err
+   412
+   413 22B5			hdr_status_ok
+   414 22B5 AD 02 88		        lda debug_fn_error
+   415 22B8 F0 08		        beq hdr_check_bytes
+   416 22BA C9 88		        cmp #136
+   417 22BC F0 72		        beq hdr_err
+   418 22BE C9 80		        cmp #128
+   419 22C0 B0 6E		        bcs hdr_err
+   420
+   421 22C2			hdr_check_bytes
+   422 22C2 AD 05 88		        lda debug_bytes_hi
+   423 22C5 D0 17		        bne hdr_ready
+   424 22C7 AD 04 88		        lda debug_bytes_lo
+   425 22CA C9 03		        cmp #3
+   426 22CC B0 10		        bcs hdr_ready
+   427 22CE AD 03 88		        lda debug_connected
+   428 22D1 F0 5D		        beq hdr_err
+   429 22D3 CE 06 88		        dec debug_timeout_ctr
+   430 22D6 F0 58		        beq hdr_err
+   431 22D8 20 FE 21		        jsr wait_one_frame
+   432 22DB 4C AD 22		        jmp hdr_wait
+   433
+   434 22DE			hdr_ready
+   435 22DE A9 03		        lda #3
+   436 22E0 85 A1		        sta zp_fn_bytes_lo
+   437 22E2 A9 00		        lda #0
+   438 22E4 85 A2		        sta zp_fn_bytes_hi
+   439 22E6 20 3D 28		        jsr fn_read
+   440 22E9 AD 03 03		        lda DSTATS
+   441 22EC 8D 01 88		        sta debug_dstats
+   442 22EF 90 03		        bcc hdr_read_ok
+   443 22F1 4C 30 23		        jmp hdr_err
+   444
+   445 22F4			hdr_read_ok
+   446 22F4 AD 18 89		        lda rx_buffer
+   447 22F7 8D 08 88		        sta img_width
+   448 22FA AD 19 89		        lda rx_buffer+1
+   449 22FD 8D 09 88		        sta img_width+1
+   450 2300 AD 1A 89		        lda rx_buffer+2
+   451 2303 8D 0D 88		        sta img_height
+   452
+   453 2306 AD 09 88		        lda img_width+1
+   454 2309 C9 02		        cmp #2
+   455 230B 90 0F		        bcc hdr_chk_lo
+   456 230D F0 03		        beq hdr_chk_hi
+   457 230F 4C 30 23		        jmp hdr_err
+   458
+   459 2312			hdr_chk_hi
+   460 2312 AD 08 88		        lda img_width
+   461 2315 C9 41		        cmp #$41
+   462 2317 B0 17		        bcs hdr_err
+   463 2319 4C 23 23		        jmp hdr_chk_h
+   464
+   465 231C			hdr_chk_lo
+   466 231C AD 08 88		        lda img_width
+   467 231F C9 08		        cmp #8
+   468 2321 90 0D		        bcc hdr_err
+   469
+   470 2323			hdr_chk_h
+   471 2323 AD 0D 88		        lda img_height
+   472 2326 C9 08		        cmp #8
+   473 2328 90 06		        bcc hdr_err
+   474 232A C9 D1		        cmp #209
+   475 232C B0 02		        bcs hdr_err
+   476 232E 18			        clc
+   477 232F 60			        rts
+   478 2330			hdr_err
+   479 2330 38			        sec
+   480 2331 60			        rts
+   481
+   482 2332			read_palette_stream
+   483 2332 A9 18		        lda #<img_pal_buf
+   484 2334 85 87		        sta zp_tmp_ptr
+   485 2336 A9 8A		        lda #>img_pal_buf
+   486 2338 85 88		        sta zp_tmp_ptr+1
+   487 233A A9 00		        lda #0
+   488 233C 8D 0A 88		        sta img_pal_count
+   489 233F 8D 0B 88		        sta img_pal_count+1
+   490 2342 8D 0C 88		        sta img_pal_leftover
+   491 2345 A9 F0		        lda #VIEW_TIMEOUT
+   492 2347 8D 06 88		        sta debug_timeout_ctr
+   493
+   494 234A			pal_wait
+   495 234A 20 E0 21		        jsr poll_status
+   496 234D 90 03		        bcc pal_status_ok
+   497 234F 4C D3 23		        jmp pal_err
+   498
+   499 2352			pal_status_ok
+   500 2352 AD 02 88		        lda debug_fn_error
+   501 2355 C9 88		        cmp #136
+   502 2357 F0 7A		        beq pal_err
+   503 2359 C9 80		        cmp #128
+   504 235B B0 76		        bcs pal_err
+   505 235D AD 04 88		        lda debug_bytes_lo
+   506 2360 0D 05 88		        ora debug_bytes_hi
+   507 2363 F0 0E		        beq pal_no_data
+   508
+   509 2365 20 3D 28		        jsr fn_read
+   510 2368 AD 03 03		        lda DSTATS
+   511 236B 8D 01 88		        sta debug_dstats
+   512 236E 90 0E		        bcc pal_read_ok
+   513 2370 4C D3 23		        jmp pal_err
+   514
+   515 2373			pal_no_data
+   516 2373 CE 06 88		        dec debug_timeout_ctr
+   517 2376 F0 5B		        beq pal_err
+   518 2378 20 FE 21		        jsr wait_one_frame
+   519 237B 4C 4A 23		        jmp pal_wait
+   520
+   521 237E			pal_read_ok
+   522 237E A5 A3		        lda zp_rx_len
+   523 2380 F0 C8		        beq pal_wait
+   524 2382 A9 F0		        lda #VIEW_TIMEOUT
+   525 2384 8D 06 88		        sta debug_timeout_ctr
+   526
+   527 2387 A0 00		        ldy #0
+   528 2389			pal_copy
+   529 2389 C4 A3		        cpy zp_rx_len
+   530 238B F0 24		        beq pal_check_done
+   531 238D B9 18 89		        lda rx_buffer,y
+   532 2390 84 8D		        sty zp_tmp3
+   533 2392 A0 00		        ldy #0
+   534 2394 91 87		        sta (zp_tmp_ptr),y
+   535 2396 A4 8D		        ldy zp_tmp3
+   536 2398 E6 87		        inc zp_tmp_ptr
+   537 239A D0 02		        bne pal_ptr_ok
+   538 239C E6 88		        inc zp_tmp_ptr+1
+   539 239E			pal_ptr_ok
+   540 239E EE 0A 88		        inc img_pal_count
+   541 23A1 D0 03		        bne pal_count_ok
+   542 23A3 EE 0B 88		        inc img_pal_count+1
+   543 23A6			pal_count_ok
+   544 23A6 AD 0B 88		        lda img_pal_count+1
+   545 23A9 C9 03		        cmp #3
+   546 23AB B0 07		        bcs pal_done
+   547 23AD C8			        iny
+   548 23AE 4C 89 23		        jmp pal_copy
+   549
+   550 23B1			pal_check_done
+   551 23B1 4C 4A 23		        jmp pal_wait
+   552
+   553 23B4			pal_done
+   554 23B4 C8			        iny
+   555 23B5 C4 A3		        cpy zp_rx_len
+   556 23B7 B0 13		        bcs pal_no_left
+   557 23B9 A2 00		        ldx #0
+   558 23BB			pal_shift
+   559 23BB B9 18 89		        lda rx_buffer,y
+   560 23BE 9D 18 89		        sta rx_buffer,x
+   561 23C1 C8			        iny
+   562 23C2 E8			        inx
+   563 23C3 C4 A3		        cpy zp_rx_len
+   564 23C5 90 F4		        bcc pal_shift
+   565 23C7 8E 0C 88		        stx img_pal_leftover
+   566 23CA 18			        clc
+   567 23CB 60			        rts
+   568
+   569 23CC			pal_no_left
+   570 23CC A9 00		        lda #0
+   571 23CE 8D 0C 88		        sta img_pal_leftover
+   572 23D1 18			        clc
+   573 23D2 60			        rts
+   574 23D3			pal_err
+   575 23D3 A9 00		        lda #0
+   576 23D5 8D 0C 88		        sta img_pal_leftover
+   577 23D8 38			        sec
+   578 23D9 60			        rts
+   579
+   580 23DA			read_pixels_stream
+   581 23DA A9 F0		        lda #VIEW_TIMEOUT
+   582 23DC 8D 06 88		        sta debug_timeout_ctr
+   583 23DF			pix_wait
+   584 23DF 20 E0 21		        jsr poll_status
+   585 23E2 90 03		        bcc pix_status_ok
+   586 23E4 4C 2D 24		        jmp pix_err
+   587
+   588 23E7			pix_status_ok
+   589 23E7 AD 02 88		        lda debug_fn_error
+   590 23EA 30 03		        bmi pix_status_fatal
+   591 23EC 4C F6 23		        jmp pix_check_data
+   592
+   593 23EF			pix_status_fatal
+   594 23EF C9 88		        cmp #136
+   595 23F1 F0 38		        beq pix_done
+   596 23F3 4C 2D 24		        jmp pix_err
+   597
+   598 23F6			pix_check_data
+   599 23F6 AD 03 88		        lda debug_connected
+   600 23F9 F0 30		        beq pix_done
+   601 23FB AD 04 88		        lda debug_bytes_lo
+   602 23FE 0D 05 88		        ora debug_bytes_hi
+   603 2401 D0 0B		        bne pix_read
+   604 2403 CE 06 88		        dec debug_timeout_ctr
+   605 2406 F0 23		        beq pix_done
+   606 2408 20 FE 21		        jsr wait_one_frame
+   607 240B 4C DF 23		        jmp pix_wait
+   608
+   609 240E			pix_read
+   610 240E 20 3D 28		        jsr fn_read
+   611 2411 AD 03 03		        lda DSTATS
+   612 2414 8D 01 88		        sta debug_dstats
+   613 2417 90 03		        bcc pix_read_ok
+   614 2419 4C 2B 24		        jmp pix_done
+   615
+   616 241C			pix_read_ok
+   617 241C A5 A3		        lda zp_rx_len
+   618 241E F0 BF		        beq pix_wait
+   619 2420 A9 F0		        lda #VIEW_TIMEOUT
+   620 2422 8D 06 88		        sta debug_timeout_ctr
+   621 2425 20 60 24		        jsr write_pixel_chunk
+   622 2428 4C DF 23		        jmp pix_wait
+   623
+   624 242B			pix_done
+   625 242B 18			        clc
+   626 242C 60			        rts
+   627 242D			pix_err
+   628 242D 38			        sec
+   629 242E 60			        rts
+   630
+   631 242F			init_image_write
+   632 242F A9 00		        lda #<VRAM_IMG_BASE
+   633 2431 8D 0E 88		        sta img_vram
+   634 2434 A9 80		        lda #>VRAM_IMG_BASE
+   635 2436 8D 0F 88		        sta img_vram+1
+   636 2439 A9 00		        lda #0
+   637 243B 8D 10 88		        sta img_vram+2
+   638
+   639 243E AD 10 88		        lda img_vram+2
+   640 2441 0A			        asl
+   641 2442 0A			        asl
+   642 2443 8D 11 88		        sta img_wr_bank
+   643 2446 AD 0F 88		        lda img_vram+1
+   644 2449 0A			        asl
+   645 244A 2E 11 88		        rol img_wr_bank
+   646 244D 0A			        asl
+   647 244E 2E 11 88		        rol img_wr_bank
+   648
+   649 2451 AD 0E 88		        lda img_vram
+   650 2454 85 AB		        sta zp_img_ptr
+   651 2456 AD 0F 88		        lda img_vram+1
+   652 2459 29 3F		        and #$3F
+   653 245B 09 40		        ora #$40
+   654 245D 85 AC		        sta zp_img_ptr+1
+   655 245F 60			        rts
+   656
+   657 2460			write_pixel_chunk
+   658 2460 A5 A3		        lda zp_rx_len
+   659 2462 F0 41		        beq write_done
+   660
+   661 2464 78			        sei
+   662 2465 AD 11 88		        lda img_wr_bank
+   663 2468 09 80		        ora #$80
+   664 246A 85 AD		        sta zp_memb_shadow
+   665 246C A0 5D		        ldy #VBXE_MEMAC_B
+   666 246E 91 80		        sta (zp_vbxe_base),y
+   667
+   668 2470 A2 00		        ldx #0
+   669 2472			write_loop
+   670 2472 A0 00		        ldy #0
+   671 2474 BD 18 89		        lda rx_buffer,x
+   672 2477 91 AB		        sta (zp_img_ptr),y
+   673 2479 E6 AB		        inc zp_img_ptr
+   674 247B D0 1A		        bne write_next
+   675 247D E6 AC		        inc zp_img_ptr+1
+   676 247F A5 AC		        lda zp_img_ptr+1
+   677 2481 C9 80		        cmp #$80
+   678 2483 D0 12		        bne write_next
+   679 2485 A9 40		        lda #$40
+   680 2487 85 AC		        sta zp_img_ptr+1
+   681 2489 EE 11 88		        inc img_wr_bank
+   682 248C AD 11 88		        lda img_wr_bank
+   683 248F 09 80		        ora #$80
+   684 2491 85 AD		        sta zp_memb_shadow
+   685 2493 A0 5D		        ldy #VBXE_MEMAC_B
+   686 2495 91 80		        sta (zp_vbxe_base),y
+   687
+   688 2497			write_next
+   689 2497 E8			        inx
+   690 2498 E4 A3		        cpx zp_rx_len
+   691 249A D0 D6		        bne write_loop
+   692 249C			        memb_off
+Macro: MEMB_OFF [Source: vbxe_const.asm]
+     1 249C A9 00		        lda #0
+     2 249E 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+     3 24A0 A0 5D		        ldy #VBXE_MEMAC_B
+     4 24A2 91 80		        sta (zp_vbxe_base),y
+Source: client.asm
+   693 24A4 58			        cli
+   694 24A5			write_done
+   695 24A5 60			        rts
+   696
+   697 24A6			generate_demo_image
+   698 24A6 AD 14 88		        lda demo_phase
+   699 24A9 18			        clc
+   700 24AA 69 11		        adc #$11
+   701 24AC 8D 14 88		        sta demo_phase
+   702
+   703 24AF A9 C8		        lda #DEMO_HEIGHT
+   704 24B1 8D 0D 88		        sta img_height
+   705 24B4 20 2F 24		        jsr init_image_write
+   706 24B7 20 EF 24		        jsr build_demo_palette
+   707
+   708 24BA A9 00		        lda #0
+   709 24BC 8D 15 88		        sta demo_row
+   710 24BF			demo_row_loop
+   711 24BF A9 00		        lda #0
+   712 24C1 8D 16 88		        sta demo_x_base
+   713 24C4 A9 A0		        lda #160
+   714 24C6 8D 17 88		        sta demo_chunk_len
+   715 24C9 20 1A 25		        jsr fill_demo_chunk
+   716
+   717 24CC A9 A0		        lda #160
+   718 24CE 8D 16 88		        sta demo_x_base
+   719 24D1 A9 A0		        lda #160
+   720 24D3 8D 17 88		        sta demo_chunk_len
+   721 24D6 20 1A 25		        jsr fill_demo_chunk
+   722
+   723 24D9 EE 15 88		        inc demo_row
+   724 24DC AD 15 88		        lda demo_row
+   725 24DF C9 C8		        cmp #DEMO_HEIGHT
+   726 24E1 D0 DC		        bne demo_row_loop
+   727
+   728 24E3 A9 18		        lda #<img_pal_buf
+   729 24E5 85 87		        sta zp_tmp_ptr
+   730 24E7 A9 8A		        lda #>img_pal_buf
+   731 24E9 85 88		        sta zp_tmp_ptr+1
+   732 24EB 20 38 25		        jsr set_image_palette
+   733 24EE 60			        rts
+   734
+   735 24EF			build_demo_palette
+   736 24EF A9 18		        lda #<img_pal_buf
+   737 24F1 85 87		        sta zp_tmp_ptr
+   738 24F3 A9 8A		        lda #>img_pal_buf
+   739 24F5 85 88		        sta zp_tmp_ptr+1
+   740 24F7 A2 00		        ldx #0
+   741 24F9			demo_pal_loop
+   742 24F9 8A			        txa
+   743 24FA A0 00		        ldy #0
+   744 24FC 91 87		        sta (zp_tmp_ptr),y
+   745 24FE 8A			        txa
+   746 24FF 0A			        asl
+   747 2500 A0 01		        ldy #1
+   748 2502 91 87		        sta (zp_tmp_ptr),y
+   749 2504 8A			        txa
+   750 2505 49 FF		        eor #$FF
+   751 2507 A0 02		        ldy #2
+   752 2509 91 87		        sta (zp_tmp_ptr),y
+   753 250B 18			        clc
+   754 250C A5 87		        lda zp_tmp_ptr
+   755 250E 69 03		        adc #3
+   756 2510 85 87		        sta zp_tmp_ptr
+   757 2512 90 02		        bcc demo_pal_next
+   758 2514 E6 88		        inc zp_tmp_ptr+1
+   759 2516			demo_pal_next
+   760 2516 E8			        inx
+   761 2517 D0 E0		        bne demo_pal_loop
+   762 2519 60			        rts
+   763
+   764 251A			fill_demo_chunk
+   765 251A A2 00		        ldx #0
+   766 251C			demo_fill_loop
+   767 251C 8A			        txa
+   768 251D 18			        clc
+   769 251E 6D 16 88		        adc demo_x_base
+   770 2521 4D 15 88		        eor demo_row
+   771 2524 18			        clc
+   772 2525 6D 14 88		        adc demo_phase
+   773 2528 09 08		        ora #8
+   774 252A 9D 18 89		        sta rx_buffer,x
+   775 252D E8			        inx
+   776 252E EC 17 88		        cpx demo_chunk_len
+   777 2531 D0 E9		        bne demo_fill_loop
+   778 2533 86 A3		        stx zp_rx_len
+   779 2535 4C 60 24		        jmp write_pixel_chunk
+   780
+   781 2538			set_image_palette
+   782 2538 A0 45		        ldy #VBXE_PSEL
+   783 253A A9 01		        lda #1
+   784 253C 91 80		        sta (zp_vbxe_base),y
+   785
+   786 253E A0 44		        ldy #VBXE_CSEL
+   787 2540 A9 08		        lda #8
+   788 2542 91 80		        sta (zp_vbxe_base),y
+   789
+   790 2544 18			        clc
+   791 2545 A5 87		        lda zp_tmp_ptr
+   792 2547 69 18		        adc #24
+   793 2549 85 87		        sta zp_tmp_ptr
+   794 254B 90 02		        bcc pal_skip_ok
+   795 254D E6 88		        inc zp_tmp_ptr+1
+   796 254F			pal_skip_ok
+   797 254F A2 08		        ldx #8
+   798 2551			setpal_loop
+   799 2551 A0 00		        ldy #0
+   800 2553 B1 87		        lda (zp_tmp_ptr),y
+   801 2555 A0 46		        ldy #VBXE_CR
+   802 2557 91 80		        sta (zp_vbxe_base),y
+   803 2559 A0 01		        ldy #1
+   804 255B B1 87		        lda (zp_tmp_ptr),y
+   805 255D A0 47		        ldy #VBXE_CG
+   806 255F 91 80		        sta (zp_vbxe_base),y
+   807 2561 A0 02		        ldy #2
+   808 2563 B1 87		        lda (zp_tmp_ptr),y
+   809 2565 A0 48		        ldy #VBXE_CB
+   810 2567 91 80		        sta (zp_vbxe_base),y
+   811 2569 18			        clc
+   812 256A A5 87		        lda zp_tmp_ptr
+   813 256C 69 03		        adc #3
+   814 256E 85 87		        sta zp_tmp_ptr
+   815 2570 90 02		        bcc setpal_next
+   816 2572 E6 88		        inc zp_tmp_ptr+1
+   817 2574			setpal_next
+   818 2574 E8			        inx
+   819 2575 D0 DA		        bne setpal_loop
+   820 2577 60			        rts
+   821
+   822 2578			detect_vbxe
+   823 2578 A9 00		        lda #<$D600
+   824 257A 85 80		        sta zp_vbxe_base
+   825 257C A9 D6		        lda #>$D600
+   826 257E 85 81		        sta zp_vbxe_base+1
+   827 2580 A0 40		        ldy #VBXE_CORE_VER
+   828 2582 A9 00		        lda #0
+   829 2584 91 80		        sta (zp_vbxe_base),y
+   830 2586 B1 80		        lda (zp_vbxe_base),y
+   831 2588 C9 10		        cmp #FX_CORE_VER
+   832 258A F0 16		        beq dv_ok
+   833
+   834 258C A9 00		        lda #<$D700
+   835 258E 85 80		        sta zp_vbxe_base
+   836 2590 A9 D7		        lda #>$D700
+   837 2592 85 81		        sta zp_vbxe_base+1
+   838 2594 A0 40		        ldy #VBXE_CORE_VER
+   839 2596 A9 00		        lda #0
+   840 2598 91 80		        sta (zp_vbxe_base),y
+   841 259A B1 80		        lda (zp_vbxe_base),y
+   842 259C C9 10		        cmp #FX_CORE_VER
+   843 259E F0 02		        beq dv_ok
+   844 25A0 18			        clc
+   845 25A1 60			        rts
+   846 25A2			dv_ok
+   847 25A2 38			        sec
+   848 25A3 60			        rts
+   849
+   850 25A4			show_fullscreen
+   851 25A4			        memb_on 0
+Macro: MEMB_ON [Source: vbxe_const.asm]
+     1 25A4 A9 80		        lda #$80+0
+     2 25A6 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+     3 25A8 A0 5D		        ldy #VBXE_MEMAC_B
+     4 25AA 91 80		        sta (zp_vbxe_base),y
+Source: client.asm
+   852 25AC A2 00		        ldx #0
+   853
+   854 25AE A9 74		        lda #<(XDLC_OVOFF|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT)
+   855 25B0 9D 00 54		        sta MEMB_XDL,x
+   856 25B3 E8			        inx
+   857 25B4 A9 09		        lda #>(XDLC_OVOFF|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT)
+   858 25B6 9D 00 54		        sta MEMB_XDL,x
+   859 25B9 E8			        inx
+   860 25BA A9 17		        lda #24-1
+   861 25BC 9D 00 54		        sta MEMB_XDL,x
+   862 25BF E8			        inx
+   863 25C0 A9 00		        lda #<VRAM_SCREEN
+   864 25C2 9D 00 54		        sta MEMB_XDL,x
+   865 25C5 E8			        inx
+   866 25C6 A9 00		        lda #>VRAM_SCREEN
+   867 25C8 9D 00 54		        sta MEMB_XDL,x
+   868 25CB E8			        inx
+   869 25CC A9 00		        lda #0
+   870 25CE 9D 00 54		        sta MEMB_XDL,x
+   871 25D1 E8			        inx
+   872 25D2 A9 A0		        lda #<SCR_STRIDE
+   873 25D4 9D 00 54		        sta MEMB_XDL,x
+   874 25D7 E8			        inx
+   875 25D8 A9 00		        lda #>SCR_STRIDE
+   876 25DA 9D 00 54		        sta MEMB_XDL,x
+   877 25DD E8			        inx
+   878 25DE A9 04		        lda #CHBASE_VAL
+   879 25E0 9D 00 54		        sta MEMB_XDL,x
+   880 25E3 E8			        inx
+   881 25E4 A9 11		        lda #$11
+   882 25E6 9D 00 54		        sta MEMB_XDL,x
+   883 25E9 E8			        inx
+   884 25EA A9 FF		        lda #$FF
+   885 25EC 9D 00 54		        sta MEMB_XDL,x
+   886 25EF E8			        inx
+   887
+   888 25F0 A9 72		        lda #<(XDLC_GMON|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_OVATT)
+   889 25F2 9D 00 54		        sta MEMB_XDL,x
+   890 25F5 E8			        inx
+   891 25F6 A9 08		        lda #>(XDLC_GMON|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_OVATT)
+   892 25F8 9D 00 54		        sta MEMB_XDL,x
+   893 25FB E8			        inx
+   894 25FC AD 0D 88		        lda img_height
+   895 25FF 38			        sec
+   896 2600 E9 01		        sbc #1
+   897 2602 9D 00 54		        sta MEMB_XDL,x
+   898 2605 E8			        inx
+   899 2606 AD 0E 88		        lda img_vram
+   900 2609 9D 00 54		        sta MEMB_XDL,x
+   901 260C E8			        inx
+   902 260D AD 0F 88		        lda img_vram+1
+   903 2610 9D 00 54		        sta MEMB_XDL,x
+   904 2613 E8			        inx
+   905 2614 AD 10 88		        lda img_vram+2
+   906 2617 9D 00 54		        sta MEMB_XDL,x
+   907 261A E8			        inx
+   908 261B A9 40		        lda #<320
+   909 261D 9D 00 54		        sta MEMB_XDL,x
+   910 2620 E8			        inx
+   911 2621 A9 01		        lda #>320
+   912 2623 9D 00 54		        sta MEMB_XDL,x
+   913 2626 E8			        inx
+   914 2627 A9 11		        lda #$11
+   915 2629 9D 00 54		        sta MEMB_XDL,x
+   916 262C E8			        inx
+   917 262D A9 FF		        lda #$FF
+   918 262F 9D 00 54		        sta MEMB_XDL,x
+   919 2632 E8			        inx
+   920
+   921 2633 A9 04		        lda #<(XDLC_OVOFF|XDLC_END)
+   922 2635 9D 00 54		        sta MEMB_XDL,x
+   923 2638 E8			        inx
+   924 2639 A9 80		        lda #>(XDLC_OVOFF|XDLC_END)
+   925 263B 9D 00 54		        sta MEMB_XDL,x
+   926
+   927 263E			        memb_off
+Macro: MEMB_OFF [Source: vbxe_const.asm]
+     1 263E A9 00		        lda #0
+     2 2640 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+     3 2642 A0 5D		        ldy #VBXE_MEMAC_B
+     4 2644 91 80		        sta (zp_vbxe_base),y
+Source: client.asm
+   928
+   929 2646 A0 41		        ldy #VBXE_XDL_ADR0
+   930 2648 A9 00		        lda #<VRAM_XDL
+   931 264A 91 80		        sta (zp_vbxe_base),y
+   932 264C C8			        iny
+   933 264D A9 14		        lda #>VRAM_XDL
+   934 264F 91 80		        sta (zp_vbxe_base),y
+   935 2651 C8			        iny
+   936 2652 A9 00		        lda #0
+   937 2654 91 80		        sta (zp_vbxe_base),y
+   938
+   939 2656 A0 40		        ldy #VBXE_VCTL
+   940 2658 A9 03		        lda #VC_XDL_ENABLED|VC_XCOLOR
+   941 265A 91 80		        sta (zp_vbxe_base),y
+   942 265C 60			        rts
+   943
+   944 265D			print_record
+   945 265D 8D 44 03		        sta ICBAL
+   946 2660 8E 45 03		        stx ICBAH
+   947 2663 8C 48 03		        sty ICBLL
+   948 2666 A9 00		        lda #0
+   949 2668 8D 49 03		        sta ICBLH
+   950 266B A9 09		        lda #$09
+   951 266D 8D 42 03		        sta ICCOM
+   952 2670 A2 00		        ldx #0
+   953 2672 4C 56 E4		        jmp CIOV
+   954
+   955 2675			nibble_to_hex
+   956 2675 29 0F		        and #$0F
+   957 2677 C9 0A		        cmp #10
+   958 2679 90 03		        bcc nibble_digit
+   959 267B 18			        clc
+   960 267C 69 06		        adc #6
+   961 267E			nibble_digit
+   962 267E 18			        clc
+   963 267F 69 30		        adc #'0'
+   964 2681 60			        rts
+   965
+   966 2682			write_dbg_hex
+   967 2682 48			        pha
+   968 2683 4A			        lsr
+   969 2684 4A			        lsr
+   970 2685 4A			        lsr
+   971 2686 4A			        lsr
+   972 2687 20 75 26		        jsr nibble_to_hex
+   973 268A 9D 74 2A		        sta dbg_line,x
+   974 268D E8			        inx
+   975 268E 68			        pla
+   976 268F 29 0F		        and #$0F
+   977 2691 20 75 26		        jsr nibble_to_hex
+   978 2694 9D 74 2A		        sta dbg_line,x
+   979 2697 60			        rts
+   980
+   981 2698			report_failure
+   982 2698 A9 22		        lda #$22
+   983 269A 8D 2F 02		        sta SDMCTL
+   984
+   985 269D AD 00 88		        lda debug_stage
+   986 26A0 C9 11		        cmp #$11
+   987 26A2 F0 10		        beq report_no_vbxe
+   988 26A4 C9 12		        cmp #$12
+   989 26A6 B0 18		        bcs report_img_fail
+   990
+   991 26A8 A9 63		        lda #<msg_text_fail
+   992 26AA A2 29		        ldx #>msg_text_fail
+   993 26AC A0 12		        ldy #msg_text_fail_end-msg_text_fail
+   994 26AE 20 5D 26		        jsr print_record
+   995 26B1 4C C9 26		        jmp report_stage
+   996
+   997 26B4			report_no_vbxe
+   998 26B4 A9 88		        lda #<msg_no_vbxe
+   999 26B6 A2 29		        ldx #>msg_no_vbxe
+  1000 26B8 A0 12		        ldy #msg_no_vbxe_end-msg_no_vbxe
+  1001 26BA 20 5D 26		        jsr print_record
+  1002 26BD 4C 39 27		        jmp report_dbg
+  1003
+  1004 26C0			report_img_fail
+  1005 26C0 A9 75		        lda #<msg_img_fail
+  1006 26C2 A2 29		        ldx #>msg_img_fail
+  1007 26C4 A0 13		        ldy #msg_img_fail_end-msg_img_fail
+  1008 26C6 20 5D 26		        jsr print_record
+  1009
+  1010 26C9			report_stage
+  1011 26C9 AD 00 88		        lda debug_stage
+  1012 26CC C9 01		        cmp #1
+  1013 26CE D0 0C		        bne report_stage_2
+  1014 26D0 A9 F5		        lda #<msg_stage_text_open
+  1015 26D2 A2 29		        ldx #>msg_stage_text_open
+  1016 26D4 A0 11		        ldy #msg_stage_text_open_end-msg_stage_text_open
+  1017 26D6 20 5D 26		        jsr print_record
+  1018 26D9 4C 39 27		        jmp report_dbg
+  1019 26DC			report_stage_2
+  1020 26DC C9 02		        cmp #2
+  1021 26DE D0 0C		        bne report_stage_3
+  1022 26E0 A9 06		        lda #<msg_stage_text_wait
+  1023 26E2 A2 2A		        ldx #>msg_stage_text_wait
+  1024 26E4 A0 11		        ldy #msg_stage_text_wait_end-msg_stage_text_wait
+  1025 26E6 20 5D 26		        jsr print_record
+  1026 26E9 4C 39 27		        jmp report_dbg
+  1027 26EC			report_stage_3
+  1028 26EC C9 03		        cmp #3
+  1029 26EE D0 0C		        bne report_stage_4
+  1030 26F0 A9 17		        lda #<msg_stage_text_read
+  1031 26F2 A2 2A		        ldx #>msg_stage_text_read
+  1032 26F4 A0 11		        ldy #msg_stage_text_read_end-msg_stage_text_read
+  1033 26F6 20 5D 26		        jsr print_record
+  1034 26F9 4C 39 27		        jmp report_dbg
+  1035 26FC			report_stage_4
+  1036 26FC C9 12		        cmp #$12
+  1037 26FE D0 0C		        bne report_stage_5
+  1038 2700 A9 28		        lda #<msg_stage_img_open
+  1039 2702 A2 2A		        ldx #>msg_stage_img_open
+  1040 2704 A0 12		        ldy #msg_stage_img_open_end-msg_stage_img_open
+  1041 2706 20 5D 26		        jsr print_record
+  1042 2709 4C 39 27		        jmp report_dbg
+  1043 270C			report_stage_5
+  1044 270C C9 13		        cmp #$13
+  1045 270E D0 0C		        bne report_stage_6
+  1046 2710 A9 3A		        lda #<msg_stage_hdr
+  1047 2712 A2 2A		        ldx #>msg_stage_hdr
+  1048 2714 A0 13		        ldy #msg_stage_hdr_end-msg_stage_hdr
+  1049 2716 20 5D 26		        jsr print_record
+  1050 2719 4C 39 27		        jmp report_dbg
+  1051 271C			report_stage_6
+  1052 271C C9 14		        cmp #$14
+  1053 271E D0 0C		        bne report_stage_7
+  1054 2720 A9 4D		        lda #<msg_stage_pal
+  1055 2722 A2 2A		        ldx #>msg_stage_pal
+  1056 2724 A0 14		        ldy #msg_stage_pal_end-msg_stage_pal
+  1057 2726 20 5D 26		        jsr print_record
+  1058 2729 4C 39 27		        jmp report_dbg
+  1059 272C			report_stage_7
+  1060 272C C9 15		        cmp #$15
+  1061 272E D0 09		        bne report_dbg
+  1062 2730 A9 61		        lda #<msg_stage_pix
+  1063 2732 A2 2A		        ldx #>msg_stage_pix
+  1064 2734 A0 13		        ldy #msg_stage_pix_end-msg_stage_pix
+  1065 2736 20 5D 26		        jsr print_record
+  1066
+  1067 2739			report_dbg
+  1068 2739 AD 00 88		        lda debug_stage
+  1069 273C A2 03		        ldx #3
+  1070 273E 20 82 26		        jsr write_dbg_hex
+  1071 2741 AD 01 88		        lda debug_dstats
+  1072 2744 A2 09		        ldx #9
+  1073 2746 20 82 26		        jsr write_dbg_hex
+  1074 2749 AD 02 88		        lda debug_fn_error
+  1075 274C A2 0F		        ldx #15
+  1076 274E 20 82 26		        jsr write_dbg_hex
+  1077 2751 AD 03 88		        lda debug_connected
+  1078 2754 A2 15		        ldx #21
+  1079 2756 20 82 26		        jsr write_dbg_hex
+  1080 2759 AD 04 88		        lda debug_bytes_lo
+  1081 275C A2 1B		        ldx #27
+  1082 275E 20 82 26		        jsr write_dbg_hex
+  1083 2761 AD 05 88		        lda debug_bytes_hi
+  1084 2764 A2 21		        ldx #33
+  1085 2766 20 82 26		        jsr write_dbg_hex
+  1086 2769 AD 07 88		        lda debug_rx_len
+  1087 276C A2 27		        ldx #39
+  1088 276E 20 82 26		        jsr write_dbg_hex
+  1089 2771 A9 74		        lda #<dbg_line
+  1090 2773 A2 2A		        ldx #>dbg_line
+  1091 2775 A0 2A		        ldy #dbg_line_end-dbg_line
+  1092 2777 20 5D 26		        jsr print_record
+  1093 277A 60			        rts
+  1094
+  1095 277B			report_text_success
+  1096 277B A9 49		        lda #<msg_text_ok
+  1097 277D A2 29		        ldx #>msg_text_ok
+  1098 277F A0 1A		        ldy #msg_text_ok_end-msg_text_ok
+  1099 2781 20 5D 26		        jsr print_record
+  1100 2784 20 39 27		        jsr report_dbg
+  1101 2787 A9 9A		        lda #<msg_payload
+  1102 2789 A2 29		        ldx #>msg_payload
+  1103 278B A0 09		        ldy #msg_payload_end-msg_payload
+  1104 278D 20 5D 26		        jsr print_record
+  1105 2790 A9 18		        lda #<rx_buffer
+  1106 2792 A2 89		        ldx #>rx_buffer
+  1107 2794 AC 07 88		        ldy debug_rx_len
+  1108 2797 20 5D 26		        jsr print_record
+  1109 279A A9 A3		        lda #<msg_press_space
+  1110 279C A2 29		        ldx #>msg_press_space
+  1111 279E A0 28		        ldy #msg_press_space_end-msg_press_space
+  1112 27A0 20 5D 26		        jsr print_record
+  1113 27A3 60			        rts
+  1114
+  1115 27A4			        icl 'fujinet.asm'
+Source: fujinet.asm
+     1 				; ============================================================================
+     2 				; FujiNet N: Device SIO Layer
+     3 				; ============================================================================
+     4
+     5 = 0071			FN_DEVID       = $71
+     6 = 0001			FN_UNIT        = 1
+     7 27A4 01			fn_cur_unit    dta FN_UNIT     ; current N: unit (1=page, 2=image)
+     8 = 004F			FN_CMD_OPEN    = 'O'
+     9 = 0043			FN_CMD_CLOSE   = 'C'
+    10 = 0052			FN_CMD_READ    = 'R'
+    11 = 0053			FN_CMD_STATUS  = 'S'
+    12 = 0040			SIO_READ       = $40
+    13 = 0080			SIO_WRITE      = $80
+    14 = 0000			SIO_NONE       = $00
+    15 = 0004			FN_OPEN_READ   = 4
+    16 = 0000			FN_TRANS_NONE  = 0
+    17 = 001E			FN_TIMEOUT     = 30
+    18 = 0100			URL_BUF_SIZE   = 256
+    19 = 0100			RX_BUF_SIZE    = 256
+    20
+    21 				; ----------------------------------------------------------------------------
+    22 				; fn_open - Open FujiNet connection (url_buffer -> OPEN)
+    23 				; Output: C=0 ok, C=1 error
+    24 				; ----------------------------------------------------------------------------
+    25 27A5			.proc fn_open
+    26 27A5 A9 71		        lda #FN_DEVID
+    27 27A7 8D 00 03		        sta DDEVIC
+    28 27AA AD A4 27		        lda fn_cur_unit
+    29 27AD 8D 01 03		        sta DUNIT
+    30 27B0 A9 4F		        lda #FN_CMD_OPEN
+    31 27B2 8D 02 03		        sta DCOMND
+    32 27B5 A9 80		        lda #SIO_WRITE
+    33 27B7 8D 03 03		        sta DSTATS
+    34 27BA A9 18		        lda #<url_buffer
+    35 27BC 8D 04 03		        sta DBUFLO
+    36 27BF A9 88		        lda #>url_buffer
+    37 27C1 8D 05 03		        sta DBUFHI
+    38 27C4 A9 1E		        lda #FN_TIMEOUT
+    39 27C6 8D 06 03		        sta DTIMLO
+    40 27C9 A9 00		        lda #<URL_BUF_SIZE
+    41 27CB 8D 08 03		        sta DBYTLO
+    42 27CE A9 01		        lda #>URL_BUF_SIZE
+    43 27D0 8D 09 03		        sta DBYTHI
+    44 27D3 A9 04		        lda #FN_OPEN_READ
+    45 27D5 8D 0A 03		        sta DAUX1
+    46 27D8 A9 00		        lda #FN_TRANS_NONE
+    47 27DA 8D 0B 03		        sta DAUX2
+    48
+    49 27DD 20 59 E4		        jsr SIOV
+    50 27E0 AD 03 03		        lda DSTATS
+    51 27E3 30 02		        bmi ?err
+    52 27E5 18			        clc
+    53 27E6 60			        rts
+    54 27E7 38			?err    sec
+    55 27E8 60			        rts
+    56 				.endp
+    57
+    58 				; ----------------------------------------------------------------------------
+    59 				; fn_status - Get FujiNet status (bytes waiting, connected, error)
+    60 				; Reads 4-byte DVSTAT: [0]=bytes_lo, [1]=bytes_hi, [2]=connected, [3]=error
+    61 				; Error codes: 0=ok, 136($88)=EOF/closed, other=fatal
+    62 				; Output: zp_fn_bytes_lo/hi, zp_fn_connected, zp_fn_error, C=0/1
+    63 				; ----------------------------------------------------------------------------
+    64 27E9			.proc fn_status
+    65 27E9 A9 71		        lda #FN_DEVID
+    66 27EB 8D 00 03		        sta DDEVIC
+    67 27EE AD A4 27		        lda fn_cur_unit
+    68 27F1 8D 01 03		        sta DUNIT
+    69 27F4 A9 53		        lda #FN_CMD_STATUS
+    70 27F6 8D 02 03		        sta DCOMND
+    71 27F9 A9 40		        lda #SIO_READ
+    72 27FB 8D 03 03		        sta DSTATS
+    73 27FE A9 EA		        lda #<DVSTAT
+    74 2800 8D 04 03		        sta DBUFLO
+    75 2803 A9 02		        lda #>DVSTAT
+    76 2805 8D 05 03		        sta DBUFHI
+    77 2808 A9 1E		        lda #FN_TIMEOUT
+    78 280A 8D 06 03		        sta DTIMLO
+    79 280D A9 04		        lda #4
+    80 280F 8D 08 03		        sta DBYTLO
+    81 2812 A9 00		        lda #0
+    82 2814 8D 09 03		        sta DBYTHI
+    83 2817 8D 0A 03		        sta DAUX1
+    84 281A 8D 0B 03		        sta DAUX2
+    85
+    86 281D 20 59 E4		        jsr SIOV
+    87 2820 AD 03 03		        lda DSTATS
+    88 2823 30 16		        bmi ?err
+    89
+    90 2825 AD EA 02		        lda DVSTAT
+    91 2828 85 A1		        sta zp_fn_bytes_lo
+    92 282A AD EB 02		        lda DVSTAT+1
+    93 282D 85 A2		        sta zp_fn_bytes_hi
+    94 282F AD EC 02		        lda DVSTAT+2
+    95 2832 85 9F		        sta zp_fn_connected
+    96 2834 AD ED 02		        lda DVSTAT+3
+    97 2837 85 A0		        sta zp_fn_error
+    98
+    99 2839 18			        clc
+   100 283A 60			        rts
+   101 283B 38			?err    sec
+   102 283C 60			        rts
+   103 				.endp
+   104
+   105 				; ----------------------------------------------------------------------------
+   106 				; fn_read - Read data from FujiNet into rx_buffer
+   107 				; Uses zp_fn_bytes_lo/hi from fn_status, caps at 255 (8-bit zp_rx_len)
+   108 				; Reading 256 would set zp_rx_len=0 (overflow!) — always read max 255
+   109 				; DAUX1/DAUX2 must match DBYTLO/DBYTHI (FujiNet requirement)
+   110 				; Output: zp_rx_len = bytes read, C=0/1
+   111 				; ----------------------------------------------------------------------------
+   112 283D			.proc fn_read
+   113 283D A5 A2		        lda zp_fn_bytes_hi
+   114 283F D0 06		        bne ?max
+   115 2841 A5 A1		        lda zp_fn_bytes_lo
+   116 2843 F0 1E		        beq ?nothing
+   117 2845 D0 0F		        bne ?use_lo
+   118
+   119 2847 A9 FF		?max    lda #255                       ; Max 255 bytes (fits in 8-bit rx_len)
+   120 2849 85 A3		        sta zp_rx_len
+   121 284B 8D 08 03		        sta DBYTLO
+   122 284E A9 00		        lda #0
+   123 2850 8D 09 03		        sta DBYTHI
+   124 2853 4C 69 28		        jmp ?do
+   125
+   126 2856 85 A3		?use_lo sta zp_rx_len
+   127 2858 8D 08 03		        sta DBYTLO
+   128 285B A9 00		        lda #0
+   129 285D 8D 09 03		        sta DBYTHI
+   130 2860 4C 69 28		        jmp ?do
+   131
+   132 2863			?nothing
+   133 2863 A9 00		        lda #0
+   134 2865 85 A3		        sta zp_rx_len
+   135 2867 18			        clc
+   136 2868 60			        rts
+   137
+   138 2869 A9 71		?do     lda #FN_DEVID
+   139 286B 8D 00 03		        sta DDEVIC
+   140 286E AD A4 27		        lda fn_cur_unit
+   141 2871 8D 01 03		        sta DUNIT
+   142 2874 A9 52		        lda #FN_CMD_READ
+   143 2876 8D 02 03		        sta DCOMND
+   144 2879 A9 40		        lda #SIO_READ
+   145 287B 8D 03 03		        sta DSTATS
+   146 287E A9 18		        lda #<rx_buffer
+   147 2880 8D 04 03		        sta DBUFLO
+   148 2883 A9 89		        lda #>rx_buffer
+   149 2885 8D 05 03		        sta DBUFHI
+   150 2888 A9 1E		        lda #FN_TIMEOUT
+   151 288A 8D 06 03		        sta DTIMLO
+   152 288D AD 08 03		        lda DBYTLO
+   153 2890 8D 0A 03		        sta DAUX1
+   154 2893 AD 09 03		        lda DBYTHI
+   155 2896 8D 0B 03		        sta DAUX2
+   156
+   157 2899 20 59 E4		        jsr SIOV
+   158 289C AD 03 03		        lda DSTATS
+   159 289F 30 02		        bmi ?err
+   160 28A1 18			        clc
+   161 28A2 60			        rts
+   162 28A3 38			?err    sec
+   163 28A4 60			        rts
+   164 				.endp
+   165
+   166 				; ----------------------------------------------------------------------------
+   167 				; fn_close - Close FujiNet connection
+   168 				; ----------------------------------------------------------------------------
+   169 28A5			.proc fn_close
+   170 28A5 A9 71		        lda #FN_DEVID
+   171 28A7 8D 00 03		        sta DDEVIC
+   172 28AA AD A4 27		        lda fn_cur_unit
+   173 28AD 8D 01 03		        sta DUNIT
+   174 28B0 A9 43		        lda #FN_CMD_CLOSE
+   175 28B2 8D 02 03		        sta DCOMND
+   176 28B5 A9 00		        lda #SIO_NONE
+   177 28B7 8D 03 03		        sta DSTATS
+   178 28BA A9 00		        lda #0
+   179 28BC 8D 04 03		        sta DBUFLO
+   180 28BF 8D 05 03		        sta DBUFHI
+   181 28C2 8D 08 03		        sta DBYTLO
+   182 28C5 8D 09 03		        sta DBYTHI
+   183 28C8 8D 0A 03		        sta DAUX1
+   184 28CB 8D 0B 03		        sta DAUX2
+   185 28CE A9 1E		        lda #FN_TIMEOUT
+   186 28D0 8D 06 03		        sta DTIMLO
+   187
+   188 28D3 4C 59 E4		        jmp SIOV
+   189 				.endp
+  1116
+  1117 28D6 4E 3A 68 74 74 70 + text_url_string  dta c'N:http://127.0.0.1:3000/',0
+  1118 28EF			text_url_string_end
+  1119 28EF 4E 3A 68 74 74 70 + slide_url_string dta c'N:http://127.0.0.1:3000/slide/'
+  1120 290D 30			slide_url_hex_hi dta c'0'
+  1121 290E 30 00		slide_url_hex_lo dta c'0',0
+  1122 2910			slide_url_string_end
+  1123
+  1124 2910 46 75 6A 69 4E 65 + msg_title            dta c'FujiNet demo: text then image', ATASCII_RET
+  1125 292E			msg_title_end
+  1126 292E 54 65 78 74 20 55 + msg_text_url         dta c'Text URL:', ATASCII_RET
+  1127 2938			msg_text_url_end
+  1128 2938 46 65 74 63 68 69 + msg_wait_text        dta c'Fetching text...', ATASCII_RET
+  1129 2949			msg_wait_text_end
+  1130 2949 54 65 78 74 20 72 + msg_text_ok          dta c'Text received from server', ATASCII_RET
+  1131 2963			msg_text_ok_end
+  1132 2963 54 65 78 74 20 66 + msg_text_fail        dta c'Text fetch failed', ATASCII_RET
+  1133 2975			msg_text_fail_end
+  1134 2975 49 6D 61 67 65 20 + msg_img_fail         dta c'Image fetch failed', ATASCII_RET
+  1135 2988			msg_img_fail_end
+  1136 2988 56 42 58 45 20 6E + msg_no_vbxe          dta c'VBXE not detected', ATASCII_RET
+  1137 299A			msg_no_vbxe_end
+  1138 299A 50 61 79 6C 6F 61 + msg_payload          dta c'Payload:', ATASCII_RET
+  1139 29A3			msg_payload_end
+  1140 29A3 50 72 65 73 73 20 + msg_press_space      dta c'Press SPACE for slideshow or D for demo', ATASCII_RET
+  1141 29CB			msg_press_space_end
+  1142 29CB 4C 6F 61 64 69 6E + msg_loading_image    dta c'Loading image...', ATASCII_RET
+  1143 29DC			msg_loading_image_end
+  1144 29DC 47 65 6E 65 72 61 + msg_generating_demo  dta c'Generating demo image...', ATASCII_RET
+  1145 29F5			msg_generating_demo_end
+  1146 29F5 53 74 61 67 65 3A + msg_stage_text_open  dta c'Stage: OPEN TEXT', ATASCII_RET
+  1147 2A06			msg_stage_text_open_end
+  1148 2A06 53 74 61 67 65 3A + msg_stage_text_wait  dta c'Stage: WAIT TEXT', ATASCII_RET
+  1149 2A17			msg_stage_text_wait_end
+  1150 2A17 53 74 61 67 65 3A + msg_stage_text_read  dta c'Stage: READ TEXT', ATASCII_RET
+  1151 2A28			msg_stage_text_read_end
+  1152 2A28 53 74 61 67 65 3A + msg_stage_img_open   dta c'Stage: OPEN IMAGE', ATASCII_RET
+  1153 2A3A			msg_stage_img_open_end
+  1154 2A3A 53 74 61 67 65 3A + msg_stage_hdr        dta c'Stage: READ HEADER', ATASCII_RET
+  1155 2A4D			msg_stage_hdr_end
+  1156 2A4D 53 74 61 67 65 3A + msg_stage_pal        dta c'Stage: READ PALETTE', ATASCII_RET
+  1157 2A61			msg_stage_pal_end
+  1158 2A61 53 74 61 67 65 3A + msg_stage_pix        dta c'Stage: READ PIXELS', ATASCII_RET
+  1159 2A74			msg_stage_pix_end
+  1160 2A74 53 54 3D 30 30 20 + dbg_line             dta c'ST=00 DS=00 FE=00 CN=00 BL=00 BH=00 RX=00', ATASCII_RET
+  1161 2A9E			dbg_line_end
+  1162
+  1163 2A9E			        org $8800
+  1164 8800-8817> 00		debug_stage       dta b(0)
+  1165 8801 00			debug_dstats      dta b(0)
+  1166 8802 00			debug_fn_error    dta b(0)
+  1167 8803 00			debug_connected   dta b(0)
+  1168 8804 00			debug_bytes_lo    dta b(0)
+  1169 8805 00			debug_bytes_hi    dta b(0)
+  1170 8806 00			debug_timeout_ctr dta b(0)
+  1171 8807 00			debug_rx_len      dta b(0)
+  1172 8808 00 00		img_width         dta b(0),b(0)
+  1173 880A 00 00		img_pal_count     dta b(0),b(0)
+  1174 880C 00			img_pal_leftover  dta b(0)
+  1175 880D 00			img_height        dta b(0)
+  1176 880E 00 00 00		img_vram          dta b(0),b(0),b(0)
+  1177 8811 00			img_wr_bank       dta b(0)
+  1178 8812 00			slide_index       dta b(0)
+  1179 8813 00			demo_mode         dta b(0)
+  1180 8814 00			demo_phase        dta b(0)
+  1181 8815 00			demo_row          dta b(0)
+  1182 8816 00			demo_x_base       dta b(0)
+  1183 8817 00			demo_chunk_len    dta b(0)
+  1184
+  1185 = 8818			url_buffer  .ds 256
+  1186 = 8918			rx_buffer   .ds 256
+  1187 = 8A18			img_pal_buf .ds 768
+  1188
+  1189 02E0-02E1> 00 20		        run main

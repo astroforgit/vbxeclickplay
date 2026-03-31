@@ -1,0 +1,12 @@
+{
+  "name": "vbxe-server",
+  "version": "1.0.0",
+  "description": "Node.js VBXE Game Server for Atari",
+  "main": "src/server/server.js",
+  "scripts": {
+    "start": "node src/server/server.js"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
