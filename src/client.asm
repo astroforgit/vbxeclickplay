@@ -13,6 +13,22 @@ VIEW_TIMEOUT = 240
 READ_LIMIT   = 96
 KEY_D        = $3A
 DEMO_HEIGHT  = 200
+DEMO_CURSOR_MAX_X = 152
+DEMO_CURSOR_MAX_Y = 192
+DEMO_CURSOR_START_X = 76
+DEMO_CURSOR_START_Y = 96
+DEMO_CURSOR_COLOR = 1
+
+STUB_BASE      = $0600
+STUB_TIRQ_EXIT = STUB_BASE+17
+
+zp_demo_cursor_x = $B0
+zp_demo_cursor_y = $B1
+zp_demo_prev_x   = $B2
+zp_demo_prev_trig = $B3
+zp_mouse_dx      = $B4
+zp_mouse_dy      = $B5
+zp_demo_prev_y   = $B6
 
         org $2000
 
@@ -72,12 +88,31 @@ image_ok
         lda #0
         sta SDMCTL
         jsr show_fullscreen
+        lda demo_mode
+        bne demo_image_loop
 image_loop
         jsr wait_for_any_key
         lda demo_mode
         bne demo_next
         inc slide_index
         jmp load_slide
+
+demo_image_loop
+        lda #0
+        sta demo_input_active
+        jsr demo_init_input
+        jsr demo_draw_cursor
+demo_wait
+        jsr wait_one_frame
+        jsr demo_update_input
+        jsr demo_draw_cursor
+        jsr demo_poll_click
+        bcs demo_next
+        lda CH
+        cmp #KEY_NONE
+        beq demo_wait
+        lda #KEY_NONE
+        sta CH
 
 demo_next
         jsr generate_demo_image
@@ -96,6 +131,7 @@ clear_debug
         sta zp_rx_len
         sta img_pal_leftover
         sta demo_mode
+        sta demo_input_active
         rts
 
 show_banner
@@ -157,6 +193,545 @@ wait_any_loop
         beq wait_any_loop
         lda #KEY_NONE
         sta CH
+        rts
+
+demo_init_input
+        lda demo_input_active
+        bne demo_init_done
+
+        lda #DEMO_CURSOR_START_X
+        sta zp_demo_cursor_x
+        lda #DEMO_CURSOR_START_Y
+        sta zp_demo_cursor_y
+        lda #$FF
+        sta zp_demo_prev_x
+        sta zp_demo_prev_y
+        lda #0
+        sta zp_mouse_dx
+        sta zp_mouse_dy
+
+        lda PORTA
+        lsr
+        lsr
+        lsr
+        lsr
+        tax
+        txa
+        and #$03
+        asl
+        asl
+        sta demo_mouse_old_x
+        txa
+        lsr
+        lsr
+        and #$03
+        asl
+        asl
+        sta demo_mouse_old_y
+
+        lda STRIG1
+        beq demo_init_trig_pressed
+        lda #1
+        bne demo_init_trig_store
+demo_init_trig_pressed
+        lda #0
+demo_init_trig_store
+        sta zp_demo_prev_trig
+
+        jsr demo_install_timer_stubs
+
+        sei
+        lda #<STUB_BASE
+        sta VTIMR2
+        lda #>STUB_BASE
+        sta VTIMR2+1
+
+        lda POKMSK
+        ora #$02
+        sta POKMSK
+        sta IRQEN
+
+        lda #0
+        sta AUDCTL
+        sta AUDC2
+        lda #$40
+        sta AUDF2
+        sta STIMER
+        cli
+
+        lda #1
+        sta demo_input_active
+demo_init_done
+        rts
+
+demo_install_timer_stubs
+        ldy #0
+demo_stub_copy
+        lda demo_timer_stubs,y
+        sta STUB_BASE,y
+        iny
+        cpy #demo_timer_stubs_end-demo_timer_stubs
+        bne demo_stub_copy
+
+        lda #<demo_timer_irq
+        sta STUB_BASE+15
+        lda #>demo_timer_irq
+        sta STUB_BASE+16
+        rts
+
+demo_timer_irq
+        txa
+        pha
+        tya
+        pha
+
+        lda PORTA
+        lsr
+        lsr
+        lsr
+        lsr
+        tax
+
+        and #$03
+        ora demo_mouse_old_x
+        tay
+        lda demo_mouse_movtab,y
+        beq demo_timer_x_done
+        bmi demo_timer_x_left
+        inc zp_mouse_dx
+        jmp demo_timer_x_done
+demo_timer_x_left
+        dec zp_mouse_dx
+demo_timer_x_done
+        txa
+        and #$03
+        asl
+        asl
+        sta demo_mouse_old_x
+
+        txa
+        lsr
+        lsr
+        and #$03
+        ora demo_mouse_old_y
+        tay
+        lda demo_mouse_movtab,y
+        beq demo_timer_y_done
+        bmi demo_timer_y_up
+        inc zp_mouse_dy
+        jmp demo_timer_y_done
+demo_timer_y_up
+        dec zp_mouse_dy
+demo_timer_y_done
+        txa
+        lsr
+        lsr
+        and #$03
+        asl
+        asl
+        sta demo_mouse_old_y
+
+        pla
+        tay
+        pla
+        tax
+        jmp STUB_TIRQ_EXIT
+
+demo_update_input
+        sei
+        lda zp_mouse_dx
+        sta demo_pending_dx
+        lda #0
+        sta zp_mouse_dx
+        lda zp_mouse_dy
+        sta demo_pending_dy
+        lda #0
+        sta zp_mouse_dy
+        cli
+
+        lda demo_pending_dx
+        ora demo_pending_dy
+        beq demo_update_joy
+        jsr demo_apply_mouse
+demo_update_joy
+        jsr demo_apply_joystick
+        rts
+
+demo_apply_mouse
+        lda demo_pending_dx
+        beq demo_apply_mouse_y
+        bpl demo_apply_mouse_x_pos
+        eor #$FF
+        clc
+        adc #1
+        lsr
+        tax
+        beq demo_apply_mouse_x_clear
+demo_apply_mouse_x_neg_loop
+        lda zp_demo_cursor_x
+        beq demo_apply_mouse_x_clear
+        dec zp_demo_cursor_x
+        dex
+        bne demo_apply_mouse_x_neg_loop
+        jmp demo_apply_mouse_x_clear
+
+demo_apply_mouse_x_pos
+        lsr
+        tax
+        beq demo_apply_mouse_x_clear
+demo_apply_mouse_x_pos_loop
+        lda zp_demo_cursor_x
+        cmp #DEMO_CURSOR_MAX_X
+        bcs demo_apply_mouse_x_clear
+        inc zp_demo_cursor_x
+        dex
+        bne demo_apply_mouse_x_pos_loop
+
+demo_apply_mouse_x_clear
+        lda #0
+        sta demo_pending_dx
+
+demo_apply_mouse_y
+        lda demo_pending_dy
+        beq demo_apply_mouse_done
+        bpl demo_apply_mouse_y_pos
+        eor #$FF
+        clc
+        adc #1
+        lsr
+        tax
+        beq demo_apply_mouse_y_clear
+demo_apply_mouse_y_neg_loop
+        lda zp_demo_cursor_y
+        beq demo_apply_mouse_y_clear
+        dec zp_demo_cursor_y
+        dex
+        bne demo_apply_mouse_y_neg_loop
+        jmp demo_apply_mouse_y_clear
+
+demo_apply_mouse_y_pos
+        lsr
+        tax
+        beq demo_apply_mouse_y_clear
+demo_apply_mouse_y_pos_loop
+        lda zp_demo_cursor_y
+        cmp #DEMO_CURSOR_MAX_Y
+        bcs demo_apply_mouse_y_clear
+        inc zp_demo_cursor_y
+        dex
+        bne demo_apply_mouse_y_pos_loop
+
+demo_apply_mouse_y_clear
+        lda #0
+        sta demo_pending_dy
+demo_apply_mouse_done
+        rts
+
+demo_apply_joystick
+        lda STICK1
+        and #$0F
+        sta demo_stick_state
+        cmp #$0F
+        beq demo_joy_done
+
+        lda demo_stick_state
+        and #$04
+        bne demo_joy_right
+        lda zp_demo_cursor_x
+        beq demo_joy_right
+        dec zp_demo_cursor_x
+demo_joy_right
+        lda demo_stick_state
+        and #$08
+        bne demo_joy_up
+        lda zp_demo_cursor_x
+        cmp #DEMO_CURSOR_MAX_X
+        bcs demo_joy_up
+        inc zp_demo_cursor_x
+demo_joy_up
+        lda demo_stick_state
+        and #$01
+        bne demo_joy_down
+        lda zp_demo_cursor_y
+        beq demo_joy_down
+        dec zp_demo_cursor_y
+demo_joy_down
+        lda demo_stick_state
+        and #$02
+        bne demo_joy_done
+        lda zp_demo_cursor_y
+        cmp #DEMO_CURSOR_MAX_Y
+        bcs demo_joy_done
+        inc zp_demo_cursor_y
+demo_joy_done
+        rts
+
+demo_poll_click
+        lda STRIG1
+        beq demo_click_pressed
+        lda #1
+        sta zp_demo_prev_trig
+        clc
+        rts
+
+demo_click_pressed
+        lda zp_demo_prev_trig
+        beq demo_click_held
+        lda #0
+        sta zp_demo_prev_trig
+        sec
+        rts
+demo_click_held
+        clc
+        rts
+
+demo_draw_cursor
+        lda zp_demo_prev_y
+        cmp #$FF
+        beq demo_draw_new
+        lda zp_demo_cursor_x
+        cmp zp_demo_prev_x
+        bne demo_draw_move
+        lda zp_demo_cursor_y
+        cmp zp_demo_prev_y
+        beq demo_draw_done
+demo_draw_move
+        jsr demo_restore_cursor
+
+demo_draw_new
+        jsr demo_plot_cursor
+        lda zp_demo_cursor_x
+        sta zp_demo_prev_x
+        lda zp_demo_cursor_y
+        sta zp_demo_prev_y
+demo_draw_done
+        rts
+
+demo_restore_cursor
+        lda #0
+        sta demo_cursor_row_ix
+demo_restore_row_loop
+        lda zp_demo_prev_y
+        clc
+        adc demo_cursor_row_ix
+        ldx zp_demo_prev_x
+        jsr demo_prepare_cursor_row_table
+        jsr demo_mem_open
+        ldx #0
+demo_restore_pix_loop
+        txa
+        clc
+        adc demo_cursor_x2
+        eor demo_cursor_abs_y
+        clc
+        adc demo_phase
+        ora #8
+        jsr demo_mem_put
+        inx
+        cpx #16
+        bne demo_restore_pix_loop
+        memb_off
+        inc demo_cursor_row_ix
+        lda demo_cursor_row_ix
+        cmp #demo_arrow_data_end-demo_arrow_data
+        bne demo_restore_row_loop
+        rts
+
+demo_plot_cursor
+        lda #0
+        sta demo_cursor_row_ix
+demo_plot_row_loop
+        ldy demo_cursor_row_ix
+        lda demo_arrow_data,y
+        beq demo_plot_row_next
+        sta demo_cursor_mask
+        lda zp_demo_cursor_y
+        clc
+        adc demo_cursor_row_ix
+        ldx zp_demo_cursor_x
+        jsr demo_prepare_cursor_row_table
+        jsr demo_mem_open
+        ldx #0
+demo_plot_bit_loop
+        lda demo_cursor_mask
+        asl
+        sta demo_cursor_mask
+        bcc demo_plot_skip_pair
+        lda #DEMO_CURSOR_COLOR
+        jsr demo_mem_put
+        lda #DEMO_CURSOR_COLOR
+        jsr demo_mem_put
+        jmp demo_plot_next_bit
+demo_plot_skip_pair
+        jsr demo_mem_advance
+        jsr demo_mem_advance
+demo_plot_next_bit
+        inx
+        cpx #8
+        bne demo_plot_bit_loop
+        memb_off
+demo_plot_row_next
+        inc demo_cursor_row_ix
+        lda demo_cursor_row_ix
+        cmp #demo_arrow_data_end-demo_arrow_data
+        bne demo_plot_row_loop
+        rts
+
+demo_prepare_cursor_row
+        sta demo_cursor_abs_y
+        txa
+        asl
+        sta demo_cursor_x2
+        sta zp_tmp_ptr
+        lda #0
+        adc #0
+        sta demo_cursor_ofs_hi
+
+        lda demo_cursor_abs_y
+        asl
+        rol demo_cursor_ofs_hi
+        asl
+        rol demo_cursor_ofs_hi
+        asl
+        rol demo_cursor_ofs_hi
+        asl
+        rol demo_cursor_ofs_hi
+        asl
+        rol demo_cursor_ofs_hi
+        asl
+        rol demo_cursor_ofs_hi
+        clc
+        adc zp_tmp_ptr
+        sta zp_tmp_ptr
+        lda demo_cursor_ofs_hi
+        adc #0
+        sta demo_cursor_ofs_hi
+
+        clc
+        lda demo_cursor_abs_y
+        adc demo_cursor_ofs_hi
+        sta demo_cursor_ofs_hi
+
+        lda demo_cursor_ofs_hi
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        clc
+        adc #2
+        sta demo_cursor_bank
+
+        lda demo_cursor_ofs_hi
+        and #$3F
+        ora #$40
+        sta zp_tmp_ptr+1
+        rts
+
+demo_prepare_cursor_row_table
+        sta demo_cursor_abs_y
+        tay
+        lda demo_row_ptr_lo,y
+        sta zp_tmp_ptr
+        lda demo_row_ptr_hi,y
+        sta zp_tmp_ptr+1
+        lda demo_row_bank,y
+        sta demo_cursor_bank
+
+        txa
+        asl
+        sta demo_cursor_x2
+        lda #0
+        adc #0
+        sta demo_cursor_ofs_hi
+
+        clc
+        lda zp_tmp_ptr
+        adc demo_cursor_x2
+        sta zp_tmp_ptr
+        lda zp_tmp_ptr+1
+        adc demo_cursor_ofs_hi
+        sta zp_tmp_ptr+1
+
+        lda zp_tmp_ptr+1
+        cmp #$80
+        bcc demo_prepare_row_table_done
+        sec
+        sbc #$40
+        sta zp_tmp_ptr+1
+        inc demo_cursor_bank
+demo_prepare_row_table_done
+        rts
+
+demo_build_row_table
+        lda img_vram
+        sta demo_rowtab_ptr_lo
+        lda img_vram+1
+        and #$3F
+        ora #$40
+        sta demo_rowtab_ptr_hi
+        lda img_wr_bank
+        sta demo_rowtab_bank
+
+        ldy #0
+demo_build_row_loop
+        lda demo_rowtab_ptr_lo
+        sta demo_row_ptr_lo,y
+        lda demo_rowtab_ptr_hi
+        sta demo_row_ptr_hi,y
+        lda demo_rowtab_bank
+        sta demo_row_bank,y
+
+        clc
+        lda demo_rowtab_ptr_lo
+        adc #<320
+        sta demo_rowtab_ptr_lo
+        lda demo_rowtab_ptr_hi
+        adc #>320
+        sta demo_rowtab_ptr_hi
+        cmp #$80
+        bcc demo_build_row_next
+        sec
+        sbc #$40
+        sta demo_rowtab_ptr_hi
+        inc demo_rowtab_bank
+demo_build_row_next
+        iny
+        cpy #DEMO_HEIGHT
+        bne demo_build_row_loop
+        rts
+
+demo_mem_open
+        lda demo_cursor_bank
+        ora #$80
+        sta zp_memb_shadow
+        ldy #VBXE_MEMAC_B
+        sta (zp_vbxe_base),y
+        rts
+
+demo_mem_put
+        ldy #0
+        sta (zp_tmp_ptr),y
+        jmp demo_mem_advance
+
+demo_mem_advance
+        inc zp_tmp_ptr
+        bne demo_mem_advance_check
+        inc zp_tmp_ptr+1
+demo_mem_advance_check
+        lda zp_tmp_ptr+1
+        cmp #$80
+        bne demo_mem_advance_done
+        lda #$40
+        sta zp_tmp_ptr+1
+        inc demo_cursor_bank
+        lda demo_cursor_bank
+        ora #$80
+        sta zp_memb_shadow
+        ldy #VBXE_MEMAC_B
+        sta (zp_vbxe_base),y
+demo_mem_advance_done
         rts
 
 copy_text_url_to_buffer
@@ -703,6 +1278,7 @@ generate_demo_image
         lda #DEMO_HEIGHT
         sta img_height
         jsr init_image_write
+        jsr demo_build_row_table
         jsr build_demo_palette
 
         lda #0
@@ -1112,6 +1688,34 @@ report_text_success
         jsr print_record
         rts
 
+demo_timer_stubs
+        tya
+        pha
+        lda zp_memb_shadow
+        sta zp_tirq_saved
+        lda #0
+        sta zp_memb_shadow
+        ldy #VBXE_MEMAC_B
+        sta (zp_vbxe_base),y
+        jmp $0000
+
+        lda zp_tirq_saved
+        sta zp_memb_shadow
+        beq *+4
+        sta (zp_vbxe_base),y
+        pla
+        tay
+        pla
+        rti
+demo_timer_stubs_end
+
+demo_mouse_movtab
+        dta 0,$FF,1,0, 1,0,0,$FF, $FF,0,0,1, 0,1,$FF,0
+
+demo_arrow_data
+        dta $80,$C0,$E0,$F0,$F8,$E0,$A0,$00
+demo_arrow_data_end
+
         icl 'fujinet.asm'
 
 text_url_string  dta c'N:http://127.0.0.1:3000/',0
@@ -1181,9 +1785,27 @@ demo_phase        dta b(0)
 demo_row          dta b(0)
 demo_x_base       dta b(0)
 demo_chunk_len    dta b(0)
+demo_input_active dta b(0)
+demo_pending_dx   dta b(0)
+demo_pending_dy   dta b(0)
+demo_mouse_old_x  dta b(0)
+demo_mouse_old_y  dta b(0)
+demo_stick_state  dta b(0)
+demo_cursor_row_ix dta b(0)
+demo_cursor_mask   dta b(0)
+demo_cursor_bank   dta b(0)
+demo_cursor_x2     dta b(0)
+demo_cursor_abs_y  dta b(0)
+demo_cursor_ofs_hi dta b(0)
+demo_rowtab_ptr_lo dta b(0)
+demo_rowtab_ptr_hi dta b(0)
+demo_rowtab_bank   dta b(0)
 
 url_buffer  .ds 256
 rx_buffer   .ds 256
 img_pal_buf .ds 768
+demo_row_ptr_lo .ds DEMO_HEIGHT
+demo_row_ptr_hi .ds DEMO_HEIGHT
+demo_row_bank   .ds DEMO_HEIGHT
 
         run main
