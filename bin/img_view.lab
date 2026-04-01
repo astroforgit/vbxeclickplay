@@ -293,1740 +293,2042 @@ Source: vbxe_const.asm
     13 = 0060			READ_LIMIT   = 96
     14 = 003A			KEY_D        = $3A
     15 = 00C8			DEMO_HEIGHT  = 200
-    16 = 0098			DEMO_CURSOR_MAX_X = 152
-    17 = 00C0			DEMO_CURSOR_MAX_Y = 192
-    18 = 004C			DEMO_CURSOR_START_X = 76
-    19 = 0060			DEMO_CURSOR_START_Y = 96
-    20 = 0001			DEMO_CURSOR_COLOR = 1
-    21
-    22 = 0600			STUB_BASE      = $0600
-    23 = 0611			STUB_TIRQ_EXIT = STUB_BASE+17
-    24
-    25 = 00B0			zp_demo_cursor_x = $B0
-    26 = 00B1			zp_demo_cursor_y = $B1
-    27 = 00B2			zp_demo_prev_x   = $B2
-    28 = 00B3			zp_demo_prev_trig = $B3
-    29 = 00B4			zp_mouse_dx      = $B4
-    30 = 00B5			zp_mouse_dy      = $B5
-    31 = 00B6			zp_demo_prev_y   = $B6
+    16 = 0014			DEMO_STAMP_SIZE = 20
+    17 = 0098			DEMO_CURSOR_MAX_X = 152
+    18 = 00C0			DEMO_CURSOR_MAX_Y = 192
+    19 = 004C			DEMO_CURSOR_START_X = 76
+    20 = 0060			DEMO_CURSOR_START_Y = 96
+    21 = 0001			DEMO_CURSOR_COLOR = 1
+    22 = 0010			DEMO_CURSOR_WIDTH = 16
+    23 = 0060			DEMO_POPUP_WIDTH = 96
+    24 = 005E			DEMO_POPUP_INNER_WIDTH = 94
+    25 = 000C			DEMO_POPUP_HEIGHT = 12
+    26 = 000B			DEMO_POPUP_LAST_ROW = 11
+    27 = 0070			DEMO_POPUP_MAX_X = 112
+    28 = 00BC			DEMO_POPUP_MAX_Y = 188
+    29 = 00FA			DEMO_POPUP_BORDER_COLOR = 250
+    30 = 0018			DEMO_POPUP_FILL_COLOR = 24
+    31 = 00FC			DEMO_POPUP_TEXT_COLOR = 252
     32
-    33 				        org $2000
-    34
-    35 				main
-    36 FFFF> 2000-2E85> A9 22	        lda #$22
-    37 2002 8D 2F 02		        sta SDMCTL
-    38 2005 20 A8 20		        jsr clear_debug
-    39 2008 20 C3 24		        jsr copy_text_url_to_buffer
-    40 200B 20 CE 20		        jsr show_banner
-    41 200E 20 05 25		        jsr fetch_text_payload
-    42 2011 90 06		        bcc text_ok
-    43 2013 20 4B 2A		        jsr report_failure
-    44 2016			fail_loop
-    45 2016 4C 16 20		        jmp fail_loop
-    46
-    47 2019			text_ok
-    48 2019 20 2E 2B		        jsr report_text_success
-    49 201C 20 F3 20		        jsr wait_for_start_key
-    50
-    51 201F 20 2B 29		        jsr detect_vbxe
-    52 2022 90 24		        bcc no_vbxe
-    53
-    54 2024 AD 13 88		        lda demo_mode
-    55 2027 D0 2A		        bne start_demo
-    56
-    57 2029 A9 B3		        lda #<msg_loading_image
-    58 202B A2 2D		        ldx #>msg_loading_image
-    59 202D A0 11		        ldy #msg_loading_image_end-msg_loading_image
-    60 202F 20 10 2A		        jsr print_record
+    33 = 0600			STUB_BASE      = $0600
+    34 = 0611			STUB_TIRQ_EXIT = STUB_BASE+17
+    35
+    36 = 00B0			zp_demo_cursor_x = $B0
+    37 = 00B1			zp_demo_cursor_y = $B1
+    38 = 00B2			zp_demo_prev_x   = $B2
+    39 = 00B3			zp_demo_prev_trig = $B3
+    40 = 00B4			zp_mouse_dx      = $B4
+    41 = 00B5			zp_mouse_dy      = $B5
+    42 = 00B6			zp_demo_prev_y   = $B6
+    43
+    44 				        org $2000
+    45
+    46 				main
+    47 FFFF> 2000-3082> A9 22	        lda #$22
+    48 2002 8D 2F 02		        sta SDMCTL
+    49 2005 20 C4 20		        jsr clear_debug
+    50 2008 20 B0 26		        jsr copy_text_url_to_buffer
+    51 200B 20 EA 20		        jsr show_banner
+    52 200E 20 F2 26		        jsr fetch_text_payload
+    53 2011 90 06		        bcc text_ok
+    54 2013 20 38 2C		        jsr report_failure
+    55 2016			fail_loop
+    56 2016 4C 16 20		        jmp fail_loop
+    57
+    58 2019			text_ok
+    59 2019 20 1B 2D		        jsr report_text_success
+    60 201C 20 0F 21		        jsr wait_for_start_key
     61
-    62 2032 A9 00		        lda #0
-    63 2034 8D 12 88		        sta slide_index
+    62 201F 20 18 2B		        jsr detect_vbxe
+    63 2022 90 24		        bcc no_vbxe
     64
-    65 2037			load_slide
-    66 2037 20 A8 20		        jsr clear_debug
-    67 203A 20 CE 24		        jsr copy_slide_url_to_buffer
-    68 203D 20 DF 25		        jsr fetch_room_image
-    69 2040 90 20		        bcc image_ok
-    70 2042 20 4B 2A		        jsr report_failure
-    71 2045 4C 16 20		        jmp fail_loop
+    65 2024 AD 13 88		        lda demo_mode
+    66 2027 D0 2A		        bne start_demo
+    67
+    68 2029 A9 B0		        lda #<msg_loading_image
+    69 202B A2 2F		        ldx #>msg_loading_image
+    70 202D A0 11		        ldy #msg_loading_image_end-msg_loading_image
+    71 202F 20 FD 2B		        jsr print_record
     72
-    73 2048			no_vbxe
-    74 2048 A9 11		        lda #$11
-    75 204A 8D 00 88		        sta debug_stage
-    76 204D 20 4B 2A		        jsr report_failure
-    77 2050 4C 16 20		        jmp fail_loop
-    78
-    79 2053			start_demo
-    80 2053 A9 C4		        lda #<msg_generating_demo
-    81 2055 A2 2D		        ldx #>msg_generating_demo
-    82 2057 A0 19		        ldy #msg_generating_demo_end-msg_generating_demo
-    83 2059 20 10 2A		        jsr print_record
-    84 205C 20 56 28		        jsr generate_demo_image
-    85 205F 4C 62 20		        jmp image_ok
-    86
-    87 2062			image_ok
-    88 2062 A9 00		        lda #0
-    89 2064 8D 2F 02		        sta SDMCTL
-    90 2067 20 57 29		        jsr show_fullscreen
-    91 206A AD 13 88		        lda demo_mode
-    92 206D D0 0E		        bne demo_image_loop
-    93 206F			image_loop
-    94 206F 20 2E 21		        jsr wait_for_any_key
-    95 2072 AD 13 88		        lda demo_mode
-    96 2075 D0 2B		        bne demo_next
-    97 2077 EE 12 88		        inc slide_index
-    98 207A 4C 37 20		        jmp load_slide
-    99
-   100 207D			demo_image_loop
-   101 207D A9 00		        lda #0
-   102 207F 8D 18 88		        sta demo_input_active
-   103 2082 20 40 21		        jsr demo_init_input
-   104 2085 20 F6 22		        jsr demo_draw_cursor
-   105 2088			demo_wait
-   106 2088 20 AE 25		        jsr wait_one_frame
-   107 208B 20 16 22		        jsr demo_update_input
-   108 208E 20 F6 22		        jsr demo_draw_cursor
-   109 2091 20 DF 22		        jsr demo_poll_click
-   110 2094 B0 0C		        bcs demo_next
-   111 2096 AD FC 02		        lda CH
-   112 2099 C9 FF		        cmp #KEY_NONE
-   113 209B F0 EB		        beq demo_wait
-   114 209D A9 FF		        lda #KEY_NONE
-   115 209F 8D FC 02		        sta CH
-   116
-   117 20A2			demo_next
-   118 20A2 20 56 28		        jsr generate_demo_image
-   119 20A5 4C 62 20		        jmp image_ok
-   120
-   121 20A8			clear_debug
-   122 20A8 A9 00		        lda #0
-   123 20AA 8D 00 88		        sta debug_stage
-   124 20AD 8D 01 88		        sta debug_dstats
-   125 20B0 8D 02 88		        sta debug_fn_error
-   126 20B3 8D 03 88		        sta debug_connected
-   127 20B6 8D 04 88		        sta debug_bytes_lo
-   128 20B9 8D 05 88		        sta debug_bytes_hi
-   129 20BC 8D 06 88		        sta debug_timeout_ctr
-   130 20BF 8D 07 88		        sta debug_rx_len
-   131 20C2 85 A3		        sta zp_rx_len
-   132 20C4 8D 0C 88		        sta img_pal_leftover
-   133 20C7 8D 13 88		        sta demo_mode
-   134 20CA 8D 18 88		        sta demo_input_active
-   135 20CD 60			        rts
-   136
-   137 20CE			show_banner
-   138 20CE A9 F8		        lda #<msg_title
-   139 20D0 A2 2C		        ldx #>msg_title
-   140 20D2 A0 1E		        ldy #msg_title_end-msg_title
-   141 20D4 20 10 2A		        jsr print_record
-   142 20D7 A9 16		        lda #<msg_text_url
-   143 20D9 A2 2D		        ldx #>msg_text_url
-   144 20DB A0 0A		        ldy #msg_text_url_end-msg_text_url
-   145 20DD 20 10 2A		        jsr print_record
-   146 20E0 A9 BE		        lda #<text_url_string
-   147 20E2 A2 2C		        ldx #>text_url_string
-   148 20E4 A0 18		        ldy #text_url_string_end-text_url_string-1
-   149 20E6 20 10 2A		        jsr print_record
-   150 20E9 A9 20		        lda #<msg_wait_text
-   151 20EB A2 2D		        ldx #>msg_wait_text
-   152 20ED A0 11		        ldy #msg_wait_text_end-msg_wait_text
-   153 20EF 20 10 2A		        jsr print_record
-   154 20F2 60			        rts
-   155
-   156 20F3			wait_for_start_key
-   157 20F3 A9 00		        lda #0
-   158 20F5 8D 13 88		        sta demo_mode
-   159 20F8 A9 FF		        lda #KEY_NONE
-   160 20FA 8D FC 02		        sta CH
-   161 20FD			wait_start_loop
-   162 20FD AD FC 02		        lda CH
-   163 2100 C9 21		        cmp #KEY_SPACE
-   164 2102 F0 14		        beq wait_space_done
-   165 2104 C9 20		        cmp #CH_SPACE
-   166 2106 F0 10		        beq wait_space_done
-   167 2108 C9 3A		        cmp #KEY_D
-   168 210A F0 17		        beq wait_demo_done
-   169 210C C9 FF		        cmp #KEY_NONE
-   170 210E F0 ED		        beq wait_start_loop
-   171 2110 A9 FF		        lda #KEY_NONE
-   172 2112 8D FC 02		        sta CH
-   173 2115 4C FD 20		        jmp wait_start_loop
-   174 2118			wait_space_done
-   175 2118 A9 00		        lda #0
-   176 211A 8D 13 88		        sta demo_mode
-   177 211D A9 FF		        lda #KEY_NONE
-   178 211F 8D FC 02		        sta CH
-   179 2122 60			        rts
-   180 2123			wait_demo_done
-   181 2123 A9 01		        lda #1
-   182 2125 8D 13 88		        sta demo_mode
-   183 2128 A9 FF		        lda #KEY_NONE
-   184 212A 8D FC 02		        sta CH
-   185 212D 60			        rts
-   186
-   187 212E			wait_for_any_key
-   188 212E A9 FF		        lda #KEY_NONE
-   189 2130 8D FC 02		        sta CH
-   190 2133			wait_any_loop
-   191 2133 AD FC 02		        lda CH
-   192 2136 C9 FF		        cmp #KEY_NONE
-   193 2138 F0 F9		        beq wait_any_loop
-   194 213A A9 FF		        lda #KEY_NONE
-   195 213C 8D FC 02		        sta CH
-   196 213F 60			        rts
-   197
-   198 2140			demo_init_input
-   199 2140 AD 18 88		        lda demo_input_active
-   200 2143 D0 68		        bne demo_init_done
-   201
-   202 2145 A9 4C		        lda #DEMO_CURSOR_START_X
-   203 2147 85 B0		        sta zp_demo_cursor_x
-   204 2149 A9 60		        lda #DEMO_CURSOR_START_Y
-   205 214B 85 B1		        sta zp_demo_cursor_y
-   206 214D A9 FF		        lda #$FF
-   207 214F 85 B2		        sta zp_demo_prev_x
-   208 2151 85 B6		        sta zp_demo_prev_y
-   209 2153 A9 00		        lda #0
-   210 2155 85 B4		        sta zp_mouse_dx
-   211 2157 85 B5		        sta zp_mouse_dy
-   212
-   213 2159 AD 00 D3		        lda PORTA
-   214 215C 4A			        lsr
-   215 215D 4A			        lsr
-   216 215E 4A			        lsr
-   217 215F 4A			        lsr
-   218 2160 AA			        tax
-   219 2161 8A			        txa
-   220 2162 29 03		        and #$03
-   221 2164 0A			        asl
-   222 2165 0A			        asl
-   223 2166 8D 1B 88		        sta demo_mouse_old_x
-   224 2169 8A			        txa
-   225 216A 4A			        lsr
-   226 216B 4A			        lsr
-   227 216C 29 03		        and #$03
-   228 216E 0A			        asl
-   229 216F 0A			        asl
-   230 2170 8D 1C 88		        sta demo_mouse_old_y
-   231
-   232 2173 AD 11 D0		        lda STRIG1
-   233 2176 F0 04		        beq demo_init_trig_pressed
-   234 2178 A9 01		        lda #1
-   235 217A D0 02		        bne demo_init_trig_store
-   236 217C			demo_init_trig_pressed
-   237 217C A9 00		        lda #0
-   238 217E			demo_init_trig_store
-   239 217E 85 B3		        sta zp_demo_prev_trig
-   240
-   241 2180 20 AE 21		        jsr demo_install_timer_stubs
-   242
-   243 2183 78			        sei
-   244 2184 A9 00		        lda #<STUB_BASE
-   245 2186 8D 12 02		        sta VTIMR2
-   246 2189 A9 06		        lda #>STUB_BASE
-   247 218B 8D 13 02		        sta VTIMR2+1
-   248
-   249 218E A5 10		        lda POKMSK
-   250 2190 09 02		        ora #$02
-   251 2192 85 10		        sta POKMSK
-   252 2194 8D 0E D2		        sta IRQEN
-   253
-   254 2197 A9 00		        lda #0
-   255 2199 8D 08 D2		        sta AUDCTL
-   256 219C 8D 03 D2		        sta AUDC2
-   257 219F A9 40		        lda #$40
-   258 21A1 8D 02 D2		        sta AUDF2
-   259 21A4 8D 09 D2		        sta STIMER
-   260 21A7 58			        cli
-   261
-   262 21A8 A9 01		        lda #1
-   263 21AA 8D 18 88		        sta demo_input_active
-   264 21AD			demo_init_done
-   265 21AD 60			        rts
+    73 2032 A9 00		        lda #0
+    74 2034 8D 12 88		        sta slide_index
+    75
+    76 2037			load_slide
+    77 2037 20 C4 20		        jsr clear_debug
+    78 203A 20 BB 26		        jsr copy_slide_url_to_buffer
+    79 203D 20 CC 27		        jsr fetch_room_image
+    80 2040 90 20		        bcc image_ok
+    81 2042 20 38 2C		        jsr report_failure
+    82 2045 4C 16 20		        jmp fail_loop
+    83
+    84 2048			no_vbxe
+    85 2048 A9 11		        lda #$11
+    86 204A 8D 00 88		        sta debug_stage
+    87 204D 20 38 2C		        jsr report_failure
+    88 2050 4C 16 20		        jmp fail_loop
+    89
+    90 2053			start_demo
+    91 2053 A9 C1		        lda #<msg_generating_demo
+    92 2055 A2 2F		        ldx #>msg_generating_demo
+    93 2057 A0 19		        ldy #msg_generating_demo_end-msg_generating_demo
+    94 2059 20 FD 2B		        jsr print_record
+    95 205C 20 43 2A		        jsr generate_demo_image
+    96 205F 4C 62 20		        jmp image_ok
+    97
+    98 2062			image_ok
+    99 2062 A9 00		        lda #0
+   100 2064 8D 2F 02		        sta SDMCTL
+   101 2067 20 44 2B		        jsr show_fullscreen
+   102 206A AD 13 88		        lda demo_mode
+   103 206D D0 0E		        bne demo_image_loop
+   104 206F			image_loop
+   105 206F 20 4A 21		        jsr wait_for_any_key
+   106 2072 AD 13 88		        lda demo_mode
+   107 2075 D0 47		        bne demo_next
+   108 2077 EE 12 88		        inc slide_index
+   109 207A 4C 37 20		        jmp load_slide
+   110
+   111 207D			demo_image_loop
+   112 207D A9 00		        lda #0
+   113 207F 8D 18 88		        sta demo_input_active
+   114 2082 20 5C 21		        jsr demo_init_input
+   115 2085 20 30 24		        jsr demo_draw_cursor
+   116 2088			demo_wait
+   117 2088 20 9B 27		        jsr wait_one_frame
+   118 208B 20 32 22		        jsr demo_update_input
+   119 208E 20 30 24		        jsr demo_draw_cursor
+   120 2091 20 FB 22		        jsr demo_poll_click
+   121 2094 90 06		        bcc demo_key_check
+   122 2096 20 12 23		        jsr demo_click_stamp
+   123 2099 4C 88 20		        jmp demo_wait
+   124 209C			demo_key_check
+   125 209C AD FC 02		        lda CH
+   126 209F C9 FF		        cmp #KEY_NONE
+   127 20A1 F0 E5		        beq demo_wait
+   128 20A3 C9 21		        cmp #KEY_SPACE
+   129 20A5 F0 0C		        beq demo_popup_key
+   130 20A7 C9 20		        cmp #CH_SPACE
+   131 20A9 F0 08		        beq demo_popup_key
+   132 20AB A9 FF		        lda #KEY_NONE
+   133 20AD 8D FC 02		        sta CH
+   134 20B0 4C BE 20		        jmp demo_next
+   135 20B3			demo_popup_key
+   136 20B3 A9 FF		        lda #KEY_NONE
+   137 20B5 8D FC 02		        sta CH
+   138 20B8 20 28 23		        jsr demo_show_popup
+   139 20BB 4C 88 20		        jmp demo_wait
+   140
+   141 20BE			demo_next
+   142 20BE 20 43 2A		        jsr generate_demo_image
+   143 20C1 4C 62 20		        jmp image_ok
+   144
+   145 20C4			clear_debug
+   146 20C4 A9 00		        lda #0
+   147 20C6 8D 00 88		        sta debug_stage
+   148 20C9 8D 01 88		        sta debug_dstats
+   149 20CC 8D 02 88		        sta debug_fn_error
+   150 20CF 8D 03 88		        sta debug_connected
+   151 20D2 8D 04 88		        sta debug_bytes_lo
+   152 20D5 8D 05 88		        sta debug_bytes_hi
+   153 20D8 8D 06 88		        sta debug_timeout_ctr
+   154 20DB 8D 07 88		        sta debug_rx_len
+   155 20DE 85 A3		        sta zp_rx_len
+   156 20E0 8D 0C 88		        sta img_pal_leftover
+   157 20E3 8D 13 88		        sta demo_mode
+   158 20E6 8D 18 88		        sta demo_input_active
+   159 20E9 60			        rts
+   160
+   161 20EA			show_banner
+   162 20EA A9 F5		        lda #<msg_title
+   163 20EC A2 2E		        ldx #>msg_title
+   164 20EE A0 1E		        ldy #msg_title_end-msg_title
+   165 20F0 20 FD 2B		        jsr print_record
+   166 20F3 A9 13		        lda #<msg_text_url
+   167 20F5 A2 2F		        ldx #>msg_text_url
+   168 20F7 A0 0A		        ldy #msg_text_url_end-msg_text_url
+   169 20F9 20 FD 2B		        jsr print_record
+   170 20FC A9 BB		        lda #<text_url_string
+   171 20FE A2 2E		        ldx #>text_url_string
+   172 2100 A0 18		        ldy #text_url_string_end-text_url_string-1
+   173 2102 20 FD 2B		        jsr print_record
+   174 2105 A9 1D		        lda #<msg_wait_text
+   175 2107 A2 2F		        ldx #>msg_wait_text
+   176 2109 A0 11		        ldy #msg_wait_text_end-msg_wait_text
+   177 210B 20 FD 2B		        jsr print_record
+   178 210E 60			        rts
+   179
+   180 210F			wait_for_start_key
+   181 210F A9 00		        lda #0
+   182 2111 8D 13 88		        sta demo_mode
+   183 2114 A9 FF		        lda #KEY_NONE
+   184 2116 8D FC 02		        sta CH
+   185 2119			wait_start_loop
+   186 2119 AD FC 02		        lda CH
+   187 211C C9 21		        cmp #KEY_SPACE
+   188 211E F0 14		        beq wait_space_done
+   189 2120 C9 20		        cmp #CH_SPACE
+   190 2122 F0 10		        beq wait_space_done
+   191 2124 C9 3A		        cmp #KEY_D
+   192 2126 F0 17		        beq wait_demo_done
+   193 2128 C9 FF		        cmp #KEY_NONE
+   194 212A F0 ED		        beq wait_start_loop
+   195 212C A9 FF		        lda #KEY_NONE
+   196 212E 8D FC 02		        sta CH
+   197 2131 4C 19 21		        jmp wait_start_loop
+   198 2134			wait_space_done
+   199 2134 A9 00		        lda #0
+   200 2136 8D 13 88		        sta demo_mode
+   201 2139 A9 FF		        lda #KEY_NONE
+   202 213B 8D FC 02		        sta CH
+   203 213E 60			        rts
+   204 213F			wait_demo_done
+   205 213F A9 01		        lda #1
+   206 2141 8D 13 88		        sta demo_mode
+   207 2144 A9 FF		        lda #KEY_NONE
+   208 2146 8D FC 02		        sta CH
+   209 2149 60			        rts
+   210
+   211 214A			wait_for_any_key
+   212 214A A9 FF		        lda #KEY_NONE
+   213 214C 8D FC 02		        sta CH
+   214 214F			wait_any_loop
+   215 214F AD FC 02		        lda CH
+   216 2152 C9 FF		        cmp #KEY_NONE
+   217 2154 F0 F9		        beq wait_any_loop
+   218 2156 A9 FF		        lda #KEY_NONE
+   219 2158 8D FC 02		        sta CH
+   220 215B 60			        rts
+   221
+   222 215C			demo_init_input
+   223 215C AD 18 88		        lda demo_input_active
+   224 215F D0 68		        bne demo_init_done
+   225
+   226 2161 A9 4C		        lda #DEMO_CURSOR_START_X
+   227 2163 85 B0		        sta zp_demo_cursor_x
+   228 2165 A9 60		        lda #DEMO_CURSOR_START_Y
+   229 2167 85 B1		        sta zp_demo_cursor_y
+   230 2169 A9 FF		        lda #$FF
+   231 216B 85 B2		        sta zp_demo_prev_x
+   232 216D 85 B6		        sta zp_demo_prev_y
+   233 216F A9 00		        lda #0
+   234 2171 85 B4		        sta zp_mouse_dx
+   235 2173 85 B5		        sta zp_mouse_dy
+   236
+   237 2175 AD 00 D3		        lda PORTA
+   238 2178 4A			        lsr
+   239 2179 4A			        lsr
+   240 217A 4A			        lsr
+   241 217B 4A			        lsr
+   242 217C AA			        tax
+   243 217D 8A			        txa
+   244 217E 29 03		        and #$03
+   245 2180 0A			        asl
+   246 2181 0A			        asl
+   247 2182 8D 1B 88		        sta demo_mouse_old_x
+   248 2185 8A			        txa
+   249 2186 4A			        lsr
+   250 2187 4A			        lsr
+   251 2188 29 03		        and #$03
+   252 218A 0A			        asl
+   253 218B 0A			        asl
+   254 218C 8D 1C 88		        sta demo_mouse_old_y
+   255
+   256 218F AD 11 D0		        lda STRIG1
+   257 2192 F0 04		        beq demo_init_trig_pressed
+   258 2194 A9 01		        lda #1
+   259 2196 D0 02		        bne demo_init_trig_store
+   260 2198			demo_init_trig_pressed
+   261 2198 A9 00		        lda #0
+   262 219A			demo_init_trig_store
+   263 219A 85 B3		        sta zp_demo_prev_trig
+   264
+   265 219C 20 CA 21		        jsr demo_install_timer_stubs
    266
-   267 21AE			demo_install_timer_stubs
-   268 21AE A0 00		        ldy #0
-   269 21B0			demo_stub_copy
-   270 21B0 B9 57 2B		        lda demo_timer_stubs,y
-   271 21B3 99 00 06		        sta STUB_BASE,y
-   272 21B6 C8			        iny
-   273 21B7 C0 1D		        cpy #demo_timer_stubs_end-demo_timer_stubs
-   274 21B9 D0 F5		        bne demo_stub_copy
-   275
-   276 21BB A9 C6		        lda #<demo_timer_irq
-   277 21BD 8D 0F 06		        sta STUB_BASE+15
-   278 21C0 A9 21		        lda #>demo_timer_irq
-   279 21C2 8D 10 06		        sta STUB_BASE+16
-   280 21C5 60			        rts
-   281
-   282 21C6			demo_timer_irq
-   283 21C6 8A			        txa
-   284 21C7 48			        pha
-   285 21C8 98			        tya
-   286 21C9 48			        pha
-   287
-   288 21CA AD 00 D3		        lda PORTA
-   289 21CD 4A			        lsr
-   290 21CE 4A			        lsr
-   291 21CF 4A			        lsr
-   292 21D0 4A			        lsr
-   293 21D1 AA			        tax
-   294
-   295 21D2 29 03		        and #$03
-   296 21D4 0D 1B 88		        ora demo_mouse_old_x
-   297 21D7 A8			        tay
-   298 21D8 B9 74 2B		        lda demo_mouse_movtab,y
-   299 21DB F0 09		        beq demo_timer_x_done
-   300 21DD 30 05		        bmi demo_timer_x_left
-   301 21DF E6 B4		        inc zp_mouse_dx
-   302 21E1 4C E6 21		        jmp demo_timer_x_done
-   303 21E4			demo_timer_x_left
-   304 21E4 C6 B4		        dec zp_mouse_dx
-   305 21E6			demo_timer_x_done
-   306 21E6 8A			        txa
-   307 21E7 29 03		        and #$03
-   308 21E9 0A			        asl
-   309 21EA 0A			        asl
-   310 21EB 8D 1B 88		        sta demo_mouse_old_x
+   267 219F 78			        sei
+   268 21A0 A9 00		        lda #<STUB_BASE
+   269 21A2 8D 12 02		        sta VTIMR2
+   270 21A5 A9 06		        lda #>STUB_BASE
+   271 21A7 8D 13 02		        sta VTIMR2+1
+   272
+   273 21AA A5 10		        lda POKMSK
+   274 21AC 09 02		        ora #$02
+   275 21AE 85 10		        sta POKMSK
+   276 21B0 8D 0E D2		        sta IRQEN
+   277
+   278 21B3 A9 00		        lda #0
+   279 21B5 8D 08 D2		        sta AUDCTL
+   280 21B8 8D 03 D2		        sta AUDC2
+   281 21BB A9 40		        lda #$40
+   282 21BD 8D 02 D2		        sta AUDF2
+   283 21C0 8D 09 D2		        sta STIMER
+   284 21C3 58			        cli
+   285
+   286 21C4 A9 01		        lda #1
+   287 21C6 8D 18 88		        sta demo_input_active
+   288 21C9			demo_init_done
+   289 21C9 60			        rts
+   290
+   291 21CA			demo_install_timer_stubs
+   292 21CA A0 00		        ldy #0
+   293 21CC			demo_stub_copy
+   294 21CC B9 44 2D		        lda demo_timer_stubs,y
+   295 21CF 99 00 06		        sta STUB_BASE,y
+   296 21D2 C8			        iny
+   297 21D3 C0 1D		        cpy #demo_timer_stubs_end-demo_timer_stubs
+   298 21D5 D0 F5		        bne demo_stub_copy
+   299
+   300 21D7 A9 E2		        lda #<demo_timer_irq
+   301 21D9 8D 0F 06		        sta STUB_BASE+15
+   302 21DC A9 21		        lda #>demo_timer_irq
+   303 21DE 8D 10 06		        sta STUB_BASE+16
+   304 21E1 60			        rts
+   305
+   306 21E2			demo_timer_irq
+   307 21E2 8A			        txa
+   308 21E3 48			        pha
+   309 21E4 98			        tya
+   310 21E5 48			        pha
    311
-   312 21EE 8A			        txa
-   313 21EF 4A			        lsr
-   314 21F0 4A			        lsr
-   315 21F1 29 03		        and #$03
-   316 21F3 0D 1C 88		        ora demo_mouse_old_y
-   317 21F6 A8			        tay
-   318 21F7 B9 74 2B		        lda demo_mouse_movtab,y
-   319 21FA F0 09		        beq demo_timer_y_done
-   320 21FC 30 05		        bmi demo_timer_y_up
-   321 21FE E6 B5		        inc zp_mouse_dy
-   322 2200 4C 05 22		        jmp demo_timer_y_done
-   323 2203			demo_timer_y_up
-   324 2203 C6 B5		        dec zp_mouse_dy
-   325 2205			demo_timer_y_done
-   326 2205 8A			        txa
-   327 2206 4A			        lsr
-   328 2207 4A			        lsr
-   329 2208 29 03		        and #$03
-   330 220A 0A			        asl
-   331 220B 0A			        asl
-   332 220C 8D 1C 88		        sta demo_mouse_old_y
-   333
-   334 220F 68			        pla
-   335 2210 A8			        tay
-   336 2211 68			        pla
-   337 2212 AA			        tax
-   338 2213 4C 11 06		        jmp STUB_TIRQ_EXIT
-   339
-   340 2216			demo_update_input
-   341 2216 78			        sei
-   342 2217 A5 B4		        lda zp_mouse_dx
-   343 2219 8D 19 88		        sta demo_pending_dx
-   344 221C A9 00		        lda #0
-   345 221E 85 B4		        sta zp_mouse_dx
-   346 2220 A5 B5		        lda zp_mouse_dy
-   347 2222 8D 1A 88		        sta demo_pending_dy
-   348 2225 A9 00		        lda #0
-   349 2227 85 B5		        sta zp_mouse_dy
-   350 2229 58			        cli
-   351
-   352 222A AD 19 88		        lda demo_pending_dx
-   353 222D 0D 1A 88		        ora demo_pending_dy
-   354 2230 F0 03		        beq demo_update_joy
-   355 2232 20 39 22		        jsr demo_apply_mouse
-   356 2235			demo_update_joy
-   357 2235 20 9A 22		        jsr demo_apply_joystick
-   358 2238 60			        rts
-   359
-   360 2239			demo_apply_mouse
-   361 2239 AD 19 88		        lda demo_pending_dx
-   362 223C F0 2B		        beq demo_apply_mouse_y
-   363 223E 10 15		        bpl demo_apply_mouse_x_pos
-   364 2240 49 FF		        eor #$FF
-   365 2242 18			        clc
-   366 2243 69 01		        adc #1
-   367 2245 4A			        lsr
-   368 2246 AA			        tax
-   369 2247 F0 1B		        beq demo_apply_mouse_x_clear
-   370 2249			demo_apply_mouse_x_neg_loop
-   371 2249 A5 B0		        lda zp_demo_cursor_x
-   372 224B F0 17		        beq demo_apply_mouse_x_clear
-   373 224D C6 B0		        dec zp_demo_cursor_x
-   374 224F CA			        dex
-   375 2250 D0 F7		        bne demo_apply_mouse_x_neg_loop
-   376 2252 4C 64 22		        jmp demo_apply_mouse_x_clear
-   377
-   378 2255			demo_apply_mouse_x_pos
-   379 2255 4A			        lsr
-   380 2256 AA			        tax
-   381 2257 F0 0B		        beq demo_apply_mouse_x_clear
-   382 2259			demo_apply_mouse_x_pos_loop
-   383 2259 A5 B0		        lda zp_demo_cursor_x
-   384 225B C9 98		        cmp #DEMO_CURSOR_MAX_X
-   385 225D B0 05		        bcs demo_apply_mouse_x_clear
-   386 225F E6 B0		        inc zp_demo_cursor_x
-   387 2261 CA			        dex
-   388 2262 D0 F5		        bne demo_apply_mouse_x_pos_loop
-   389
-   390 2264			demo_apply_mouse_x_clear
-   391 2264 A9 00		        lda #0
-   392 2266 8D 19 88		        sta demo_pending_dx
-   393
-   394 2269			demo_apply_mouse_y
-   395 2269 AD 1A 88		        lda demo_pending_dy
-   396 226C F0 2B		        beq demo_apply_mouse_done
-   397 226E 10 15		        bpl demo_apply_mouse_y_pos
-   398 2270 49 FF		        eor #$FF
-   399 2272 18			        clc
-   400 2273 69 01		        adc #1
-   401 2275 4A			        lsr
-   402 2276 AA			        tax
-   403 2277 F0 1B		        beq demo_apply_mouse_y_clear
-   404 2279			demo_apply_mouse_y_neg_loop
-   405 2279 A5 B1		        lda zp_demo_cursor_y
-   406 227B F0 17		        beq demo_apply_mouse_y_clear
-   407 227D C6 B1		        dec zp_demo_cursor_y
-   408 227F CA			        dex
-   409 2280 D0 F7		        bne demo_apply_mouse_y_neg_loop
-   410 2282 4C 94 22		        jmp demo_apply_mouse_y_clear
-   411
-   412 2285			demo_apply_mouse_y_pos
-   413 2285 4A			        lsr
-   414 2286 AA			        tax
-   415 2287 F0 0B		        beq demo_apply_mouse_y_clear
-   416 2289			demo_apply_mouse_y_pos_loop
-   417 2289 A5 B1		        lda zp_demo_cursor_y
-   418 228B C9 C0		        cmp #DEMO_CURSOR_MAX_Y
-   419 228D B0 05		        bcs demo_apply_mouse_y_clear
-   420 228F E6 B1		        inc zp_demo_cursor_y
-   421 2291 CA			        dex
-   422 2292 D0 F5		        bne demo_apply_mouse_y_pos_loop
-   423
-   424 2294			demo_apply_mouse_y_clear
-   425 2294 A9 00		        lda #0
-   426 2296 8D 1A 88		        sta demo_pending_dy
-   427 2299			demo_apply_mouse_done
-   428 2299 60			        rts
-   429
-   430 229A			demo_apply_joystick
-   431 229A AD 79 02		        lda STICK1
-   432 229D 29 0F		        and #$0F
-   433 229F 8D 1D 88		        sta demo_stick_state
-   434 22A2 C9 0F		        cmp #$0F
-   435 22A4 F0 38		        beq demo_joy_done
-   436
-   437 22A6 AD 1D 88		        lda demo_stick_state
-   438 22A9 29 04		        and #$04
-   439 22AB D0 06		        bne demo_joy_right
-   440 22AD A5 B0		        lda zp_demo_cursor_x
-   441 22AF F0 02		        beq demo_joy_right
-   442 22B1 C6 B0		        dec zp_demo_cursor_x
-   443 22B3			demo_joy_right
-   444 22B3 AD 1D 88		        lda demo_stick_state
-   445 22B6 29 08		        and #$08
-   446 22B8 D0 08		        bne demo_joy_up
-   447 22BA A5 B0		        lda zp_demo_cursor_x
-   448 22BC C9 98		        cmp #DEMO_CURSOR_MAX_X
-   449 22BE B0 02		        bcs demo_joy_up
-   450 22C0 E6 B0		        inc zp_demo_cursor_x
-   451 22C2			demo_joy_up
-   452 22C2 AD 1D 88		        lda demo_stick_state
-   453 22C5 29 01		        and #$01
-   454 22C7 D0 06		        bne demo_joy_down
-   455 22C9 A5 B1		        lda zp_demo_cursor_y
-   456 22CB F0 02		        beq demo_joy_down
-   457 22CD C6 B1		        dec zp_demo_cursor_y
-   458 22CF			demo_joy_down
-   459 22CF AD 1D 88		        lda demo_stick_state
-   460 22D2 29 02		        and #$02
-   461 22D4 D0 08		        bne demo_joy_done
-   462 22D6 A5 B1		        lda zp_demo_cursor_y
-   463 22D8 C9 C0		        cmp #DEMO_CURSOR_MAX_Y
-   464 22DA B0 02		        bcs demo_joy_done
-   465 22DC E6 B1		        inc zp_demo_cursor_y
-   466 22DE			demo_joy_done
-   467 22DE 60			        rts
-   468
-   469 22DF			demo_poll_click
-   470 22DF AD 11 D0		        lda STRIG1
-   471 22E2 F0 06		        beq demo_click_pressed
-   472 22E4 A9 01		        lda #1
-   473 22E6 85 B3		        sta zp_demo_prev_trig
-   474 22E8 18			        clc
-   475 22E9 60			        rts
-   476
-   477 22EA			demo_click_pressed
-   478 22EA A5 B3		        lda zp_demo_prev_trig
-   479 22EC F0 06		        beq demo_click_held
-   480 22EE A9 00		        lda #0
-   481 22F0 85 B3		        sta zp_demo_prev_trig
-   482 22F2 38			        sec
-   483 22F3 60			        rts
-   484 22F4			demo_click_held
-   485 22F4 18			        clc
-   486 22F5 60			        rts
-   487
-   488 22F6			demo_draw_cursor
-   489 22F6 A5 B6		        lda zp_demo_prev_y
-   490 22F8 C9 FF		        cmp #$FF
-   491 22FA F0 0F		        beq demo_draw_new
-   492 22FC A5 B0		        lda zp_demo_cursor_x
-   493 22FE C5 B2		        cmp zp_demo_prev_x
-   494 2300 D0 06		        bne demo_draw_move
-   495 2302 A5 B1		        lda zp_demo_cursor_y
-   496 2304 C5 B6		        cmp zp_demo_prev_y
-   497 2306 F0 0E		        beq demo_draw_done
-   498 2308			demo_draw_move
-   499 2308 20 17 23		        jsr demo_restore_cursor
+   312 21E6 AD 00 D3		        lda PORTA
+   313 21E9 4A			        lsr
+   314 21EA 4A			        lsr
+   315 21EB 4A			        lsr
+   316 21EC 4A			        lsr
+   317 21ED AA			        tax
+   318
+   319 21EE 29 03		        and #$03
+   320 21F0 0D 1B 88		        ora demo_mouse_old_x
+   321 21F3 A8			        tay
+   322 21F4 B9 61 2D		        lda demo_mouse_movtab,y
+   323 21F7 F0 09		        beq demo_timer_x_done
+   324 21F9 30 05		        bmi demo_timer_x_left
+   325 21FB E6 B4		        inc zp_mouse_dx
+   326 21FD 4C 02 22		        jmp demo_timer_x_done
+   327 2200			demo_timer_x_left
+   328 2200 C6 B4		        dec zp_mouse_dx
+   329 2202			demo_timer_x_done
+   330 2202 8A			        txa
+   331 2203 29 03		        and #$03
+   332 2205 0A			        asl
+   333 2206 0A			        asl
+   334 2207 8D 1B 88		        sta demo_mouse_old_x
+   335
+   336 220A 8A			        txa
+   337 220B 4A			        lsr
+   338 220C 4A			        lsr
+   339 220D 29 03		        and #$03
+   340 220F 0D 1C 88		        ora demo_mouse_old_y
+   341 2212 A8			        tay
+   342 2213 B9 61 2D		        lda demo_mouse_movtab,y
+   343 2216 F0 09		        beq demo_timer_y_done
+   344 2218 30 05		        bmi demo_timer_y_up
+   345 221A E6 B5		        inc zp_mouse_dy
+   346 221C 4C 21 22		        jmp demo_timer_y_done
+   347 221F			demo_timer_y_up
+   348 221F C6 B5		        dec zp_mouse_dy
+   349 2221			demo_timer_y_done
+   350 2221 8A			        txa
+   351 2222 4A			        lsr
+   352 2223 4A			        lsr
+   353 2224 29 03		        and #$03
+   354 2226 0A			        asl
+   355 2227 0A			        asl
+   356 2228 8D 1C 88		        sta demo_mouse_old_y
+   357
+   358 222B 68			        pla
+   359 222C A8			        tay
+   360 222D 68			        pla
+   361 222E AA			        tax
+   362 222F 4C 11 06		        jmp STUB_TIRQ_EXIT
+   363
+   364 2232			demo_update_input
+   365 2232 78			        sei
+   366 2233 A5 B4		        lda zp_mouse_dx
+   367 2235 8D 19 88		        sta demo_pending_dx
+   368 2238 A9 00		        lda #0
+   369 223A 85 B4		        sta zp_mouse_dx
+   370 223C A5 B5		        lda zp_mouse_dy
+   371 223E 8D 1A 88		        sta demo_pending_dy
+   372 2241 A9 00		        lda #0
+   373 2243 85 B5		        sta zp_mouse_dy
+   374 2245 58			        cli
+   375
+   376 2246 AD 19 88		        lda demo_pending_dx
+   377 2249 0D 1A 88		        ora demo_pending_dy
+   378 224C F0 03		        beq demo_update_joy
+   379 224E 20 55 22		        jsr demo_apply_mouse
+   380 2251			demo_update_joy
+   381 2251 20 B6 22		        jsr demo_apply_joystick
+   382 2254 60			        rts
+   383
+   384 2255			demo_apply_mouse
+   385 2255 AD 19 88		        lda demo_pending_dx
+   386 2258 F0 2B		        beq demo_apply_mouse_y
+   387 225A 10 15		        bpl demo_apply_mouse_x_pos
+   388 225C 49 FF		        eor #$FF
+   389 225E 18			        clc
+   390 225F 69 01		        adc #1
+   391 2261 4A			        lsr
+   392 2262 AA			        tax
+   393 2263 F0 1B		        beq demo_apply_mouse_x_clear
+   394 2265			demo_apply_mouse_x_neg_loop
+   395 2265 A5 B0		        lda zp_demo_cursor_x
+   396 2267 F0 17		        beq demo_apply_mouse_x_clear
+   397 2269 C6 B0		        dec zp_demo_cursor_x
+   398 226B CA			        dex
+   399 226C D0 F7		        bne demo_apply_mouse_x_neg_loop
+   400 226E 4C 80 22		        jmp demo_apply_mouse_x_clear
+   401
+   402 2271			demo_apply_mouse_x_pos
+   403 2271 4A			        lsr
+   404 2272 AA			        tax
+   405 2273 F0 0B		        beq demo_apply_mouse_x_clear
+   406 2275			demo_apply_mouse_x_pos_loop
+   407 2275 A5 B0		        lda zp_demo_cursor_x
+   408 2277 C9 98		        cmp #DEMO_CURSOR_MAX_X
+   409 2279 B0 05		        bcs demo_apply_mouse_x_clear
+   410 227B E6 B0		        inc zp_demo_cursor_x
+   411 227D CA			        dex
+   412 227E D0 F5		        bne demo_apply_mouse_x_pos_loop
+   413
+   414 2280			demo_apply_mouse_x_clear
+   415 2280 A9 00		        lda #0
+   416 2282 8D 19 88		        sta demo_pending_dx
+   417
+   418 2285			demo_apply_mouse_y
+   419 2285 AD 1A 88		        lda demo_pending_dy
+   420 2288 F0 2B		        beq demo_apply_mouse_done
+   421 228A 10 15		        bpl demo_apply_mouse_y_pos
+   422 228C 49 FF		        eor #$FF
+   423 228E 18			        clc
+   424 228F 69 01		        adc #1
+   425 2291 4A			        lsr
+   426 2292 AA			        tax
+   427 2293 F0 1B		        beq demo_apply_mouse_y_clear
+   428 2295			demo_apply_mouse_y_neg_loop
+   429 2295 A5 B1		        lda zp_demo_cursor_y
+   430 2297 F0 17		        beq demo_apply_mouse_y_clear
+   431 2299 C6 B1		        dec zp_demo_cursor_y
+   432 229B CA			        dex
+   433 229C D0 F7		        bne demo_apply_mouse_y_neg_loop
+   434 229E 4C B0 22		        jmp demo_apply_mouse_y_clear
+   435
+   436 22A1			demo_apply_mouse_y_pos
+   437 22A1 4A			        lsr
+   438 22A2 AA			        tax
+   439 22A3 F0 0B		        beq demo_apply_mouse_y_clear
+   440 22A5			demo_apply_mouse_y_pos_loop
+   441 22A5 A5 B1		        lda zp_demo_cursor_y
+   442 22A7 C9 C0		        cmp #DEMO_CURSOR_MAX_Y
+   443 22A9 B0 05		        bcs demo_apply_mouse_y_clear
+   444 22AB E6 B1		        inc zp_demo_cursor_y
+   445 22AD CA			        dex
+   446 22AE D0 F5		        bne demo_apply_mouse_y_pos_loop
+   447
+   448 22B0			demo_apply_mouse_y_clear
+   449 22B0 A9 00		        lda #0
+   450 22B2 8D 1A 88		        sta demo_pending_dy
+   451 22B5			demo_apply_mouse_done
+   452 22B5 60			        rts
+   453
+   454 22B6			demo_apply_joystick
+   455 22B6 AD 79 02		        lda STICK1
+   456 22B9 29 0F		        and #$0F
+   457 22BB 8D 1D 88		        sta demo_stick_state
+   458 22BE C9 0F		        cmp #$0F
+   459 22C0 F0 38		        beq demo_joy_done
+   460
+   461 22C2 AD 1D 88		        lda demo_stick_state
+   462 22C5 29 04		        and #$04
+   463 22C7 D0 06		        bne demo_joy_right
+   464 22C9 A5 B0		        lda zp_demo_cursor_x
+   465 22CB F0 02		        beq demo_joy_right
+   466 22CD C6 B0		        dec zp_demo_cursor_x
+   467 22CF			demo_joy_right
+   468 22CF AD 1D 88		        lda demo_stick_state
+   469 22D2 29 08		        and #$08
+   470 22D4 D0 08		        bne demo_joy_up
+   471 22D6 A5 B0		        lda zp_demo_cursor_x
+   472 22D8 C9 98		        cmp #DEMO_CURSOR_MAX_X
+   473 22DA B0 02		        bcs demo_joy_up
+   474 22DC E6 B0		        inc zp_demo_cursor_x
+   475 22DE			demo_joy_up
+   476 22DE AD 1D 88		        lda demo_stick_state
+   477 22E1 29 01		        and #$01
+   478 22E3 D0 06		        bne demo_joy_down
+   479 22E5 A5 B1		        lda zp_demo_cursor_y
+   480 22E7 F0 02		        beq demo_joy_down
+   481 22E9 C6 B1		        dec zp_demo_cursor_y
+   482 22EB			demo_joy_down
+   483 22EB AD 1D 88		        lda demo_stick_state
+   484 22EE 29 02		        and #$02
+   485 22F0 D0 08		        bne demo_joy_done
+   486 22F2 A5 B1		        lda zp_demo_cursor_y
+   487 22F4 C9 C0		        cmp #DEMO_CURSOR_MAX_Y
+   488 22F6 B0 02		        bcs demo_joy_done
+   489 22F8 E6 B1		        inc zp_demo_cursor_y
+   490 22FA			demo_joy_done
+   491 22FA 60			        rts
+   492
+   493 22FB			demo_poll_click
+   494 22FB AD 11 D0		        lda STRIG1
+   495 22FE F0 06		        beq demo_click_pressed
+   496 2300 A9 01		        lda #1
+   497 2302 85 B3		        sta zp_demo_prev_trig
+   498 2304 18			        clc
+   499 2305 60			        rts
    500
-   501 230B			demo_draw_new
-   502 230B 20 55 23		        jsr demo_plot_cursor
-   503 230E A5 B0		        lda zp_demo_cursor_x
-   504 2310 85 B2		        sta zp_demo_prev_x
-   505 2312 A5 B1		        lda zp_demo_cursor_y
-   506 2314 85 B6		        sta zp_demo_prev_y
-   507 2316			demo_draw_done
-   508 2316 60			        rts
-   509
-   510 2317			demo_restore_cursor
-   511 2317 A9 00		        lda #0
-   512 2319 8D 1E 88		        sta demo_cursor_row_ix
-   513 231C			demo_restore_row_loop
-   514 231C A5 B6		        lda zp_demo_prev_y
-   515 231E 18			        clc
-   516 231F 6D 1E 88		        adc demo_cursor_row_ix
-   517 2322 A6 B2		        ldx zp_demo_prev_x
-   518 2324 20 05 24		        jsr demo_prepare_cursor_row_table
-   519 2327 20 91 24		        jsr demo_mem_open
-   520 232A A2 00		        ldx #0
-   521 232C			demo_restore_pix_loop
-   522 232C 8A			        txa
-   523 232D 18			        clc
-   524 232E 6D 21 88		        adc demo_cursor_x2
-   525 2331 4D 22 88		        eor demo_cursor_abs_y
-   526 2334 18			        clc
-   527 2335 6D 14 88		        adc demo_phase
-   528 2338 09 08		        ora #8
-   529 233A 20 9D 24		        jsr demo_mem_put
-   530 233D E8			        inx
-   531 233E E0 10		        cpx #16
-   532 2340 D0 EA		        bne demo_restore_pix_loop
-   533 2342			        memb_off
-Macro: MEMB_OFF [Source: vbxe_const.asm]
-     1 2342 A9 00		        lda #0
-     2 2344 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
-     3 2346 A0 5D		        ldy #VBXE_MEMAC_B
-     4 2348 91 80		        sta (zp_vbxe_base),y
-Source: client.asm
-   534 234A EE 1E 88		        inc demo_cursor_row_ix
-   535 234D AD 1E 88		        lda demo_cursor_row_ix
-   536 2350 C9 08		        cmp #demo_arrow_data_end-demo_arrow_data
-   537 2352 D0 C8		        bne demo_restore_row_loop
-   538 2354 60			        rts
-   539
-   540 2355			demo_plot_cursor
-   541 2355 A9 00		        lda #0
-   542 2357 8D 1E 88		        sta demo_cursor_row_ix
-   543 235A			demo_plot_row_loop
-   544 235A AC 1E 88		        ldy demo_cursor_row_ix
-   545 235D B9 84 2B		        lda demo_arrow_data,y
-   546 2360 F0 3C		        beq demo_plot_row_next
-   547 2362 8D 1F 88		        sta demo_cursor_mask
-   548 2365 A5 B1		        lda zp_demo_cursor_y
-   549 2367 18			        clc
-   550 2368 6D 1E 88		        adc demo_cursor_row_ix
-   551 236B A6 B0		        ldx zp_demo_cursor_x
-   552 236D 20 05 24		        jsr demo_prepare_cursor_row_table
-   553 2370 20 91 24		        jsr demo_mem_open
-   554 2373 A2 00		        ldx #0
-   555 2375			demo_plot_bit_loop
-   556 2375 AD 1F 88		        lda demo_cursor_mask
-   557 2378 0A			        asl
-   558 2379 8D 1F 88		        sta demo_cursor_mask
-   559 237C 90 0D		        bcc demo_plot_skip_pair
-   560 237E A9 01		        lda #DEMO_CURSOR_COLOR
-   561 2380 20 9D 24		        jsr demo_mem_put
-   562 2383 A9 01		        lda #DEMO_CURSOR_COLOR
-   563 2385 20 9D 24		        jsr demo_mem_put
-   564 2388 4C 91 23		        jmp demo_plot_next_bit
-   565 238B			demo_plot_skip_pair
-   566 238B 20 A4 24		        jsr demo_mem_advance
-   567 238E 20 A4 24		        jsr demo_mem_advance
-   568 2391			demo_plot_next_bit
-   569 2391 E8			        inx
-   570 2392 E0 08		        cpx #8
-   571 2394 D0 DF		        bne demo_plot_bit_loop
-   572 2396			        memb_off
-Macro: MEMB_OFF [Source: vbxe_const.asm]
-     1 2396 A9 00		        lda #0
-     2 2398 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
-     3 239A A0 5D		        ldy #VBXE_MEMAC_B
-     4 239C 91 80		        sta (zp_vbxe_base),y
-Source: client.asm
-   573 239E			demo_plot_row_next
-   574 239E EE 1E 88		        inc demo_cursor_row_ix
-   575 23A1 AD 1E 88		        lda demo_cursor_row_ix
-   576 23A4 C9 08		        cmp #demo_arrow_data_end-demo_arrow_data
-   577 23A6 D0 B2		        bne demo_plot_row_loop
-   578 23A8 60			        rts
-   579
-   580 23A9			demo_prepare_cursor_row
-   581 23A9 8D 22 88		        sta demo_cursor_abs_y
-   582 23AC 8A			        txa
-   583 23AD 0A			        asl
-   584 23AE 8D 21 88		        sta demo_cursor_x2
-   585 23B1 85 87		        sta zp_tmp_ptr
-   586 23B3 A9 00		        lda #0
-   587 23B5 69 00		        adc #0
-   588 23B7 8D 23 88		        sta demo_cursor_ofs_hi
+   501 2306			demo_click_pressed
+   502 2306 A5 B3		        lda zp_demo_prev_trig
+   503 2308 F0 06		        beq demo_click_held
+   504 230A A9 00		        lda #0
+   505 230C 85 B3		        sta zp_demo_prev_trig
+   506 230E 38			        sec
+   507 230F 60			        rts
+   508 2310			demo_click_held
+   509 2310 18			        clc
+   510 2311 60			        rts
+   511
+   512 2312			demo_click_stamp
+   513 2312 A5 B6		        lda zp_demo_prev_y
+   514 2314 C9 FF		        cmp #$FF
+   515 2316 F0 09		        beq demo_click_stamp_patch
+   516 2318 20 94 24		        jsr demo_restore_cursor
+   517 231B A9 FF		        lda #$FF
+   518 231D 85 B2		        sta zp_demo_prev_x
+   519 231F 85 B6		        sta zp_demo_prev_y
+   520 2321			demo_click_stamp_patch
+   521 2321 20 D0 24		        jsr demo_apply_stamp
+   522 2324 20 30 24		        jsr demo_draw_cursor
+   523 2327 60			        rts
+   524
+   525 2328			demo_show_popup
+   526 2328 A5 B6		        lda zp_demo_prev_y
+   527 232A C9 FF		        cmp #$FF
+   528 232C F0 09		        beq demo_show_popup_draw
+   529 232E 20 94 24		        jsr demo_restore_cursor
+   530 2331 A9 FF		        lda #$FF
+   531 2333 85 B2		        sta zp_demo_prev_x
+   532 2335 85 B6		        sta zp_demo_prev_y
+   533 2337			demo_show_popup_draw
+   534 2337 20 41 23		        jsr demo_draw_popup_box
+   535 233A 20 AD 23		        jsr demo_draw_popup_text
+   536 233D 20 30 24		        jsr demo_draw_cursor
+   537 2340 60			        rts
+   538
+   539 2341			demo_draw_popup_box
+   540 2341 A5 B0		        lda zp_demo_cursor_x
+   541 2343 C9 70		        cmp #DEMO_POPUP_MAX_X
+   542 2345 90 02		        bcc demo_popup_x_ok
+   543 2347 A9 70		        lda #DEMO_POPUP_MAX_X
+   544 2349			demo_popup_x_ok
+   545 2349 8D 29 88		        sta demo_popup_x
+   546
+   547 234C A5 B1		        lda zp_demo_cursor_y
+   548 234E C9 BC		        cmp #DEMO_POPUP_MAX_Y
+   549 2350 90 02		        bcc demo_popup_y_ok
+   550 2352 A9 BC		        lda #DEMO_POPUP_MAX_Y
+   551 2354			demo_popup_y_ok
+   552 2354 8D 2A 88		        sta demo_popup_y
+   553
+   554 2357 A9 00		        lda #0
+   555 2359 8D 2B 88		        sta demo_popup_row
+   556 235C			demo_popup_box_row_loop
+   557 235C AD 2A 88		        lda demo_popup_y
+   558 235F 18			        clc
+   559 2360 6D 2B 88		        adc demo_popup_row
+   560 2363 AE 29 88		        ldx demo_popup_x
+   561 2366 20 F2 25		        jsr demo_prepare_cursor_row_table
+   562 2369 20 7E 26		        jsr demo_mem_open
+   563 236C AD 2B 88		        lda demo_popup_row
+   564 236F F0 1D		        beq demo_popup_border_row
+   565 2371 C9 0B		        cmp #DEMO_POPUP_LAST_ROW
+   566 2373 F0 19		        beq demo_popup_border_row
+   567
+   568 2375 A9 FA		        lda #DEMO_POPUP_BORDER_COLOR
+   569 2377 20 8A 26		        jsr demo_mem_put
+   570 237A A2 00		        ldx #0
+   571 237C			demo_popup_fill_loop
+   572 237C A9 18		        lda #DEMO_POPUP_FILL_COLOR
+   573 237E 20 8A 26		        jsr demo_mem_put
+   574 2381 E8			        inx
+   575 2382 E0 5E		        cpx #DEMO_POPUP_INNER_WIDTH
+   576 2384 D0 F6		        bne demo_popup_fill_loop
+   577 2386 A9 FA		        lda #DEMO_POPUP_BORDER_COLOR
+   578 2388 20 8A 26		        jsr demo_mem_put
+   579 238B 4C 9A 23		        jmp demo_popup_box_row_done
+   580
+   581 238E			demo_popup_border_row
+   582 238E A2 00		        ldx #0
+   583 2390			demo_popup_border_fill_loop
+   584 2390 A9 FA		        lda #DEMO_POPUP_BORDER_COLOR
+   585 2392 20 8A 26		        jsr demo_mem_put
+   586 2395 E8			        inx
+   587 2396 E0 60		        cpx #DEMO_POPUP_WIDTH
+   588 2398 D0 F6		        bne demo_popup_border_fill_loop
    589
-   590 23BA AD 22 88		        lda demo_cursor_abs_y
-   591 23BD 0A			        asl
-   592 23BE 2E 23 88		        rol demo_cursor_ofs_hi
-   593 23C1 0A			        asl
-   594 23C2 2E 23 88		        rol demo_cursor_ofs_hi
-   595 23C5 0A			        asl
-   596 23C6 2E 23 88		        rol demo_cursor_ofs_hi
-   597 23C9 0A			        asl
-   598 23CA 2E 23 88		        rol demo_cursor_ofs_hi
-   599 23CD 0A			        asl
-   600 23CE 2E 23 88		        rol demo_cursor_ofs_hi
-   601 23D1 0A			        asl
-   602 23D2 2E 23 88		        rol demo_cursor_ofs_hi
-   603 23D5 18			        clc
-   604 23D6 65 87		        adc zp_tmp_ptr
-   605 23D8 85 87		        sta zp_tmp_ptr
-   606 23DA AD 23 88		        lda demo_cursor_ofs_hi
-   607 23DD 69 00		        adc #0
-   608 23DF 8D 23 88		        sta demo_cursor_ofs_hi
-   609
-   610 23E2 18			        clc
-   611 23E3 AD 22 88		        lda demo_cursor_abs_y
-   612 23E6 6D 23 88		        adc demo_cursor_ofs_hi
-   613 23E9 8D 23 88		        sta demo_cursor_ofs_hi
-   614
-   615 23EC AD 23 88		        lda demo_cursor_ofs_hi
-   616 23EF 4A			        lsr
-   617 23F0 4A			        lsr
-   618 23F1 4A			        lsr
-   619 23F2 4A			        lsr
-   620 23F3 4A			        lsr
-   621 23F4 4A			        lsr
-   622 23F5 18			        clc
-   623 23F6 69 02		        adc #2
-   624 23F8 8D 20 88		        sta demo_cursor_bank
-   625
-   626 23FB AD 23 88		        lda demo_cursor_ofs_hi
-   627 23FE 29 3F		        and #$3F
-   628 2400 09 40		        ora #$40
-   629 2402 85 88		        sta zp_tmp_ptr+1
-   630 2404 60			        rts
-   631
-   632 2405			demo_prepare_cursor_row_table
-   633 2405 8D 22 88		        sta demo_cursor_abs_y
-   634 2408 A8			        tay
-   635 2409 B9 27 8D		        lda demo_row_ptr_lo,y
-   636 240C 85 87		        sta zp_tmp_ptr
-   637 240E B9 EF 8D		        lda demo_row_ptr_hi,y
-   638 2411 85 88		        sta zp_tmp_ptr+1
-   639 2413 B9 B7 8E		        lda demo_row_bank,y
-   640 2416 8D 20 88		        sta demo_cursor_bank
-   641
-   642 2419 8A			        txa
-   643 241A 0A			        asl
-   644 241B 8D 21 88		        sta demo_cursor_x2
-   645 241E A9 00		        lda #0
-   646 2420 69 00		        adc #0
-   647 2422 8D 23 88		        sta demo_cursor_ofs_hi
-   648
-   649 2425 18			        clc
-   650 2426 A5 87		        lda zp_tmp_ptr
-   651 2428 6D 21 88		        adc demo_cursor_x2
-   652 242B 85 87		        sta zp_tmp_ptr
-   653 242D A5 88		        lda zp_tmp_ptr+1
-   654 242F 6D 23 88		        adc demo_cursor_ofs_hi
-   655 2432 85 88		        sta zp_tmp_ptr+1
-   656
-   657 2434 A5 88		        lda zp_tmp_ptr+1
-   658 2436 C9 80		        cmp #$80
-   659 2438 90 08		        bcc demo_prepare_row_table_done
-   660 243A 38			        sec
-   661 243B E9 40		        sbc #$40
-   662 243D 85 88		        sta zp_tmp_ptr+1
-   663 243F EE 20 88		        inc demo_cursor_bank
-   664 2442			demo_prepare_row_table_done
-   665 2442 60			        rts
-   666
-   667 2443			demo_build_row_table
-   668 2443 AD 0E 88		        lda img_vram
-   669 2446 8D 24 88		        sta demo_rowtab_ptr_lo
-   670 2449 AD 0F 88		        lda img_vram+1
-   671 244C 29 3F		        and #$3F
-   672 244E 09 40		        ora #$40
-   673 2450 8D 25 88		        sta demo_rowtab_ptr_hi
-   674 2453 AD 11 88		        lda img_wr_bank
-   675 2456 8D 26 88		        sta demo_rowtab_bank
-   676
-   677 2459 A0 00		        ldy #0
-   678 245B			demo_build_row_loop
-   679 245B AD 24 88		        lda demo_rowtab_ptr_lo
-   680 245E 99 27 8D		        sta demo_row_ptr_lo,y
-   681 2461 AD 25 88		        lda demo_rowtab_ptr_hi
-   682 2464 99 EF 8D		        sta demo_row_ptr_hi,y
-   683 2467 AD 26 88		        lda demo_rowtab_bank
-   684 246A 99 B7 8E		        sta demo_row_bank,y
-   685
-   686 246D 18			        clc
-   687 246E AD 24 88		        lda demo_rowtab_ptr_lo
-   688 2471 69 40		        adc #<320
-   689 2473 8D 24 88		        sta demo_rowtab_ptr_lo
-   690 2476 AD 25 88		        lda demo_rowtab_ptr_hi
-   691 2479 69 01		        adc #>320
-   692 247B 8D 25 88		        sta demo_rowtab_ptr_hi
-   693 247E C9 80		        cmp #$80
-   694 2480 90 09		        bcc demo_build_row_next
-   695 2482 38			        sec
-   696 2483 E9 40		        sbc #$40
-   697 2485 8D 25 88		        sta demo_rowtab_ptr_hi
-   698 2488 EE 26 88		        inc demo_rowtab_bank
-   699 248B			demo_build_row_next
-   700 248B C8			        iny
-   701 248C C0 C8		        cpy #DEMO_HEIGHT
-   702 248E D0 CB		        bne demo_build_row_loop
-   703 2490 60			        rts
-   704
-   705 2491			demo_mem_open
-   706 2491 AD 20 88		        lda demo_cursor_bank
-   707 2494 09 80		        ora #$80
-   708 2496 85 AD		        sta zp_memb_shadow
-   709 2498 A0 5D		        ldy #VBXE_MEMAC_B
-   710 249A 91 80		        sta (zp_vbxe_base),y
-   711 249C 60			        rts
-   712
-   713 249D			demo_mem_put
-   714 249D A0 00		        ldy #0
-   715 249F 91 87		        sta (zp_tmp_ptr),y
-   716 24A1 4C A4 24		        jmp demo_mem_advance
-   717
-   718 24A4			demo_mem_advance
-   719 24A4 E6 87		        inc zp_tmp_ptr
-   720 24A6 D0 02		        bne demo_mem_advance_check
-   721 24A8 E6 88		        inc zp_tmp_ptr+1
-   722 24AA			demo_mem_advance_check
-   723 24AA A5 88		        lda zp_tmp_ptr+1
-   724 24AC C9 80		        cmp #$80
-   725 24AE D0 12		        bne demo_mem_advance_done
-   726 24B0 A9 40		        lda #$40
-   727 24B2 85 88		        sta zp_tmp_ptr+1
-   728 24B4 EE 20 88		        inc demo_cursor_bank
-   729 24B7 AD 20 88		        lda demo_cursor_bank
-   730 24BA 09 80		        ora #$80
-   731 24BC 85 AD		        sta zp_memb_shadow
-   732 24BE A0 5D		        ldy #VBXE_MEMAC_B
-   733 24C0 91 80		        sta (zp_vbxe_base),y
-   734 24C2			demo_mem_advance_done
-   735 24C2 60			        rts
-   736
-   737 24C3			copy_text_url_to_buffer
-   738 24C3 A9 BE		        lda #<text_url_string
-   739 24C5 85 87		        sta zp_tmp_ptr
-   740 24C7 A9 2C		        lda #>text_url_string
-   741 24C9 85 88		        sta zp_tmp_ptr+1
-   742 24CB 4C EF 24		        jmp copy_string_to_buffer
-   743
-   744 24CE			copy_slide_url_to_buffer
-   745 24CE AD 12 88		        lda slide_index
-   746 24D1 4A			        lsr
-   747 24D2 4A			        lsr
-   748 24D3 4A			        lsr
-   749 24D4 4A			        lsr
-   750 24D5 20 28 2A		        jsr nibble_to_hex
-   751 24D8 8D F5 2C		        sta slide_url_hex_hi
-   752
-   753 24DB AD 12 88		        lda slide_index
-   754 24DE 20 28 2A		        jsr nibble_to_hex
-   755 24E1 8D F6 2C		        sta slide_url_hex_lo
-   756
-   757 24E4 A9 D7		        lda #<slide_url_string
-   758 24E6 85 87		        sta zp_tmp_ptr
-   759 24E8 A9 2C		        lda #>slide_url_string
-   760 24EA 85 88		        sta zp_tmp_ptr+1
-   761 24EC 4C EF 24		        jmp copy_string_to_buffer
-   762
-   763 24EF			copy_string_to_buffer
-   764 24EF A9 00		        lda #0
-   765 24F1 A8			        tay
-   766 24F2			copy_url_clear_loop
-   767 24F2 99 27 88		        sta url_buffer,y
-   768 24F5 C8			        iny
-   769 24F6 D0 FA		        bne copy_url_clear_loop
-   770
-   771 24F8 A0 00		        ldy #0
-   772 24FA			copy_url_copy_loop
-   773 24FA B1 87		        lda (zp_tmp_ptr),y
-   774 24FC 99 27 88		        sta url_buffer,y
-   775 24FF F0 03		        beq copy_url_done
-   776 2501 C8			        iny
-   777 2502 D0 F6		        bne copy_url_copy_loop
-   778 2504			copy_url_done
-   779 2504 60			        rts
+   590 239A			demo_popup_box_row_done
+   591 239A			        memb_off
+Macro: MEMB_OFF [Source: vbxe_const.asm]
+     1 239A A9 00		        lda #0
+     2 239C 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+     3 239E A0 5D		        ldy #VBXE_MEMAC_B
+     4 23A0 91 80		        sta (zp_vbxe_base),y
+Source: client.asm
+   592 23A2 EE 2B 88		        inc demo_popup_row
+   593 23A5 AD 2B 88		        lda demo_popup_row
+   594 23A8 C9 0C		        cmp #DEMO_POPUP_HEIGHT
+   595 23AA D0 B0		        bne demo_popup_box_row_loop
+   596 23AC 60			        rts
+   597
+   598 23AD			demo_draw_popup_text
+   599 23AD A9 00		        lda #0
+   600 23AF 8D 2D 88		        sta demo_popup_text_row
+   601 23B2			demo_popup_text_row_loop
+   602 23B2 AD 2A 88		        lda demo_popup_y
+   603 23B5 18			        clc
+   604 23B6 6D 2D 88		        adc demo_popup_text_row
+   605 23B9 69 02		        adc #2
+   606 23BB AE 29 88		        ldx demo_popup_x
+   607 23BE E8			        inx
+   608 23BF E8			        inx
+   609 23C0 20 F2 25		        jsr demo_prepare_cursor_row_table
+   610 23C3 20 7E 26		        jsr demo_mem_open
+   611
+   612 23C6 A9 00		        lda #0
+   613 23C8 8D 2C 88		        sta demo_popup_char_ix
+   614 23CB			demo_popup_char_loop
+   615 23CB AC 2C 88		        ldy demo_popup_char_ix
+   616 23CE B9 7D 2D		        lda demo_popup_text,y
+   617 23D1 F0 27		        beq demo_popup_text_row_done
+   618 23D3 20 0D 24		        jsr demo_get_popup_font_bits
+   619 23D6 8D 2E 88		        sta demo_popup_font_bits
+   620 23D9 A2 00		        ldx #0
+   621 23DB			demo_popup_font_bit_loop
+   622 23DB AD 2E 88		        lda demo_popup_font_bits
+   623 23DE 0A			        asl
+   624 23DF 8D 2E 88		        sta demo_popup_font_bits
+   625 23E2 90 08		        bcc demo_popup_font_skip
+   626 23E4 A9 FC		        lda #DEMO_POPUP_TEXT_COLOR
+   627 23E6 20 8A 26		        jsr demo_mem_put
+   628 23E9 4C EF 23		        jmp demo_popup_font_next
+   629 23EC			demo_popup_font_skip
+   630 23EC 20 91 26		        jsr demo_mem_advance
+   631 23EF			demo_popup_font_next
+   632 23EF E8			        inx
+   633 23F0 E0 08		        cpx #8
+   634 23F2 D0 E7		        bne demo_popup_font_bit_loop
+   635 23F4 EE 2C 88		        inc demo_popup_char_ix
+   636 23F7 4C CB 23		        jmp demo_popup_char_loop
+   637
+   638 23FA			demo_popup_text_row_done
+   639 23FA			        memb_off
+Macro: MEMB_OFF [Source: vbxe_const.asm]
+     1 23FA A9 00		        lda #0
+     2 23FC 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+     3 23FE A0 5D		        ldy #VBXE_MEMAC_B
+     4 2400 91 80		        sta (zp_vbxe_base),y
+Source: client.asm
+   640 2402 EE 2D 88		        inc demo_popup_text_row
+   641 2405 AD 2D 88		        lda demo_popup_text_row
+   642 2408 C9 08		        cmp #8
+   643 240A D0 A6		        bne demo_popup_text_row_loop
+   644 240C 60			        rts
+   645
+   646 240D			demo_get_popup_font_bits
+   647 240D 85 8B		        sta zp_tmp1
+   648 240F 29 1F		        and #$1F
+   649 2411 0A			        asl
+   650 2412 0A			        asl
+   651 2413 0A			        asl
+   652 2414 18			        clc
+   653 2415 6D 2D 88		        adc demo_popup_text_row
+   654 2418 85 89		        sta zp_tmp_ptr2
+   655 241A A5 8B		        lda zp_tmp1
+   656 241C 4A			        lsr
+   657 241D 4A			        lsr
+   658 241E 4A			        lsr
+   659 241F 4A			        lsr
+   660 2420 4A			        lsr
+   661 2421 AA			        tax
+   662 2422 AD F4 02		        lda CHBAS
+   663 2425 18			        clc
+   664 2426 7D 71 2D		        adc demo_font_page_map,x
+   665 2429 85 8A		        sta zp_tmp_ptr2+1
+   666 242B A0 00		        ldy #0
+   667 242D B1 89		        lda (zp_tmp_ptr2),y
+   668 242F 60			        rts
+   669
+   670 2430			demo_draw_cursor
+   671 2430 A5 B6		        lda zp_demo_prev_y
+   672 2432 C9 FF		        cmp #$FF
+   673 2434 F0 0F		        beq demo_draw_new
+   674 2436 A5 B0		        lda zp_demo_cursor_x
+   675 2438 C5 B2		        cmp zp_demo_prev_x
+   676 243A D0 06		        bne demo_draw_move
+   677 243C A5 B1		        lda zp_demo_cursor_y
+   678 243E C5 B6		        cmp zp_demo_prev_y
+   679 2440 F0 11		        beq demo_draw_done
+   680 2442			demo_draw_move
+   681 2442 20 94 24		        jsr demo_restore_cursor
+   682
+   683 2445			demo_draw_new
+   684 2445 20 54 24		        jsr demo_save_cursor_under
+   685 2448 20 42 25		        jsr demo_plot_cursor
+   686 244B A5 B0		        lda zp_demo_cursor_x
+   687 244D 85 B2		        sta zp_demo_prev_x
+   688 244F A5 B1		        lda zp_demo_cursor_y
+   689 2451 85 B6		        sta zp_demo_prev_y
+   690 2453			demo_draw_done
+   691 2453 60			        rts
+   692
+   693 2454			demo_save_cursor_under
+   694 2454 A9 00		        lda #0
+   695 2456 8D 1E 88		        sta demo_cursor_row_ix
+   696 2459 8D 24 88		        sta demo_cursor_save_ix
+   697 245C			demo_save_row_loop
+   698 245C A5 B1		        lda zp_demo_cursor_y
+   699 245E 18			        clc
+   700 245F 6D 1E 88		        adc demo_cursor_row_ix
+   701 2462 A6 B0		        ldx zp_demo_cursor_x
+   702 2464 20 F2 25		        jsr demo_prepare_cursor_row_table
+   703 2467 20 7E 26		        jsr demo_mem_open
+   704 246A A2 00		        ldx #0
+   705 246C			demo_save_pix_loop
+   706 246C A0 00		        ldy #0
+   707 246E B1 87		        lda (zp_tmp_ptr),y
+   708 2470 AC 24 88		        ldy demo_cursor_save_ix
+   709 2473 99 32 8D		        sta demo_cursor_saved,y
+   710 2476 EE 24 88		        inc demo_cursor_save_ix
+   711 2479 20 91 26		        jsr demo_mem_advance
+   712 247C E8			        inx
+   713 247D E0 10		        cpx #DEMO_CURSOR_WIDTH
+   714 247F D0 EB		        bne demo_save_pix_loop
+   715 2481			        memb_off
+Macro: MEMB_OFF [Source: vbxe_const.asm]
+     1 2481 A9 00		        lda #0
+     2 2483 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+     3 2485 A0 5D		        ldy #VBXE_MEMAC_B
+     4 2487 91 80		        sta (zp_vbxe_base),y
+Source: client.asm
+   716 2489 EE 1E 88		        inc demo_cursor_row_ix
+   717 248C AD 1E 88		        lda demo_cursor_row_ix
+   718 248F C9 08		        cmp #demo_arrow_data_end-demo_arrow_data
+   719 2491 D0 C9		        bne demo_save_row_loop
+   720 2493 60			        rts
+   721
+   722 2494			demo_restore_cursor
+   723 2494 A9 00		        lda #0
+   724 2496 8D 1E 88		        sta demo_cursor_row_ix
+   725 2499 8D 24 88		        sta demo_cursor_save_ix
+   726 249C			demo_restore_row_loop
+   727 249C A5 B6		        lda zp_demo_prev_y
+   728 249E 18			        clc
+   729 249F 6D 1E 88		        adc demo_cursor_row_ix
+   730 24A2 A6 B2		        ldx zp_demo_prev_x
+   731 24A4 20 F2 25		        jsr demo_prepare_cursor_row_table
+   732 24A7 20 7E 26		        jsr demo_mem_open
+   733 24AA A2 00		        ldx #0
+   734 24AC			demo_restore_pix_loop
+   735 24AC AC 24 88		        ldy demo_cursor_save_ix
+   736 24AF B9 32 8D		        lda demo_cursor_saved,y
+   737 24B2 EE 24 88		        inc demo_cursor_save_ix
+   738 24B5 20 8A 26		        jsr demo_mem_put
+   739 24B8 E8			        inx
+   740 24B9 E0 10		        cpx #DEMO_CURSOR_WIDTH
+   741 24BB D0 EF		        bne demo_restore_pix_loop
+   742 24BD			        memb_off
+Macro: MEMB_OFF [Source: vbxe_const.asm]
+     1 24BD A9 00		        lda #0
+     2 24BF 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+     3 24C1 A0 5D		        ldy #VBXE_MEMAC_B
+     4 24C3 91 80		        sta (zp_vbxe_base),y
+Source: client.asm
+   743 24C5 EE 1E 88		        inc demo_cursor_row_ix
+   744 24C8 AD 1E 88		        lda demo_cursor_row_ix
+   745 24CB C9 08		        cmp #demo_arrow_data_end-demo_arrow_data
+   746 24CD D0 CD		        bne demo_restore_row_loop
+   747 24CF 60			        rts
+   748
+   749 24D0			demo_apply_stamp
+   750 24D0 AD 25 88		        lda demo_stamp_phase
+   751 24D3 18			        clc
+   752 24D4 69 29		        adc #$29
+   753 24D6 8D 25 88		        sta demo_stamp_phase
+   754
+   755 24D9 A9 A0		        lda #160
+   756 24DB 38			        sec
+   757 24DC E5 B0		        sbc zp_demo_cursor_x
+   758 24DE C9 0A		        cmp #10
+   759 24E0 90 04		        bcc demo_stamp_width_clip
+   760 24E2 A9 14		        lda #DEMO_STAMP_SIZE
+   761 24E4 D0 01		        bne demo_stamp_width_done
+   762 24E6			demo_stamp_width_clip
+   763 24E6 0A			        asl
+   764 24E7			demo_stamp_width_done
+   765 24E7 8D 26 88		        sta demo_stamp_width
+   766
+   767 24EA A9 C8		        lda #DEMO_HEIGHT
+   768 24EC 38			        sec
+   769 24ED E5 B1		        sbc zp_demo_cursor_y
+   770 24EF C9 14		        cmp #DEMO_STAMP_SIZE
+   771 24F1 90 02		        bcc demo_stamp_height_clip
+   772 24F3 A9 14		        lda #DEMO_STAMP_SIZE
+   773 24F5			demo_stamp_height_clip
+   774 24F5 8D 27 88		        sta demo_stamp_height
+   775
+   776 24F8 AD 26 88		        lda demo_stamp_width
+   777 24FB F0 44		        beq demo_apply_stamp_done
+   778 24FD AD 27 88		        lda demo_stamp_height
+   779 2500 F0 3F		        beq demo_apply_stamp_done
    780
-   781 2505			fetch_text_payload
-   782 2505 A9 01		        lda #1
-   783 2507 8D 00 88		        sta debug_stage
-   784 250A 20 8D 2B		        jsr fn_open
-   785 250D AD 03 03		        lda DSTATS
-   786 2510 8D 01 88		        sta debug_dstats
-   787 2513 90 03		        bcc text_open_ok
-   788 2515 4C 8E 25		        jmp text_fail
-   789
-   790 2518			text_open_ok
-   791 2518 A9 F0		        lda #VIEW_TIMEOUT
-   792 251A 8D 06 88		        sta debug_timeout_ctr
-   793
-   794 251D			text_wait
-   795 251D A9 02		        lda #2
-   796 251F 8D 00 88		        sta debug_stage
-   797 2522 20 90 25		        jsr poll_status
-   798 2525 90 03		        bcc text_status_ok
-   799 2527 4C 8B 25		        jmp text_fail_close
-   800
-   801 252A			text_status_ok
-   802 252A AD 02 88		        lda debug_fn_error
-   803 252D 30 03		        bmi text_status_fatal
-   804 252F 4C 39 25		        jmp text_check_bytes
-   805
-   806 2532			text_status_fatal
-   807 2532 C9 88		        cmp #136
-   808 2534 F0 55		        beq text_fail_close
-   809 2536 4C 8B 25		        jmp text_fail_close
-   810
-   811 2539			text_check_bytes
-   812 2539 AD 05 88		        lda debug_bytes_hi
-   813 253C D0 15		        bne text_read
-   814 253E AD 04 88		        lda debug_bytes_lo
-   815 2541 D0 10		        bne text_read
-   816 2543 AD 03 88		        lda debug_connected
-   817 2546 F0 43		        beq text_fail_close
-   818 2548 CE 06 88		        dec debug_timeout_ctr
-   819 254B F0 3E		        beq text_fail_close
-   820 254D 20 AE 25		        jsr wait_one_frame
-   821 2550 4C 1D 25		        jmp text_wait
-   822
-   823 2553			text_read
-   824 2553 A9 03		        lda #3
-   825 2555 8D 00 88		        sta debug_stage
-   826 2558 AD 05 88		        lda debug_bytes_hi
-   827 255B F0 04		        beq text_read_lo
-   828 255D A9 60		        lda #READ_LIMIT
-   829 255F D0 09		        bne text_read_set
-   830
-   831 2561			text_read_lo
-   832 2561 AD 04 88		        lda debug_bytes_lo
-   833 2564 C9 60		        cmp #READ_LIMIT
-   834 2566 90 02		        bcc text_read_set
-   835 2568 A9 60		        lda #READ_LIMIT
-   836
-   837 256A			text_read_set
-   838 256A 85 A1		        sta zp_fn_bytes_lo
-   839 256C A9 00		        lda #0
-   840 256E 85 A2		        sta zp_fn_bytes_hi
-   841 2570 20 25 2C		        jsr fn_read
-   842 2573 AD 03 03		        lda DSTATS
-   843 2576 8D 01 88		        sta debug_dstats
-   844 2579 90 03		        bcc text_read_ok
-   845 257B 4C 8B 25		        jmp text_fail_close
-   846
-   847 257E			text_read_ok
-   848 257E A5 A3		        lda zp_rx_len
-   849 2580 8D 07 88		        sta debug_rx_len
-   850 2583 20 B5 25		        jsr sanitize_rx_buffer
-   851 2586 20 8D 2C		        jsr fn_close
-   852 2589 18			        clc
-   853 258A 60			        rts
-   854
-   855 258B			text_fail_close
-   856 258B 20 8D 2C		        jsr fn_close
-   857 258E			text_fail
-   858 258E 38			        sec
-   859 258F 60			        rts
-   860
-   861 2590			poll_status
-   862 2590 20 D1 2B		        jsr fn_status
-   863 2593 AD 03 03		        lda DSTATS
-   864 2596 8D 01 88		        sta debug_dstats
-   865 2599 A5 A0		        lda zp_fn_error
-   866 259B 8D 02 88		        sta debug_fn_error
-   867 259E A5 9F		        lda zp_fn_connected
-   868 25A0 8D 03 88		        sta debug_connected
-   869 25A3 A5 A1		        lda zp_fn_bytes_lo
-   870 25A5 8D 04 88		        sta debug_bytes_lo
-   871 25A8 A5 A2		        lda zp_fn_bytes_hi
-   872 25AA 8D 05 88		        sta debug_bytes_hi
-   873 25AD 60			        rts
-   874
-   875 25AE			wait_one_frame
-   876 25AE A5 14		        lda RTCLOK+2
-   877 25B0			wait_one_frame_loop
-   878 25B0 C5 14		        cmp RTCLOK+2
-   879 25B2 F0 FC		        beq wait_one_frame_loop
-   880 25B4 60			        rts
+   781 2502 A9 00		        lda #0
+   782 2504 8D 28 88		        sta demo_stamp_row
+   783 2507			demo_stamp_row_loop
+   784 2507 A5 B1		        lda zp_demo_cursor_y
+   785 2509 18			        clc
+   786 250A 6D 28 88		        adc demo_stamp_row
+   787 250D A6 B0		        ldx zp_demo_cursor_x
+   788 250F 20 F2 25		        jsr demo_prepare_cursor_row_table
+   789 2512 20 7E 26		        jsr demo_mem_open
+   790 2515 A2 00		        ldx #0
+   791 2517			demo_stamp_pix_loop
+   792 2517 8A			        txa
+   793 2518 0A			        asl
+   794 2519 18			        clc
+   795 251A 6D 28 88		        adc demo_stamp_row
+   796 251D 4D 25 88		        eor demo_stamp_phase
+   797 2520 18			        clc
+   798 2521 65 B0		        adc zp_demo_cursor_x
+   799 2523 09 18		        ora #$18
+   800 2525 20 8A 26		        jsr demo_mem_put
+   801 2528 E8			        inx
+   802 2529 EC 26 88		        cpx demo_stamp_width
+   803 252C D0 E9		        bne demo_stamp_pix_loop
+   804 252E			        memb_off
+Macro: MEMB_OFF [Source: vbxe_const.asm]
+     1 252E A9 00		        lda #0
+     2 2530 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+     3 2532 A0 5D		        ldy #VBXE_MEMAC_B
+     4 2534 91 80		        sta (zp_vbxe_base),y
+Source: client.asm
+   805 2536 EE 28 88		        inc demo_stamp_row
+   806 2539 AD 28 88		        lda demo_stamp_row
+   807 253C CD 27 88		        cmp demo_stamp_height
+   808 253F D0 C6		        bne demo_stamp_row_loop
+   809 2541			demo_apply_stamp_done
+   810 2541 60			        rts
+   811
+   812 2542			demo_plot_cursor
+   813 2542 A9 00		        lda #0
+   814 2544 8D 1E 88		        sta demo_cursor_row_ix
+   815 2547			demo_plot_row_loop
+   816 2547 AC 1E 88		        ldy demo_cursor_row_ix
+   817 254A B9 75 2D		        lda demo_arrow_data,y
+   818 254D F0 3C		        beq demo_plot_row_next
+   819 254F 8D 1F 88		        sta demo_cursor_mask
+   820 2552 A5 B1		        lda zp_demo_cursor_y
+   821 2554 18			        clc
+   822 2555 6D 1E 88		        adc demo_cursor_row_ix
+   823 2558 A6 B0		        ldx zp_demo_cursor_x
+   824 255A 20 F2 25		        jsr demo_prepare_cursor_row_table
+   825 255D 20 7E 26		        jsr demo_mem_open
+   826 2560 A2 00		        ldx #0
+   827 2562			demo_plot_bit_loop
+   828 2562 AD 1F 88		        lda demo_cursor_mask
+   829 2565 0A			        asl
+   830 2566 8D 1F 88		        sta demo_cursor_mask
+   831 2569 90 0D		        bcc demo_plot_skip_pair
+   832 256B A9 01		        lda #DEMO_CURSOR_COLOR
+   833 256D 20 8A 26		        jsr demo_mem_put
+   834 2570 A9 01		        lda #DEMO_CURSOR_COLOR
+   835 2572 20 8A 26		        jsr demo_mem_put
+   836 2575 4C 7E 25		        jmp demo_plot_next_bit
+   837 2578			demo_plot_skip_pair
+   838 2578 20 91 26		        jsr demo_mem_advance
+   839 257B 20 91 26		        jsr demo_mem_advance
+   840 257E			demo_plot_next_bit
+   841 257E E8			        inx
+   842 257F E0 08		        cpx #8
+   843 2581 D0 DF		        bne demo_plot_bit_loop
+   844 2583			        memb_off
+Macro: MEMB_OFF [Source: vbxe_const.asm]
+     1 2583 A9 00		        lda #0
+     2 2585 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+     3 2587 A0 5D		        ldy #VBXE_MEMAC_B
+     4 2589 91 80		        sta (zp_vbxe_base),y
+Source: client.asm
+   845 258B			demo_plot_row_next
+   846 258B EE 1E 88		        inc demo_cursor_row_ix
+   847 258E AD 1E 88		        lda demo_cursor_row_ix
+   848 2591 C9 08		        cmp #demo_arrow_data_end-demo_arrow_data
+   849 2593 D0 B2		        bne demo_plot_row_loop
+   850 2595 60			        rts
+   851
+   852 2596			demo_prepare_cursor_row
+   853 2596 8D 22 88		        sta demo_cursor_abs_y
+   854 2599 8A			        txa
+   855 259A 0A			        asl
+   856 259B 8D 21 88		        sta demo_cursor_x2
+   857 259E 85 87		        sta zp_tmp_ptr
+   858 25A0 A9 00		        lda #0
+   859 25A2 69 00		        adc #0
+   860 25A4 8D 23 88		        sta demo_cursor_ofs_hi
+   861
+   862 25A7 AD 22 88		        lda demo_cursor_abs_y
+   863 25AA 0A			        asl
+   864 25AB 2E 23 88		        rol demo_cursor_ofs_hi
+   865 25AE 0A			        asl
+   866 25AF 2E 23 88		        rol demo_cursor_ofs_hi
+   867 25B2 0A			        asl
+   868 25B3 2E 23 88		        rol demo_cursor_ofs_hi
+   869 25B6 0A			        asl
+   870 25B7 2E 23 88		        rol demo_cursor_ofs_hi
+   871 25BA 0A			        asl
+   872 25BB 2E 23 88		        rol demo_cursor_ofs_hi
+   873 25BE 0A			        asl
+   874 25BF 2E 23 88		        rol demo_cursor_ofs_hi
+   875 25C2 18			        clc
+   876 25C3 65 87		        adc zp_tmp_ptr
+   877 25C5 85 87		        sta zp_tmp_ptr
+   878 25C7 AD 23 88		        lda demo_cursor_ofs_hi
+   879 25CA 69 00		        adc #0
+   880 25CC 8D 23 88		        sta demo_cursor_ofs_hi
    881
-   882 25B5			sanitize_rx_buffer
-   883 25B5 A2 00		        ldx #0
-   884 25B7			sanitize_loop
-   885 25B7 E4 A3		        cpx zp_rx_len
-   886 25B9 F0 23		        beq sanitize_done
-   887 25BB BD 27 89		        lda rx_buffer,x
-   888 25BE C9 0D		        cmp #13
-   889 25C0 F0 0F		        beq sanitize_nl
-   890 25C2 C9 0A		        cmp #10
-   891 25C4 F0 0B		        beq sanitize_nl
-   892 25C6 C9 20		        cmp #32
-   893 25C8 90 0B		        bcc sanitize_dot
-   894 25CA C9 7F		        cmp #127
-   895 25CC B0 07		        bcs sanitize_dot
-   896 25CE 4C DA 25		        jmp sanitize_next
+   882 25CF 18			        clc
+   883 25D0 AD 22 88		        lda demo_cursor_abs_y
+   884 25D3 6D 23 88		        adc demo_cursor_ofs_hi
+   885 25D6 8D 23 88		        sta demo_cursor_ofs_hi
+   886
+   887 25D9 AD 23 88		        lda demo_cursor_ofs_hi
+   888 25DC 4A			        lsr
+   889 25DD 4A			        lsr
+   890 25DE 4A			        lsr
+   891 25DF 4A			        lsr
+   892 25E0 4A			        lsr
+   893 25E1 4A			        lsr
+   894 25E2 18			        clc
+   895 25E3 69 02		        adc #2
+   896 25E5 8D 20 88		        sta demo_cursor_bank
    897
-   898 25D1			sanitize_nl
-   899 25D1 A9 9B		        lda #ATASCII_RET
-   900 25D3 D0 02		        bne sanitize_store
-   901
-   902 25D5			sanitize_dot
-   903 25D5 A9 2E		        lda #'.'
-   904
-   905 25D7			sanitize_store
-   906 25D7 9D 27 89		        sta rx_buffer,x
-   907
-   908 25DA			sanitize_next
-   909 25DA E8			        inx
-   910 25DB 4C B7 25		        jmp sanitize_loop
-   911 25DE			sanitize_done
-   912 25DE 60			        rts
+   898 25E8 AD 23 88		        lda demo_cursor_ofs_hi
+   899 25EB 29 3F		        and #$3F
+   900 25ED 09 40		        ora #$40
+   901 25EF 85 88		        sta zp_tmp_ptr+1
+   902 25F1 60			        rts
+   903
+   904 25F2			demo_prepare_cursor_row_table
+   905 25F2 8D 22 88		        sta demo_cursor_abs_y
+   906 25F5 A8			        tay
+   907 25F6 B9 B2 8D		        lda demo_row_ptr_lo,y
+   908 25F9 85 87		        sta zp_tmp_ptr
+   909 25FB B9 7A 8E		        lda demo_row_ptr_hi,y
+   910 25FE 85 88		        sta zp_tmp_ptr+1
+   911 2600 B9 42 8F		        lda demo_row_bank,y
+   912 2603 8D 20 88		        sta demo_cursor_bank
    913
-   914 25DF			fetch_room_image
-   915 25DF A9 12		        lda #$12
-   916 25E1 8D 00 88		        sta debug_stage
-   917 25E4 20 8D 2B		        jsr fn_open
-   918 25E7 AD 03 03		        lda DSTATS
-   919 25EA 8D 01 88		        sta debug_dstats
-   920 25ED 90 03		        bcc fetch_open_ok
-   921 25EF 4C 3D 26		        jmp fetch_fail
-   922
-   923 25F2			fetch_open_ok
-   924 25F2 A9 13		        lda #$13
-   925 25F4 8D 00 88		        sta debug_stage
-   926 25F7 20 3F 26		        jsr read_header_chunk
-   927 25FA 90 03		        bcc fetch_header_ok
-   928 25FC 4C 3A 26		        jmp fetch_fail_close
-   929
-   930 25FF			fetch_header_ok
-   931 25FF AD 0D 88		        lda img_height
-   932 2602 8D 07 88		        sta debug_rx_len
-   933
-   934 2605 A9 14		        lda #$14
-   935 2607 8D 00 88		        sta debug_stage
-   936 260A 20 E2 26		        jsr read_palette_stream
-   937 260D 90 03		        bcc fetch_palette_ok
-   938 260F 4C 3A 26		        jmp fetch_fail_close
-   939
-   940 2612			fetch_palette_ok
-   941 2612 20 DF 27		        jsr init_image_write
-   942 2615 AD 0C 88		        lda img_pal_leftover
-   943 2618 85 A3		        sta zp_rx_len
-   944 261A 20 10 28		        jsr write_pixel_chunk
-   945
-   946 261D A9 15		        lda #$15
-   947 261F 8D 00 88		        sta debug_stage
-   948 2622 20 8A 27		        jsr read_pixels_stream
-   949 2625 90 03		        bcc fetch_pixels_ok
-   950 2627 4C 3A 26		        jmp fetch_fail_close
-   951
-   952 262A			fetch_pixels_ok
-   953 262A 20 8D 2C		        jsr fn_close
-   954 262D A9 27		        lda #<img_pal_buf
-   955 262F 85 87		        sta zp_tmp_ptr
-   956 2631 A9 8A		        lda #>img_pal_buf
-   957 2633 85 88		        sta zp_tmp_ptr+1
-   958 2635 20 EB 28		        jsr set_image_palette
-   959 2638 18			        clc
-   960 2639 60			        rts
-   961
-   962 263A			fetch_fail_close
-   963 263A 20 8D 2C		        jsr fn_close
-   964 263D			fetch_fail
-   965 263D 38			        sec
-   966 263E 60			        rts
-   967
-   968 263F			read_header_chunk
-   969 263F A9 F0		        lda #VIEW_TIMEOUT
-   970 2641 8D 06 88		        sta debug_timeout_ctr
-   971
-   972 2644 A9 03		        lda #3
-   973 2646 85 A1		        sta zp_fn_bytes_lo
-   974 2648 8D 04 88		        sta debug_bytes_lo
-   975 264B A9 00		        lda #0
-   976 264D 85 A2		        sta zp_fn_bytes_hi
-   977 264F 8D 05 88		        sta debug_bytes_hi
-   978 2652 20 25 2C		        jsr fn_read
-   979 2655 AD 03 03		        lda DSTATS
-   980 2658 8D 01 88		        sta debug_dstats
-   981 265B 90 47		        bcc hdr_read_ok
-   982
-   983 265D			hdr_wait
-   984 265D 20 90 25		        jsr poll_status
-   985 2660 90 03		        bcc hdr_status_ok
-   986 2662 4C E0 26		        jmp hdr_err
-   987
-   988 2665			hdr_status_ok
-   989 2665 AD 02 88		        lda debug_fn_error
-   990 2668 F0 08		        beq hdr_check_bytes
-   991 266A C9 88		        cmp #136
-   992 266C F0 72		        beq hdr_err
-   993 266E C9 80		        cmp #128
-   994 2670 B0 6E		        bcs hdr_err
-   995
-   996 2672			hdr_check_bytes
-   997 2672 AD 05 88		        lda debug_bytes_hi
-   998 2675 D0 17		        bne hdr_ready
-   999 2677 AD 04 88		        lda debug_bytes_lo
-  1000 267A C9 03		        cmp #3
-  1001 267C B0 10		        bcs hdr_ready
-  1002 267E AD 03 88		        lda debug_connected
-  1003 2681 F0 5D		        beq hdr_err
-  1004 2683 CE 06 88		        dec debug_timeout_ctr
-  1005 2686 F0 58		        beq hdr_err
-  1006 2688 20 AE 25		        jsr wait_one_frame
-  1007 268B 4C 5D 26		        jmp hdr_wait
+   914 2606 8A			        txa
+   915 2607 0A			        asl
+   916 2608 8D 21 88		        sta demo_cursor_x2
+   917 260B A9 00		        lda #0
+   918 260D 69 00		        adc #0
+   919 260F 8D 23 88		        sta demo_cursor_ofs_hi
+   920
+   921 2612 18			        clc
+   922 2613 A5 87		        lda zp_tmp_ptr
+   923 2615 6D 21 88		        adc demo_cursor_x2
+   924 2618 85 87		        sta zp_tmp_ptr
+   925 261A A5 88		        lda zp_tmp_ptr+1
+   926 261C 6D 23 88		        adc demo_cursor_ofs_hi
+   927 261F 85 88		        sta zp_tmp_ptr+1
+   928
+   929 2621 A5 88		        lda zp_tmp_ptr+1
+   930 2623 C9 80		        cmp #$80
+   931 2625 90 08		        bcc demo_prepare_row_table_done
+   932 2627 38			        sec
+   933 2628 E9 40		        sbc #$40
+   934 262A 85 88		        sta zp_tmp_ptr+1
+   935 262C EE 20 88		        inc demo_cursor_bank
+   936 262F			demo_prepare_row_table_done
+   937 262F 60			        rts
+   938
+   939 2630			demo_build_row_table
+   940 2630 AD 0E 88		        lda img_vram
+   941 2633 8D 2F 88		        sta demo_rowtab_ptr_lo
+   942 2636 AD 0F 88		        lda img_vram+1
+   943 2639 29 3F		        and #$3F
+   944 263B 09 40		        ora #$40
+   945 263D 8D 30 88		        sta demo_rowtab_ptr_hi
+   946 2640 AD 11 88		        lda img_wr_bank
+   947 2643 8D 31 88		        sta demo_rowtab_bank
+   948
+   949 2646 A0 00		        ldy #0
+   950 2648			demo_build_row_loop
+   951 2648 AD 2F 88		        lda demo_rowtab_ptr_lo
+   952 264B 99 B2 8D		        sta demo_row_ptr_lo,y
+   953 264E AD 30 88		        lda demo_rowtab_ptr_hi
+   954 2651 99 7A 8E		        sta demo_row_ptr_hi,y
+   955 2654 AD 31 88		        lda demo_rowtab_bank
+   956 2657 99 42 8F		        sta demo_row_bank,y
+   957
+   958 265A 18			        clc
+   959 265B AD 2F 88		        lda demo_rowtab_ptr_lo
+   960 265E 69 40		        adc #<320
+   961 2660 8D 2F 88		        sta demo_rowtab_ptr_lo
+   962 2663 AD 30 88		        lda demo_rowtab_ptr_hi
+   963 2666 69 01		        adc #>320
+   964 2668 8D 30 88		        sta demo_rowtab_ptr_hi
+   965 266B C9 80		        cmp #$80
+   966 266D 90 09		        bcc demo_build_row_next
+   967 266F 38			        sec
+   968 2670 E9 40		        sbc #$40
+   969 2672 8D 30 88		        sta demo_rowtab_ptr_hi
+   970 2675 EE 31 88		        inc demo_rowtab_bank
+   971 2678			demo_build_row_next
+   972 2678 C8			        iny
+   973 2679 C0 C8		        cpy #DEMO_HEIGHT
+   974 267B D0 CB		        bne demo_build_row_loop
+   975 267D 60			        rts
+   976
+   977 267E			demo_mem_open
+   978 267E AD 20 88		        lda demo_cursor_bank
+   979 2681 09 80		        ora #$80
+   980 2683 85 AD		        sta zp_memb_shadow
+   981 2685 A0 5D		        ldy #VBXE_MEMAC_B
+   982 2687 91 80		        sta (zp_vbxe_base),y
+   983 2689 60			        rts
+   984
+   985 268A			demo_mem_put
+   986 268A A0 00		        ldy #0
+   987 268C 91 87		        sta (zp_tmp_ptr),y
+   988 268E 4C 91 26		        jmp demo_mem_advance
+   989
+   990 2691			demo_mem_advance
+   991 2691 E6 87		        inc zp_tmp_ptr
+   992 2693 D0 02		        bne demo_mem_advance_check
+   993 2695 E6 88		        inc zp_tmp_ptr+1
+   994 2697			demo_mem_advance_check
+   995 2697 A5 88		        lda zp_tmp_ptr+1
+   996 2699 C9 80		        cmp #$80
+   997 269B D0 12		        bne demo_mem_advance_done
+   998 269D A9 40		        lda #$40
+   999 269F 85 88		        sta zp_tmp_ptr+1
+  1000 26A1 EE 20 88		        inc demo_cursor_bank
+  1001 26A4 AD 20 88		        lda demo_cursor_bank
+  1002 26A7 09 80		        ora #$80
+  1003 26A9 85 AD		        sta zp_memb_shadow
+  1004 26AB A0 5D		        ldy #VBXE_MEMAC_B
+  1005 26AD 91 80		        sta (zp_vbxe_base),y
+  1006 26AF			demo_mem_advance_done
+  1007 26AF 60			        rts
   1008
-  1009 268E			hdr_ready
-  1010 268E A9 03		        lda #3
-  1011 2690 85 A1		        sta zp_fn_bytes_lo
-  1012 2692 A9 00		        lda #0
-  1013 2694 85 A2		        sta zp_fn_bytes_hi
-  1014 2696 20 25 2C		        jsr fn_read
-  1015 2699 AD 03 03		        lda DSTATS
-  1016 269C 8D 01 88		        sta debug_dstats
-  1017 269F 90 03		        bcc hdr_read_ok
-  1018 26A1 4C E0 26		        jmp hdr_err
-  1019
-  1020 26A4			hdr_read_ok
-  1021 26A4 AD 27 89		        lda rx_buffer
-  1022 26A7 8D 08 88		        sta img_width
-  1023 26AA AD 28 89		        lda rx_buffer+1
-  1024 26AD 8D 09 88		        sta img_width+1
-  1025 26B0 AD 29 89		        lda rx_buffer+2
-  1026 26B3 8D 0D 88		        sta img_height
-  1027
-  1028 26B6 AD 09 88		        lda img_width+1
-  1029 26B9 C9 02		        cmp #2
-  1030 26BB 90 0F		        bcc hdr_chk_lo
-  1031 26BD F0 03		        beq hdr_chk_hi
-  1032 26BF 4C E0 26		        jmp hdr_err
-  1033
-  1034 26C2			hdr_chk_hi
-  1035 26C2 AD 08 88		        lda img_width
-  1036 26C5 C9 41		        cmp #$41
-  1037 26C7 B0 17		        bcs hdr_err
-  1038 26C9 4C D3 26		        jmp hdr_chk_h
-  1039
-  1040 26CC			hdr_chk_lo
-  1041 26CC AD 08 88		        lda img_width
-  1042 26CF C9 08		        cmp #8
-  1043 26D1 90 0D		        bcc hdr_err
-  1044
-  1045 26D3			hdr_chk_h
-  1046 26D3 AD 0D 88		        lda img_height
-  1047 26D6 C9 08		        cmp #8
-  1048 26D8 90 06		        bcc hdr_err
-  1049 26DA C9 D1		        cmp #209
-  1050 26DC B0 02		        bcs hdr_err
-  1051 26DE 18			        clc
-  1052 26DF 60			        rts
-  1053 26E0			hdr_err
-  1054 26E0 38			        sec
-  1055 26E1 60			        rts
-  1056
-  1057 26E2			read_palette_stream
-  1058 26E2 A9 27		        lda #<img_pal_buf
-  1059 26E4 85 87		        sta zp_tmp_ptr
-  1060 26E6 A9 8A		        lda #>img_pal_buf
-  1061 26E8 85 88		        sta zp_tmp_ptr+1
-  1062 26EA A9 00		        lda #0
-  1063 26EC 8D 0A 88		        sta img_pal_count
-  1064 26EF 8D 0B 88		        sta img_pal_count+1
-  1065 26F2 8D 0C 88		        sta img_pal_leftover
-  1066 26F5 A9 F0		        lda #VIEW_TIMEOUT
-  1067 26F7 8D 06 88		        sta debug_timeout_ctr
-  1068
-  1069 26FA			pal_wait
-  1070 26FA 20 90 25		        jsr poll_status
-  1071 26FD 90 03		        bcc pal_status_ok
-  1072 26FF 4C 83 27		        jmp pal_err
-  1073
-  1074 2702			pal_status_ok
-  1075 2702 AD 02 88		        lda debug_fn_error
-  1076 2705 C9 88		        cmp #136
-  1077 2707 F0 7A		        beq pal_err
-  1078 2709 C9 80		        cmp #128
-  1079 270B B0 76		        bcs pal_err
-  1080 270D AD 04 88		        lda debug_bytes_lo
-  1081 2710 0D 05 88		        ora debug_bytes_hi
-  1082 2713 F0 0E		        beq pal_no_data
-  1083
-  1084 2715 20 25 2C		        jsr fn_read
-  1085 2718 AD 03 03		        lda DSTATS
-  1086 271B 8D 01 88		        sta debug_dstats
-  1087 271E 90 0E		        bcc pal_read_ok
-  1088 2720 4C 83 27		        jmp pal_err
-  1089
-  1090 2723			pal_no_data
-  1091 2723 CE 06 88		        dec debug_timeout_ctr
-  1092 2726 F0 5B		        beq pal_err
-  1093 2728 20 AE 25		        jsr wait_one_frame
-  1094 272B 4C FA 26		        jmp pal_wait
-  1095
-  1096 272E			pal_read_ok
-  1097 272E A5 A3		        lda zp_rx_len
-  1098 2730 F0 C8		        beq pal_wait
-  1099 2732 A9 F0		        lda #VIEW_TIMEOUT
-  1100 2734 8D 06 88		        sta debug_timeout_ctr
-  1101
-  1102 2737 A0 00		        ldy #0
-  1103 2739			pal_copy
-  1104 2739 C4 A3		        cpy zp_rx_len
-  1105 273B F0 24		        beq pal_check_done
-  1106 273D B9 27 89		        lda rx_buffer,y
-  1107 2740 84 8D		        sty zp_tmp3
-  1108 2742 A0 00		        ldy #0
-  1109 2744 91 87		        sta (zp_tmp_ptr),y
-  1110 2746 A4 8D		        ldy zp_tmp3
-  1111 2748 E6 87		        inc zp_tmp_ptr
-  1112 274A D0 02		        bne pal_ptr_ok
-  1113 274C E6 88		        inc zp_tmp_ptr+1
-  1114 274E			pal_ptr_ok
-  1115 274E EE 0A 88		        inc img_pal_count
-  1116 2751 D0 03		        bne pal_count_ok
-  1117 2753 EE 0B 88		        inc img_pal_count+1
-  1118 2756			pal_count_ok
-  1119 2756 AD 0B 88		        lda img_pal_count+1
-  1120 2759 C9 03		        cmp #3
-  1121 275B B0 07		        bcs pal_done
-  1122 275D C8			        iny
-  1123 275E 4C 39 27		        jmp pal_copy
-  1124
-  1125 2761			pal_check_done
-  1126 2761 4C FA 26		        jmp pal_wait
-  1127
-  1128 2764			pal_done
-  1129 2764 C8			        iny
-  1130 2765 C4 A3		        cpy zp_rx_len
-  1131 2767 B0 13		        bcs pal_no_left
-  1132 2769 A2 00		        ldx #0
-  1133 276B			pal_shift
-  1134 276B B9 27 89		        lda rx_buffer,y
-  1135 276E 9D 27 89		        sta rx_buffer,x
-  1136 2771 C8			        iny
-  1137 2772 E8			        inx
-  1138 2773 C4 A3		        cpy zp_rx_len
-  1139 2775 90 F4		        bcc pal_shift
-  1140 2777 8E 0C 88		        stx img_pal_leftover
-  1141 277A 18			        clc
-  1142 277B 60			        rts
-  1143
-  1144 277C			pal_no_left
-  1145 277C A9 00		        lda #0
-  1146 277E 8D 0C 88		        sta img_pal_leftover
-  1147 2781 18			        clc
-  1148 2782 60			        rts
-  1149 2783			pal_err
-  1150 2783 A9 00		        lda #0
-  1151 2785 8D 0C 88		        sta img_pal_leftover
-  1152 2788 38			        sec
-  1153 2789 60			        rts
-  1154
-  1155 278A			read_pixels_stream
-  1156 278A A9 F0		        lda #VIEW_TIMEOUT
-  1157 278C 8D 06 88		        sta debug_timeout_ctr
-  1158 278F			pix_wait
-  1159 278F 20 90 25		        jsr poll_status
-  1160 2792 90 03		        bcc pix_status_ok
-  1161 2794 4C DD 27		        jmp pix_err
-  1162
-  1163 2797			pix_status_ok
-  1164 2797 AD 02 88		        lda debug_fn_error
-  1165 279A 30 03		        bmi pix_status_fatal
-  1166 279C 4C A6 27		        jmp pix_check_data
-  1167
-  1168 279F			pix_status_fatal
-  1169 279F C9 88		        cmp #136
-  1170 27A1 F0 38		        beq pix_done
-  1171 27A3 4C DD 27		        jmp pix_err
-  1172
-  1173 27A6			pix_check_data
-  1174 27A6 AD 03 88		        lda debug_connected
-  1175 27A9 F0 30		        beq pix_done
-  1176 27AB AD 04 88		        lda debug_bytes_lo
-  1177 27AE 0D 05 88		        ora debug_bytes_hi
-  1178 27B1 D0 0B		        bne pix_read
-  1179 27B3 CE 06 88		        dec debug_timeout_ctr
-  1180 27B6 F0 23		        beq pix_done
-  1181 27B8 20 AE 25		        jsr wait_one_frame
-  1182 27BB 4C 8F 27		        jmp pix_wait
-  1183
-  1184 27BE			pix_read
-  1185 27BE 20 25 2C		        jsr fn_read
-  1186 27C1 AD 03 03		        lda DSTATS
-  1187 27C4 8D 01 88		        sta debug_dstats
-  1188 27C7 90 03		        bcc pix_read_ok
-  1189 27C9 4C DB 27		        jmp pix_done
-  1190
-  1191 27CC			pix_read_ok
-  1192 27CC A5 A3		        lda zp_rx_len
-  1193 27CE F0 BF		        beq pix_wait
-  1194 27D0 A9 F0		        lda #VIEW_TIMEOUT
-  1195 27D2 8D 06 88		        sta debug_timeout_ctr
-  1196 27D5 20 10 28		        jsr write_pixel_chunk
-  1197 27D8 4C 8F 27		        jmp pix_wait
-  1198
-  1199 27DB			pix_done
-  1200 27DB 18			        clc
-  1201 27DC 60			        rts
-  1202 27DD			pix_err
-  1203 27DD 38			        sec
-  1204 27DE 60			        rts
+  1009 26B0			copy_text_url_to_buffer
+  1010 26B0 A9 BB		        lda #<text_url_string
+  1011 26B2 85 87		        sta zp_tmp_ptr
+  1012 26B4 A9 2E		        lda #>text_url_string
+  1013 26B6 85 88		        sta zp_tmp_ptr+1
+  1014 26B8 4C DC 26		        jmp copy_string_to_buffer
+  1015
+  1016 26BB			copy_slide_url_to_buffer
+  1017 26BB AD 12 88		        lda slide_index
+  1018 26BE 4A			        lsr
+  1019 26BF 4A			        lsr
+  1020 26C0 4A			        lsr
+  1021 26C1 4A			        lsr
+  1022 26C2 20 15 2C		        jsr nibble_to_hex
+  1023 26C5 8D F2 2E		        sta slide_url_hex_hi
+  1024
+  1025 26C8 AD 12 88		        lda slide_index
+  1026 26CB 20 15 2C		        jsr nibble_to_hex
+  1027 26CE 8D F3 2E		        sta slide_url_hex_lo
+  1028
+  1029 26D1 A9 D4		        lda #<slide_url_string
+  1030 26D3 85 87		        sta zp_tmp_ptr
+  1031 26D5 A9 2E		        lda #>slide_url_string
+  1032 26D7 85 88		        sta zp_tmp_ptr+1
+  1033 26D9 4C DC 26		        jmp copy_string_to_buffer
+  1034
+  1035 26DC			copy_string_to_buffer
+  1036 26DC A9 00		        lda #0
+  1037 26DE A8			        tay
+  1038 26DF			copy_url_clear_loop
+  1039 26DF 99 32 88		        sta url_buffer,y
+  1040 26E2 C8			        iny
+  1041 26E3 D0 FA		        bne copy_url_clear_loop
+  1042
+  1043 26E5 A0 00		        ldy #0
+  1044 26E7			copy_url_copy_loop
+  1045 26E7 B1 87		        lda (zp_tmp_ptr),y
+  1046 26E9 99 32 88		        sta url_buffer,y
+  1047 26EC F0 03		        beq copy_url_done
+  1048 26EE C8			        iny
+  1049 26EF D0 F6		        bne copy_url_copy_loop
+  1050 26F1			copy_url_done
+  1051 26F1 60			        rts
+  1052
+  1053 26F2			fetch_text_payload
+  1054 26F2 A9 01		        lda #1
+  1055 26F4 8D 00 88		        sta debug_stage
+  1056 26F7 20 8A 2D		        jsr fn_open
+  1057 26FA AD 03 03		        lda DSTATS
+  1058 26FD 8D 01 88		        sta debug_dstats
+  1059 2700 90 03		        bcc text_open_ok
+  1060 2702 4C 7B 27		        jmp text_fail
+  1061
+  1062 2705			text_open_ok
+  1063 2705 A9 F0		        lda #VIEW_TIMEOUT
+  1064 2707 8D 06 88		        sta debug_timeout_ctr
+  1065
+  1066 270A			text_wait
+  1067 270A A9 02		        lda #2
+  1068 270C 8D 00 88		        sta debug_stage
+  1069 270F 20 7D 27		        jsr poll_status
+  1070 2712 90 03		        bcc text_status_ok
+  1071 2714 4C 78 27		        jmp text_fail_close
+  1072
+  1073 2717			text_status_ok
+  1074 2717 AD 02 88		        lda debug_fn_error
+  1075 271A 30 03		        bmi text_status_fatal
+  1076 271C 4C 26 27		        jmp text_check_bytes
+  1077
+  1078 271F			text_status_fatal
+  1079 271F C9 88		        cmp #136
+  1080 2721 F0 55		        beq text_fail_close
+  1081 2723 4C 78 27		        jmp text_fail_close
+  1082
+  1083 2726			text_check_bytes
+  1084 2726 AD 05 88		        lda debug_bytes_hi
+  1085 2729 D0 15		        bne text_read
+  1086 272B AD 04 88		        lda debug_bytes_lo
+  1087 272E D0 10		        bne text_read
+  1088 2730 AD 03 88		        lda debug_connected
+  1089 2733 F0 43		        beq text_fail_close
+  1090 2735 CE 06 88		        dec debug_timeout_ctr
+  1091 2738 F0 3E		        beq text_fail_close
+  1092 273A 20 9B 27		        jsr wait_one_frame
+  1093 273D 4C 0A 27		        jmp text_wait
+  1094
+  1095 2740			text_read
+  1096 2740 A9 03		        lda #3
+  1097 2742 8D 00 88		        sta debug_stage
+  1098 2745 AD 05 88		        lda debug_bytes_hi
+  1099 2748 F0 04		        beq text_read_lo
+  1100 274A A9 60		        lda #READ_LIMIT
+  1101 274C D0 09		        bne text_read_set
+  1102
+  1103 274E			text_read_lo
+  1104 274E AD 04 88		        lda debug_bytes_lo
+  1105 2751 C9 60		        cmp #READ_LIMIT
+  1106 2753 90 02		        bcc text_read_set
+  1107 2755 A9 60		        lda #READ_LIMIT
+  1108
+  1109 2757			text_read_set
+  1110 2757 85 A1		        sta zp_fn_bytes_lo
+  1111 2759 A9 00		        lda #0
+  1112 275B 85 A2		        sta zp_fn_bytes_hi
+  1113 275D 20 22 2E		        jsr fn_read
+  1114 2760 AD 03 03		        lda DSTATS
+  1115 2763 8D 01 88		        sta debug_dstats
+  1116 2766 90 03		        bcc text_read_ok
+  1117 2768 4C 78 27		        jmp text_fail_close
+  1118
+  1119 276B			text_read_ok
+  1120 276B A5 A3		        lda zp_rx_len
+  1121 276D 8D 07 88		        sta debug_rx_len
+  1122 2770 20 A2 27		        jsr sanitize_rx_buffer
+  1123 2773 20 8A 2E		        jsr fn_close
+  1124 2776 18			        clc
+  1125 2777 60			        rts
+  1126
+  1127 2778			text_fail_close
+  1128 2778 20 8A 2E		        jsr fn_close
+  1129 277B			text_fail
+  1130 277B 38			        sec
+  1131 277C 60			        rts
+  1132
+  1133 277D			poll_status
+  1134 277D 20 CE 2D		        jsr fn_status
+  1135 2780 AD 03 03		        lda DSTATS
+  1136 2783 8D 01 88		        sta debug_dstats
+  1137 2786 A5 A0		        lda zp_fn_error
+  1138 2788 8D 02 88		        sta debug_fn_error
+  1139 278B A5 9F		        lda zp_fn_connected
+  1140 278D 8D 03 88		        sta debug_connected
+  1141 2790 A5 A1		        lda zp_fn_bytes_lo
+  1142 2792 8D 04 88		        sta debug_bytes_lo
+  1143 2795 A5 A2		        lda zp_fn_bytes_hi
+  1144 2797 8D 05 88		        sta debug_bytes_hi
+  1145 279A 60			        rts
+  1146
+  1147 279B			wait_one_frame
+  1148 279B A5 14		        lda RTCLOK+2
+  1149 279D			wait_one_frame_loop
+  1150 279D C5 14		        cmp RTCLOK+2
+  1151 279F F0 FC		        beq wait_one_frame_loop
+  1152 27A1 60			        rts
+  1153
+  1154 27A2			sanitize_rx_buffer
+  1155 27A2 A2 00		        ldx #0
+  1156 27A4			sanitize_loop
+  1157 27A4 E4 A3		        cpx zp_rx_len
+  1158 27A6 F0 23		        beq sanitize_done
+  1159 27A8 BD 32 89		        lda rx_buffer,x
+  1160 27AB C9 0D		        cmp #13
+  1161 27AD F0 0F		        beq sanitize_nl
+  1162 27AF C9 0A		        cmp #10
+  1163 27B1 F0 0B		        beq sanitize_nl
+  1164 27B3 C9 20		        cmp #32
+  1165 27B5 90 0B		        bcc sanitize_dot
+  1166 27B7 C9 7F		        cmp #127
+  1167 27B9 B0 07		        bcs sanitize_dot
+  1168 27BB 4C C7 27		        jmp sanitize_next
+  1169
+  1170 27BE			sanitize_nl
+  1171 27BE A9 9B		        lda #ATASCII_RET
+  1172 27C0 D0 02		        bne sanitize_store
+  1173
+  1174 27C2			sanitize_dot
+  1175 27C2 A9 2E		        lda #'.'
+  1176
+  1177 27C4			sanitize_store
+  1178 27C4 9D 32 89		        sta rx_buffer,x
+  1179
+  1180 27C7			sanitize_next
+  1181 27C7 E8			        inx
+  1182 27C8 4C A4 27		        jmp sanitize_loop
+  1183 27CB			sanitize_done
+  1184 27CB 60			        rts
+  1185
+  1186 27CC			fetch_room_image
+  1187 27CC A9 12		        lda #$12
+  1188 27CE 8D 00 88		        sta debug_stage
+  1189 27D1 20 8A 2D		        jsr fn_open
+  1190 27D4 AD 03 03		        lda DSTATS
+  1191 27D7 8D 01 88		        sta debug_dstats
+  1192 27DA 90 03		        bcc fetch_open_ok
+  1193 27DC 4C 2A 28		        jmp fetch_fail
+  1194
+  1195 27DF			fetch_open_ok
+  1196 27DF A9 13		        lda #$13
+  1197 27E1 8D 00 88		        sta debug_stage
+  1198 27E4 20 2C 28		        jsr read_header_chunk
+  1199 27E7 90 03		        bcc fetch_header_ok
+  1200 27E9 4C 27 28		        jmp fetch_fail_close
+  1201
+  1202 27EC			fetch_header_ok
+  1203 27EC AD 0D 88		        lda img_height
+  1204 27EF 8D 07 88		        sta debug_rx_len
   1205
-  1206 27DF			init_image_write
-  1207 27DF A9 00		        lda #<VRAM_IMG_BASE
-  1208 27E1 8D 0E 88		        sta img_vram
-  1209 27E4 A9 80		        lda #>VRAM_IMG_BASE
-  1210 27E6 8D 0F 88		        sta img_vram+1
-  1211 27E9 A9 00		        lda #0
-  1212 27EB 8D 10 88		        sta img_vram+2
-  1213
-  1214 27EE AD 10 88		        lda img_vram+2
-  1215 27F1 0A			        asl
-  1216 27F2 0A			        asl
-  1217 27F3 8D 11 88		        sta img_wr_bank
-  1218 27F6 AD 0F 88		        lda img_vram+1
-  1219 27F9 0A			        asl
-  1220 27FA 2E 11 88		        rol img_wr_bank
-  1221 27FD 0A			        asl
-  1222 27FE 2E 11 88		        rol img_wr_bank
+  1206 27F2 A9 14		        lda #$14
+  1207 27F4 8D 00 88		        sta debug_stage
+  1208 27F7 20 CF 28		        jsr read_palette_stream
+  1209 27FA 90 03		        bcc fetch_palette_ok
+  1210 27FC 4C 27 28		        jmp fetch_fail_close
+  1211
+  1212 27FF			fetch_palette_ok
+  1213 27FF 20 CC 29		        jsr init_image_write
+  1214 2802 AD 0C 88		        lda img_pal_leftover
+  1215 2805 85 A3		        sta zp_rx_len
+  1216 2807 20 FD 29		        jsr write_pixel_chunk
+  1217
+  1218 280A A9 15		        lda #$15
+  1219 280C 8D 00 88		        sta debug_stage
+  1220 280F 20 77 29		        jsr read_pixels_stream
+  1221 2812 90 03		        bcc fetch_pixels_ok
+  1222 2814 4C 27 28		        jmp fetch_fail_close
   1223
-  1224 2801 AD 0E 88		        lda img_vram
-  1225 2804 85 AB		        sta zp_img_ptr
-  1226 2806 AD 0F 88		        lda img_vram+1
-  1227 2809 29 3F		        and #$3F
-  1228 280B 09 40		        ora #$40
-  1229 280D 85 AC		        sta zp_img_ptr+1
-  1230 280F 60			        rts
-  1231
-  1232 2810			write_pixel_chunk
-  1233 2810 A5 A3		        lda zp_rx_len
-  1234 2812 F0 41		        beq write_done
-  1235
-  1236 2814 78			        sei
-  1237 2815 AD 11 88		        lda img_wr_bank
-  1238 2818 09 80		        ora #$80
-  1239 281A 85 AD		        sta zp_memb_shadow
-  1240 281C A0 5D		        ldy #VBXE_MEMAC_B
-  1241 281E 91 80		        sta (zp_vbxe_base),y
-  1242
-  1243 2820 A2 00		        ldx #0
-  1244 2822			write_loop
-  1245 2822 A0 00		        ldy #0
-  1246 2824 BD 27 89		        lda rx_buffer,x
-  1247 2827 91 AB		        sta (zp_img_ptr),y
-  1248 2829 E6 AB		        inc zp_img_ptr
-  1249 282B D0 1A		        bne write_next
-  1250 282D E6 AC		        inc zp_img_ptr+1
-  1251 282F A5 AC		        lda zp_img_ptr+1
-  1252 2831 C9 80		        cmp #$80
-  1253 2833 D0 12		        bne write_next
-  1254 2835 A9 40		        lda #$40
-  1255 2837 85 AC		        sta zp_img_ptr+1
-  1256 2839 EE 11 88		        inc img_wr_bank
-  1257 283C AD 11 88		        lda img_wr_bank
-  1258 283F 09 80		        ora #$80
-  1259 2841 85 AD		        sta zp_memb_shadow
-  1260 2843 A0 5D		        ldy #VBXE_MEMAC_B
-  1261 2845 91 80		        sta (zp_vbxe_base),y
-  1262
-  1263 2847			write_next
-  1264 2847 E8			        inx
-  1265 2848 E4 A3		        cpx zp_rx_len
-  1266 284A D0 D6		        bne write_loop
-  1267 284C			        memb_off
-Macro: MEMB_OFF [Source: vbxe_const.asm]
-     1 284C A9 00		        lda #0
-     2 284E 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
-     3 2850 A0 5D		        ldy #VBXE_MEMAC_B
-     4 2852 91 80		        sta (zp_vbxe_base),y
-Source: client.asm
-  1268 2854 58			        cli
-  1269 2855			write_done
-  1270 2855 60			        rts
-  1271
-  1272 2856			generate_demo_image
-  1273 2856 AD 14 88		        lda demo_phase
-  1274 2859 18			        clc
-  1275 285A 69 11		        adc #$11
-  1276 285C 8D 14 88		        sta demo_phase
-  1277
-  1278 285F A9 C8		        lda #DEMO_HEIGHT
-  1279 2861 8D 0D 88		        sta img_height
-  1280 2864 20 DF 27		        jsr init_image_write
-  1281 2867 20 43 24		        jsr demo_build_row_table
-  1282 286A 20 A2 28		        jsr build_demo_palette
-  1283
-  1284 286D A9 00		        lda #0
-  1285 286F 8D 15 88		        sta demo_row
-  1286 2872			demo_row_loop
-  1287 2872 A9 00		        lda #0
-  1288 2874 8D 16 88		        sta demo_x_base
-  1289 2877 A9 A0		        lda #160
-  1290 2879 8D 17 88		        sta demo_chunk_len
-  1291 287C 20 CD 28		        jsr fill_demo_chunk
-  1292
-  1293 287F A9 A0		        lda #160
-  1294 2881 8D 16 88		        sta demo_x_base
-  1295 2884 A9 A0		        lda #160
-  1296 2886 8D 17 88		        sta demo_chunk_len
-  1297 2889 20 CD 28		        jsr fill_demo_chunk
-  1298
-  1299 288C EE 15 88		        inc demo_row
-  1300 288F AD 15 88		        lda demo_row
-  1301 2892 C9 C8		        cmp #DEMO_HEIGHT
-  1302 2894 D0 DC		        bne demo_row_loop
-  1303
-  1304 2896 A9 27		        lda #<img_pal_buf
-  1305 2898 85 87		        sta zp_tmp_ptr
-  1306 289A A9 8A		        lda #>img_pal_buf
-  1307 289C 85 88		        sta zp_tmp_ptr+1
-  1308 289E 20 EB 28		        jsr set_image_palette
-  1309 28A1 60			        rts
-  1310
-  1311 28A2			build_demo_palette
-  1312 28A2 A9 27		        lda #<img_pal_buf
-  1313 28A4 85 87		        sta zp_tmp_ptr
-  1314 28A6 A9 8A		        lda #>img_pal_buf
-  1315 28A8 85 88		        sta zp_tmp_ptr+1
-  1316 28AA A2 00		        ldx #0
-  1317 28AC			demo_pal_loop
-  1318 28AC 8A			        txa
-  1319 28AD A0 00		        ldy #0
-  1320 28AF 91 87		        sta (zp_tmp_ptr),y
-  1321 28B1 8A			        txa
-  1322 28B2 0A			        asl
-  1323 28B3 A0 01		        ldy #1
-  1324 28B5 91 87		        sta (zp_tmp_ptr),y
-  1325 28B7 8A			        txa
-  1326 28B8 49 FF		        eor #$FF
-  1327 28BA A0 02		        ldy #2
-  1328 28BC 91 87		        sta (zp_tmp_ptr),y
-  1329 28BE 18			        clc
-  1330 28BF A5 87		        lda zp_tmp_ptr
-  1331 28C1 69 03		        adc #3
-  1332 28C3 85 87		        sta zp_tmp_ptr
-  1333 28C5 90 02		        bcc demo_pal_next
-  1334 28C7 E6 88		        inc zp_tmp_ptr+1
-  1335 28C9			demo_pal_next
-  1336 28C9 E8			        inx
-  1337 28CA D0 E0		        bne demo_pal_loop
-  1338 28CC 60			        rts
-  1339
-  1340 28CD			fill_demo_chunk
-  1341 28CD A2 00		        ldx #0
-  1342 28CF			demo_fill_loop
-  1343 28CF 8A			        txa
-  1344 28D0 18			        clc
-  1345 28D1 6D 16 88		        adc demo_x_base
-  1346 28D4 4D 15 88		        eor demo_row
-  1347 28D7 18			        clc
-  1348 28D8 6D 14 88		        adc demo_phase
-  1349 28DB 09 08		        ora #8
-  1350 28DD 9D 27 89		        sta rx_buffer,x
-  1351 28E0 E8			        inx
-  1352 28E1 EC 17 88		        cpx demo_chunk_len
-  1353 28E4 D0 E9		        bne demo_fill_loop
-  1354 28E6 86 A3		        stx zp_rx_len
-  1355 28E8 4C 10 28		        jmp write_pixel_chunk
-  1356
-  1357 28EB			set_image_palette
-  1358 28EB A0 45		        ldy #VBXE_PSEL
-  1359 28ED A9 01		        lda #1
-  1360 28EF 91 80		        sta (zp_vbxe_base),y
+  1224 2817			fetch_pixels_ok
+  1225 2817 20 8A 2E		        jsr fn_close
+  1226 281A A9 32		        lda #<img_pal_buf
+  1227 281C 85 87		        sta zp_tmp_ptr
+  1228 281E A9 8A		        lda #>img_pal_buf
+  1229 2820 85 88		        sta zp_tmp_ptr+1
+  1230 2822 20 D8 2A		        jsr set_image_palette
+  1231 2825 18			        clc
+  1232 2826 60			        rts
+  1233
+  1234 2827			fetch_fail_close
+  1235 2827 20 8A 2E		        jsr fn_close
+  1236 282A			fetch_fail
+  1237 282A 38			        sec
+  1238 282B 60			        rts
+  1239
+  1240 282C			read_header_chunk
+  1241 282C A9 F0		        lda #VIEW_TIMEOUT
+  1242 282E 8D 06 88		        sta debug_timeout_ctr
+  1243
+  1244 2831 A9 03		        lda #3
+  1245 2833 85 A1		        sta zp_fn_bytes_lo
+  1246 2835 8D 04 88		        sta debug_bytes_lo
+  1247 2838 A9 00		        lda #0
+  1248 283A 85 A2		        sta zp_fn_bytes_hi
+  1249 283C 8D 05 88		        sta debug_bytes_hi
+  1250 283F 20 22 2E		        jsr fn_read
+  1251 2842 AD 03 03		        lda DSTATS
+  1252 2845 8D 01 88		        sta debug_dstats
+  1253 2848 90 47		        bcc hdr_read_ok
+  1254
+  1255 284A			hdr_wait
+  1256 284A 20 7D 27		        jsr poll_status
+  1257 284D 90 03		        bcc hdr_status_ok
+  1258 284F 4C CD 28		        jmp hdr_err
+  1259
+  1260 2852			hdr_status_ok
+  1261 2852 AD 02 88		        lda debug_fn_error
+  1262 2855 F0 08		        beq hdr_check_bytes
+  1263 2857 C9 88		        cmp #136
+  1264 2859 F0 72		        beq hdr_err
+  1265 285B C9 80		        cmp #128
+  1266 285D B0 6E		        bcs hdr_err
+  1267
+  1268 285F			hdr_check_bytes
+  1269 285F AD 05 88		        lda debug_bytes_hi
+  1270 2862 D0 17		        bne hdr_ready
+  1271 2864 AD 04 88		        lda debug_bytes_lo
+  1272 2867 C9 03		        cmp #3
+  1273 2869 B0 10		        bcs hdr_ready
+  1274 286B AD 03 88		        lda debug_connected
+  1275 286E F0 5D		        beq hdr_err
+  1276 2870 CE 06 88		        dec debug_timeout_ctr
+  1277 2873 F0 58		        beq hdr_err
+  1278 2875 20 9B 27		        jsr wait_one_frame
+  1279 2878 4C 4A 28		        jmp hdr_wait
+  1280
+  1281 287B			hdr_ready
+  1282 287B A9 03		        lda #3
+  1283 287D 85 A1		        sta zp_fn_bytes_lo
+  1284 287F A9 00		        lda #0
+  1285 2881 85 A2		        sta zp_fn_bytes_hi
+  1286 2883 20 22 2E		        jsr fn_read
+  1287 2886 AD 03 03		        lda DSTATS
+  1288 2889 8D 01 88		        sta debug_dstats
+  1289 288C 90 03		        bcc hdr_read_ok
+  1290 288E 4C CD 28		        jmp hdr_err
+  1291
+  1292 2891			hdr_read_ok
+  1293 2891 AD 32 89		        lda rx_buffer
+  1294 2894 8D 08 88		        sta img_width
+  1295 2897 AD 33 89		        lda rx_buffer+1
+  1296 289A 8D 09 88		        sta img_width+1
+  1297 289D AD 34 89		        lda rx_buffer+2
+  1298 28A0 8D 0D 88		        sta img_height
+  1299
+  1300 28A3 AD 09 88		        lda img_width+1
+  1301 28A6 C9 02		        cmp #2
+  1302 28A8 90 0F		        bcc hdr_chk_lo
+  1303 28AA F0 03		        beq hdr_chk_hi
+  1304 28AC 4C CD 28		        jmp hdr_err
+  1305
+  1306 28AF			hdr_chk_hi
+  1307 28AF AD 08 88		        lda img_width
+  1308 28B2 C9 41		        cmp #$41
+  1309 28B4 B0 17		        bcs hdr_err
+  1310 28B6 4C C0 28		        jmp hdr_chk_h
+  1311
+  1312 28B9			hdr_chk_lo
+  1313 28B9 AD 08 88		        lda img_width
+  1314 28BC C9 08		        cmp #8
+  1315 28BE 90 0D		        bcc hdr_err
+  1316
+  1317 28C0			hdr_chk_h
+  1318 28C0 AD 0D 88		        lda img_height
+  1319 28C3 C9 08		        cmp #8
+  1320 28C5 90 06		        bcc hdr_err
+  1321 28C7 C9 D1		        cmp #209
+  1322 28C9 B0 02		        bcs hdr_err
+  1323 28CB 18			        clc
+  1324 28CC 60			        rts
+  1325 28CD			hdr_err
+  1326 28CD 38			        sec
+  1327 28CE 60			        rts
+  1328
+  1329 28CF			read_palette_stream
+  1330 28CF A9 32		        lda #<img_pal_buf
+  1331 28D1 85 87		        sta zp_tmp_ptr
+  1332 28D3 A9 8A		        lda #>img_pal_buf
+  1333 28D5 85 88		        sta zp_tmp_ptr+1
+  1334 28D7 A9 00		        lda #0
+  1335 28D9 8D 0A 88		        sta img_pal_count
+  1336 28DC 8D 0B 88		        sta img_pal_count+1
+  1337 28DF 8D 0C 88		        sta img_pal_leftover
+  1338 28E2 A9 F0		        lda #VIEW_TIMEOUT
+  1339 28E4 8D 06 88		        sta debug_timeout_ctr
+  1340
+  1341 28E7			pal_wait
+  1342 28E7 20 7D 27		        jsr poll_status
+  1343 28EA 90 03		        bcc pal_status_ok
+  1344 28EC 4C 70 29		        jmp pal_err
+  1345
+  1346 28EF			pal_status_ok
+  1347 28EF AD 02 88		        lda debug_fn_error
+  1348 28F2 C9 88		        cmp #136
+  1349 28F4 F0 7A		        beq pal_err
+  1350 28F6 C9 80		        cmp #128
+  1351 28F8 B0 76		        bcs pal_err
+  1352 28FA AD 04 88		        lda debug_bytes_lo
+  1353 28FD 0D 05 88		        ora debug_bytes_hi
+  1354 2900 F0 0E		        beq pal_no_data
+  1355
+  1356 2902 20 22 2E		        jsr fn_read
+  1357 2905 AD 03 03		        lda DSTATS
+  1358 2908 8D 01 88		        sta debug_dstats
+  1359 290B 90 0E		        bcc pal_read_ok
+  1360 290D 4C 70 29		        jmp pal_err
   1361
-  1362 28F1 A0 44		        ldy #VBXE_CSEL
-  1363 28F3 A9 08		        lda #8
-  1364 28F5 91 80		        sta (zp_vbxe_base),y
-  1365
-  1366 28F7 18			        clc
-  1367 28F8 A5 87		        lda zp_tmp_ptr
-  1368 28FA 69 18		        adc #24
-  1369 28FC 85 87		        sta zp_tmp_ptr
-  1370 28FE 90 02		        bcc pal_skip_ok
-  1371 2900 E6 88		        inc zp_tmp_ptr+1
-  1372 2902			pal_skip_ok
-  1373 2902 A2 08		        ldx #8
-  1374 2904			setpal_loop
-  1375 2904 A0 00		        ldy #0
-  1376 2906 B1 87		        lda (zp_tmp_ptr),y
-  1377 2908 A0 46		        ldy #VBXE_CR
-  1378 290A 91 80		        sta (zp_vbxe_base),y
-  1379 290C A0 01		        ldy #1
-  1380 290E B1 87		        lda (zp_tmp_ptr),y
-  1381 2910 A0 47		        ldy #VBXE_CG
-  1382 2912 91 80		        sta (zp_vbxe_base),y
-  1383 2914 A0 02		        ldy #2
-  1384 2916 B1 87		        lda (zp_tmp_ptr),y
-  1385 2918 A0 48		        ldy #VBXE_CB
-  1386 291A 91 80		        sta (zp_vbxe_base),y
-  1387 291C 18			        clc
-  1388 291D A5 87		        lda zp_tmp_ptr
-  1389 291F 69 03		        adc #3
-  1390 2921 85 87		        sta zp_tmp_ptr
-  1391 2923 90 02		        bcc setpal_next
-  1392 2925 E6 88		        inc zp_tmp_ptr+1
-  1393 2927			setpal_next
-  1394 2927 E8			        inx
-  1395 2928 D0 DA		        bne setpal_loop
-  1396 292A 60			        rts
-  1397
-  1398 292B			detect_vbxe
-  1399 292B A9 00		        lda #<$D600
-  1400 292D 85 80		        sta zp_vbxe_base
-  1401 292F A9 D6		        lda #>$D600
-  1402 2931 85 81		        sta zp_vbxe_base+1
-  1403 2933 A0 40		        ldy #VBXE_CORE_VER
-  1404 2935 A9 00		        lda #0
-  1405 2937 91 80		        sta (zp_vbxe_base),y
-  1406 2939 B1 80		        lda (zp_vbxe_base),y
-  1407 293B C9 10		        cmp #FX_CORE_VER
-  1408 293D F0 16		        beq dv_ok
-  1409
-  1410 293F A9 00		        lda #<$D700
-  1411 2941 85 80		        sta zp_vbxe_base
-  1412 2943 A9 D7		        lda #>$D700
-  1413 2945 85 81		        sta zp_vbxe_base+1
-  1414 2947 A0 40		        ldy #VBXE_CORE_VER
-  1415 2949 A9 00		        lda #0
-  1416 294B 91 80		        sta (zp_vbxe_base),y
-  1417 294D B1 80		        lda (zp_vbxe_base),y
-  1418 294F C9 10		        cmp #FX_CORE_VER
-  1419 2951 F0 02		        beq dv_ok
-  1420 2953 18			        clc
-  1421 2954 60			        rts
-  1422 2955			dv_ok
-  1423 2955 38			        sec
-  1424 2956 60			        rts
-  1425
-  1426 2957			show_fullscreen
-  1427 2957			        memb_on 0
-Macro: MEMB_ON [Source: vbxe_const.asm]
-     1 2957 A9 80		        lda #$80+0
-     2 2959 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
-     3 295B A0 5D		        ldy #VBXE_MEMAC_B
-     4 295D 91 80		        sta (zp_vbxe_base),y
-Source: client.asm
-  1428 295F A2 00		        ldx #0
-  1429
-  1430 2961 A9 74		        lda #<(XDLC_OVOFF|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT)
-  1431 2963 9D 00 54		        sta MEMB_XDL,x
-  1432 2966 E8			        inx
-  1433 2967 A9 09		        lda #>(XDLC_OVOFF|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT)
-  1434 2969 9D 00 54		        sta MEMB_XDL,x
-  1435 296C E8			        inx
-  1436 296D A9 17		        lda #24-1
-  1437 296F 9D 00 54		        sta MEMB_XDL,x
-  1438 2972 E8			        inx
-  1439 2973 A9 00		        lda #<VRAM_SCREEN
-  1440 2975 9D 00 54		        sta MEMB_XDL,x
-  1441 2978 E8			        inx
-  1442 2979 A9 00		        lda #>VRAM_SCREEN
-  1443 297B 9D 00 54		        sta MEMB_XDL,x
-  1444 297E E8			        inx
-  1445 297F A9 00		        lda #0
-  1446 2981 9D 00 54		        sta MEMB_XDL,x
-  1447 2984 E8			        inx
-  1448 2985 A9 A0		        lda #<SCR_STRIDE
-  1449 2987 9D 00 54		        sta MEMB_XDL,x
-  1450 298A E8			        inx
-  1451 298B A9 00		        lda #>SCR_STRIDE
-  1452 298D 9D 00 54		        sta MEMB_XDL,x
-  1453 2990 E8			        inx
-  1454 2991 A9 04		        lda #CHBASE_VAL
-  1455 2993 9D 00 54		        sta MEMB_XDL,x
-  1456 2996 E8			        inx
-  1457 2997 A9 11		        lda #$11
-  1458 2999 9D 00 54		        sta MEMB_XDL,x
-  1459 299C E8			        inx
-  1460 299D A9 FF		        lda #$FF
-  1461 299F 9D 00 54		        sta MEMB_XDL,x
-  1462 29A2 E8			        inx
-  1463
-  1464 29A3 A9 72		        lda #<(XDLC_GMON|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_OVATT)
-  1465 29A5 9D 00 54		        sta MEMB_XDL,x
-  1466 29A8 E8			        inx
-  1467 29A9 A9 08		        lda #>(XDLC_GMON|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_OVATT)
-  1468 29AB 9D 00 54		        sta MEMB_XDL,x
-  1469 29AE E8			        inx
-  1470 29AF AD 0D 88		        lda img_height
-  1471 29B2 38			        sec
-  1472 29B3 E9 01		        sbc #1
-  1473 29B5 9D 00 54		        sta MEMB_XDL,x
-  1474 29B8 E8			        inx
-  1475 29B9 AD 0E 88		        lda img_vram
-  1476 29BC 9D 00 54		        sta MEMB_XDL,x
-  1477 29BF E8			        inx
-  1478 29C0 AD 0F 88		        lda img_vram+1
-  1479 29C3 9D 00 54		        sta MEMB_XDL,x
-  1480 29C6 E8			        inx
-  1481 29C7 AD 10 88		        lda img_vram+2
-  1482 29CA 9D 00 54		        sta MEMB_XDL,x
-  1483 29CD E8			        inx
-  1484 29CE A9 40		        lda #<320
-  1485 29D0 9D 00 54		        sta MEMB_XDL,x
-  1486 29D3 E8			        inx
-  1487 29D4 A9 01		        lda #>320
-  1488 29D6 9D 00 54		        sta MEMB_XDL,x
-  1489 29D9 E8			        inx
-  1490 29DA A9 11		        lda #$11
-  1491 29DC 9D 00 54		        sta MEMB_XDL,x
-  1492 29DF E8			        inx
-  1493 29E0 A9 FF		        lda #$FF
-  1494 29E2 9D 00 54		        sta MEMB_XDL,x
-  1495 29E5 E8			        inx
-  1496
-  1497 29E6 A9 04		        lda #<(XDLC_OVOFF|XDLC_END)
-  1498 29E8 9D 00 54		        sta MEMB_XDL,x
-  1499 29EB E8			        inx
-  1500 29EC A9 80		        lda #>(XDLC_OVOFF|XDLC_END)
-  1501 29EE 9D 00 54		        sta MEMB_XDL,x
-  1502
-  1503 29F1			        memb_off
-Macro: MEMB_OFF [Source: vbxe_const.asm]
-     1 29F1 A9 00		        lda #0
-     2 29F3 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
-     3 29F5 A0 5D		        ldy #VBXE_MEMAC_B
-     4 29F7 91 80		        sta (zp_vbxe_base),y
-Source: client.asm
-  1504
-  1505 29F9 A0 41		        ldy #VBXE_XDL_ADR0
-  1506 29FB A9 00		        lda #<VRAM_XDL
-  1507 29FD 91 80		        sta (zp_vbxe_base),y
-  1508 29FF C8			        iny
-  1509 2A00 A9 14		        lda #>VRAM_XDL
-  1510 2A02 91 80		        sta (zp_vbxe_base),y
-  1511 2A04 C8			        iny
-  1512 2A05 A9 00		        lda #0
-  1513 2A07 91 80		        sta (zp_vbxe_base),y
+  1362 2910			pal_no_data
+  1363 2910 CE 06 88		        dec debug_timeout_ctr
+  1364 2913 F0 5B		        beq pal_err
+  1365 2915 20 9B 27		        jsr wait_one_frame
+  1366 2918 4C E7 28		        jmp pal_wait
+  1367
+  1368 291B			pal_read_ok
+  1369 291B A5 A3		        lda zp_rx_len
+  1370 291D F0 C8		        beq pal_wait
+  1371 291F A9 F0		        lda #VIEW_TIMEOUT
+  1372 2921 8D 06 88		        sta debug_timeout_ctr
+  1373
+  1374 2924 A0 00		        ldy #0
+  1375 2926			pal_copy
+  1376 2926 C4 A3		        cpy zp_rx_len
+  1377 2928 F0 24		        beq pal_check_done
+  1378 292A B9 32 89		        lda rx_buffer,y
+  1379 292D 84 8D		        sty zp_tmp3
+  1380 292F A0 00		        ldy #0
+  1381 2931 91 87		        sta (zp_tmp_ptr),y
+  1382 2933 A4 8D		        ldy zp_tmp3
+  1383 2935 E6 87		        inc zp_tmp_ptr
+  1384 2937 D0 02		        bne pal_ptr_ok
+  1385 2939 E6 88		        inc zp_tmp_ptr+1
+  1386 293B			pal_ptr_ok
+  1387 293B EE 0A 88		        inc img_pal_count
+  1388 293E D0 03		        bne pal_count_ok
+  1389 2940 EE 0B 88		        inc img_pal_count+1
+  1390 2943			pal_count_ok
+  1391 2943 AD 0B 88		        lda img_pal_count+1
+  1392 2946 C9 03		        cmp #3
+  1393 2948 B0 07		        bcs pal_done
+  1394 294A C8			        iny
+  1395 294B 4C 26 29		        jmp pal_copy
+  1396
+  1397 294E			pal_check_done
+  1398 294E 4C E7 28		        jmp pal_wait
+  1399
+  1400 2951			pal_done
+  1401 2951 C8			        iny
+  1402 2952 C4 A3		        cpy zp_rx_len
+  1403 2954 B0 13		        bcs pal_no_left
+  1404 2956 A2 00		        ldx #0
+  1405 2958			pal_shift
+  1406 2958 B9 32 89		        lda rx_buffer,y
+  1407 295B 9D 32 89		        sta rx_buffer,x
+  1408 295E C8			        iny
+  1409 295F E8			        inx
+  1410 2960 C4 A3		        cpy zp_rx_len
+  1411 2962 90 F4		        bcc pal_shift
+  1412 2964 8E 0C 88		        stx img_pal_leftover
+  1413 2967 18			        clc
+  1414 2968 60			        rts
+  1415
+  1416 2969			pal_no_left
+  1417 2969 A9 00		        lda #0
+  1418 296B 8D 0C 88		        sta img_pal_leftover
+  1419 296E 18			        clc
+  1420 296F 60			        rts
+  1421 2970			pal_err
+  1422 2970 A9 00		        lda #0
+  1423 2972 8D 0C 88		        sta img_pal_leftover
+  1424 2975 38			        sec
+  1425 2976 60			        rts
+  1426
+  1427 2977			read_pixels_stream
+  1428 2977 A9 F0		        lda #VIEW_TIMEOUT
+  1429 2979 8D 06 88		        sta debug_timeout_ctr
+  1430 297C			pix_wait
+  1431 297C 20 7D 27		        jsr poll_status
+  1432 297F 90 03		        bcc pix_status_ok
+  1433 2981 4C CA 29		        jmp pix_err
+  1434
+  1435 2984			pix_status_ok
+  1436 2984 AD 02 88		        lda debug_fn_error
+  1437 2987 30 03		        bmi pix_status_fatal
+  1438 2989 4C 93 29		        jmp pix_check_data
+  1439
+  1440 298C			pix_status_fatal
+  1441 298C C9 88		        cmp #136
+  1442 298E F0 38		        beq pix_done
+  1443 2990 4C CA 29		        jmp pix_err
+  1444
+  1445 2993			pix_check_data
+  1446 2993 AD 03 88		        lda debug_connected
+  1447 2996 F0 30		        beq pix_done
+  1448 2998 AD 04 88		        lda debug_bytes_lo
+  1449 299B 0D 05 88		        ora debug_bytes_hi
+  1450 299E D0 0B		        bne pix_read
+  1451 29A0 CE 06 88		        dec debug_timeout_ctr
+  1452 29A3 F0 23		        beq pix_done
+  1453 29A5 20 9B 27		        jsr wait_one_frame
+  1454 29A8 4C 7C 29		        jmp pix_wait
+  1455
+  1456 29AB			pix_read
+  1457 29AB 20 22 2E		        jsr fn_read
+  1458 29AE AD 03 03		        lda DSTATS
+  1459 29B1 8D 01 88		        sta debug_dstats
+  1460 29B4 90 03		        bcc pix_read_ok
+  1461 29B6 4C C8 29		        jmp pix_done
+  1462
+  1463 29B9			pix_read_ok
+  1464 29B9 A5 A3		        lda zp_rx_len
+  1465 29BB F0 BF		        beq pix_wait
+  1466 29BD A9 F0		        lda #VIEW_TIMEOUT
+  1467 29BF 8D 06 88		        sta debug_timeout_ctr
+  1468 29C2 20 FD 29		        jsr write_pixel_chunk
+  1469 29C5 4C 7C 29		        jmp pix_wait
+  1470
+  1471 29C8			pix_done
+  1472 29C8 18			        clc
+  1473 29C9 60			        rts
+  1474 29CA			pix_err
+  1475 29CA 38			        sec
+  1476 29CB 60			        rts
+  1477
+  1478 29CC			init_image_write
+  1479 29CC A9 00		        lda #<VRAM_IMG_BASE
+  1480 29CE 8D 0E 88		        sta img_vram
+  1481 29D1 A9 80		        lda #>VRAM_IMG_BASE
+  1482 29D3 8D 0F 88		        sta img_vram+1
+  1483 29D6 A9 00		        lda #0
+  1484 29D8 8D 10 88		        sta img_vram+2
+  1485
+  1486 29DB AD 10 88		        lda img_vram+2
+  1487 29DE 0A			        asl
+  1488 29DF 0A			        asl
+  1489 29E0 8D 11 88		        sta img_wr_bank
+  1490 29E3 AD 0F 88		        lda img_vram+1
+  1491 29E6 0A			        asl
+  1492 29E7 2E 11 88		        rol img_wr_bank
+  1493 29EA 0A			        asl
+  1494 29EB 2E 11 88		        rol img_wr_bank
+  1495
+  1496 29EE AD 0E 88		        lda img_vram
+  1497 29F1 85 AB		        sta zp_img_ptr
+  1498 29F3 AD 0F 88		        lda img_vram+1
+  1499 29F6 29 3F		        and #$3F
+  1500 29F8 09 40		        ora #$40
+  1501 29FA 85 AC		        sta zp_img_ptr+1
+  1502 29FC 60			        rts
+  1503
+  1504 29FD			write_pixel_chunk
+  1505 29FD A5 A3		        lda zp_rx_len
+  1506 29FF F0 41		        beq write_done
+  1507
+  1508 2A01 78			        sei
+  1509 2A02 AD 11 88		        lda img_wr_bank
+  1510 2A05 09 80		        ora #$80
+  1511 2A07 85 AD		        sta zp_memb_shadow
+  1512 2A09 A0 5D		        ldy #VBXE_MEMAC_B
+  1513 2A0B 91 80		        sta (zp_vbxe_base),y
   1514
-  1515 2A09 A0 40		        ldy #VBXE_VCTL
-  1516 2A0B A9 03		        lda #VC_XDL_ENABLED|VC_XCOLOR
-  1517 2A0D 91 80		        sta (zp_vbxe_base),y
-  1518 2A0F 60			        rts
-  1519
-  1520 2A10			print_record
-  1521 2A10 8D 44 03		        sta ICBAL
-  1522 2A13 8E 45 03		        stx ICBAH
-  1523 2A16 8C 48 03		        sty ICBLL
-  1524 2A19 A9 00		        lda #0
-  1525 2A1B 8D 49 03		        sta ICBLH
-  1526 2A1E A9 09		        lda #$09
-  1527 2A20 8D 42 03		        sta ICCOM
-  1528 2A23 A2 00		        ldx #0
-  1529 2A25 4C 56 E4		        jmp CIOV
-  1530
-  1531 2A28			nibble_to_hex
-  1532 2A28 29 0F		        and #$0F
-  1533 2A2A C9 0A		        cmp #10
-  1534 2A2C 90 03		        bcc nibble_digit
-  1535 2A2E 18			        clc
-  1536 2A2F 69 06		        adc #6
-  1537 2A31			nibble_digit
-  1538 2A31 18			        clc
-  1539 2A32 69 30		        adc #'0'
-  1540 2A34 60			        rts
-  1541
-  1542 2A35			write_dbg_hex
-  1543 2A35 48			        pha
-  1544 2A36 4A			        lsr
-  1545 2A37 4A			        lsr
-  1546 2A38 4A			        lsr
-  1547 2A39 4A			        lsr
-  1548 2A3A 20 28 2A		        jsr nibble_to_hex
-  1549 2A3D 9D 5C 2E		        sta dbg_line,x
-  1550 2A40 E8			        inx
-  1551 2A41 68			        pla
-  1552 2A42 29 0F		        and #$0F
-  1553 2A44 20 28 2A		        jsr nibble_to_hex
-  1554 2A47 9D 5C 2E		        sta dbg_line,x
-  1555 2A4A 60			        rts
-  1556
-  1557 2A4B			report_failure
-  1558 2A4B A9 22		        lda #$22
-  1559 2A4D 8D 2F 02		        sta SDMCTL
-  1560
-  1561 2A50 AD 00 88		        lda debug_stage
-  1562 2A53 C9 11		        cmp #$11
-  1563 2A55 F0 10		        beq report_no_vbxe
-  1564 2A57 C9 12		        cmp #$12
-  1565 2A59 B0 18		        bcs report_img_fail
-  1566
-  1567 2A5B A9 4B		        lda #<msg_text_fail
-  1568 2A5D A2 2D		        ldx #>msg_text_fail
-  1569 2A5F A0 12		        ldy #msg_text_fail_end-msg_text_fail
-  1570 2A61 20 10 2A		        jsr print_record
-  1571 2A64 4C 7C 2A		        jmp report_stage
-  1572
-  1573 2A67			report_no_vbxe
-  1574 2A67 A9 70		        lda #<msg_no_vbxe
-  1575 2A69 A2 2D		        ldx #>msg_no_vbxe
-  1576 2A6B A0 12		        ldy #msg_no_vbxe_end-msg_no_vbxe
-  1577 2A6D 20 10 2A		        jsr print_record
-  1578 2A70 4C EC 2A		        jmp report_dbg
-  1579
-  1580 2A73			report_img_fail
-  1581 2A73 A9 5D		        lda #<msg_img_fail
-  1582 2A75 A2 2D		        ldx #>msg_img_fail
-  1583 2A77 A0 13		        ldy #msg_img_fail_end-msg_img_fail
-  1584 2A79 20 10 2A		        jsr print_record
-  1585
-  1586 2A7C			report_stage
-  1587 2A7C AD 00 88		        lda debug_stage
-  1588 2A7F C9 01		        cmp #1
-  1589 2A81 D0 0C		        bne report_stage_2
-  1590 2A83 A9 DD		        lda #<msg_stage_text_open
-  1591 2A85 A2 2D		        ldx #>msg_stage_text_open
-  1592 2A87 A0 11		        ldy #msg_stage_text_open_end-msg_stage_text_open
-  1593 2A89 20 10 2A		        jsr print_record
-  1594 2A8C 4C EC 2A		        jmp report_dbg
-  1595 2A8F			report_stage_2
-  1596 2A8F C9 02		        cmp #2
-  1597 2A91 D0 0C		        bne report_stage_3
-  1598 2A93 A9 EE		        lda #<msg_stage_text_wait
-  1599 2A95 A2 2D		        ldx #>msg_stage_text_wait
-  1600 2A97 A0 11		        ldy #msg_stage_text_wait_end-msg_stage_text_wait
-  1601 2A99 20 10 2A		        jsr print_record
-  1602 2A9C 4C EC 2A		        jmp report_dbg
-  1603 2A9F			report_stage_3
-  1604 2A9F C9 03		        cmp #3
-  1605 2AA1 D0 0C		        bne report_stage_4
-  1606 2AA3 A9 FF		        lda #<msg_stage_text_read
-  1607 2AA5 A2 2D		        ldx #>msg_stage_text_read
-  1608 2AA7 A0 11		        ldy #msg_stage_text_read_end-msg_stage_text_read
-  1609 2AA9 20 10 2A		        jsr print_record
-  1610 2AAC 4C EC 2A		        jmp report_dbg
-  1611 2AAF			report_stage_4
-  1612 2AAF C9 12		        cmp #$12
-  1613 2AB1 D0 0C		        bne report_stage_5
-  1614 2AB3 A9 10		        lda #<msg_stage_img_open
-  1615 2AB5 A2 2E		        ldx #>msg_stage_img_open
-  1616 2AB7 A0 12		        ldy #msg_stage_img_open_end-msg_stage_img_open
-  1617 2AB9 20 10 2A		        jsr print_record
-  1618 2ABC 4C EC 2A		        jmp report_dbg
-  1619 2ABF			report_stage_5
-  1620 2ABF C9 13		        cmp #$13
-  1621 2AC1 D0 0C		        bne report_stage_6
-  1622 2AC3 A9 22		        lda #<msg_stage_hdr
-  1623 2AC5 A2 2E		        ldx #>msg_stage_hdr
-  1624 2AC7 A0 13		        ldy #msg_stage_hdr_end-msg_stage_hdr
-  1625 2AC9 20 10 2A		        jsr print_record
-  1626 2ACC 4C EC 2A		        jmp report_dbg
-  1627 2ACF			report_stage_6
-  1628 2ACF C9 14		        cmp #$14
-  1629 2AD1 D0 0C		        bne report_stage_7
-  1630 2AD3 A9 35		        lda #<msg_stage_pal
-  1631 2AD5 A2 2E		        ldx #>msg_stage_pal
-  1632 2AD7 A0 14		        ldy #msg_stage_pal_end-msg_stage_pal
-  1633 2AD9 20 10 2A		        jsr print_record
-  1634 2ADC 4C EC 2A		        jmp report_dbg
-  1635 2ADF			report_stage_7
-  1636 2ADF C9 15		        cmp #$15
-  1637 2AE1 D0 09		        bne report_dbg
-  1638 2AE3 A9 49		        lda #<msg_stage_pix
-  1639 2AE5 A2 2E		        ldx #>msg_stage_pix
-  1640 2AE7 A0 13		        ldy #msg_stage_pix_end-msg_stage_pix
-  1641 2AE9 20 10 2A		        jsr print_record
-  1642
-  1643 2AEC			report_dbg
-  1644 2AEC AD 00 88		        lda debug_stage
-  1645 2AEF A2 03		        ldx #3
-  1646 2AF1 20 35 2A		        jsr write_dbg_hex
-  1647 2AF4 AD 01 88		        lda debug_dstats
-  1648 2AF7 A2 09		        ldx #9
-  1649 2AF9 20 35 2A		        jsr write_dbg_hex
-  1650 2AFC AD 02 88		        lda debug_fn_error
-  1651 2AFF A2 0F		        ldx #15
-  1652 2B01 20 35 2A		        jsr write_dbg_hex
-  1653 2B04 AD 03 88		        lda debug_connected
-  1654 2B07 A2 15		        ldx #21
-  1655 2B09 20 35 2A		        jsr write_dbg_hex
-  1656 2B0C AD 04 88		        lda debug_bytes_lo
-  1657 2B0F A2 1B		        ldx #27
-  1658 2B11 20 35 2A		        jsr write_dbg_hex
-  1659 2B14 AD 05 88		        lda debug_bytes_hi
-  1660 2B17 A2 21		        ldx #33
-  1661 2B19 20 35 2A		        jsr write_dbg_hex
-  1662 2B1C AD 07 88		        lda debug_rx_len
-  1663 2B1F A2 27		        ldx #39
-  1664 2B21 20 35 2A		        jsr write_dbg_hex
-  1665 2B24 A9 5C		        lda #<dbg_line
-  1666 2B26 A2 2E		        ldx #>dbg_line
-  1667 2B28 A0 2A		        ldy #dbg_line_end-dbg_line
-  1668 2B2A 20 10 2A		        jsr print_record
-  1669 2B2D 60			        rts
-  1670
-  1671 2B2E			report_text_success
-  1672 2B2E A9 31		        lda #<msg_text_ok
-  1673 2B30 A2 2D		        ldx #>msg_text_ok
-  1674 2B32 A0 1A		        ldy #msg_text_ok_end-msg_text_ok
-  1675 2B34 20 10 2A		        jsr print_record
-  1676 2B37 20 EC 2A		        jsr report_dbg
-  1677 2B3A A9 82		        lda #<msg_payload
-  1678 2B3C A2 2D		        ldx #>msg_payload
-  1679 2B3E A0 09		        ldy #msg_payload_end-msg_payload
-  1680 2B40 20 10 2A		        jsr print_record
-  1681 2B43 A9 27		        lda #<rx_buffer
-  1682 2B45 A2 89		        ldx #>rx_buffer
-  1683 2B47 AC 07 88		        ldy debug_rx_len
-  1684 2B4A 20 10 2A		        jsr print_record
-  1685 2B4D A9 8B		        lda #<msg_press_space
-  1686 2B4F A2 2D		        ldx #>msg_press_space
-  1687 2B51 A0 28		        ldy #msg_press_space_end-msg_press_space
-  1688 2B53 20 10 2A		        jsr print_record
-  1689 2B56 60			        rts
-  1690
-  1691 2B57			demo_timer_stubs
-  1692 2B57 98			        tya
-  1693 2B58 48			        pha
-  1694 2B59 A5 AD		        lda zp_memb_shadow
-  1695 2B5B 85 AE		        sta zp_tirq_saved
-  1696 2B5D A9 00		        lda #0
-  1697 2B5F 85 AD		        sta zp_memb_shadow
-  1698 2B61 A0 5D		        ldy #VBXE_MEMAC_B
-  1699 2B63 91 80		        sta (zp_vbxe_base),y
-  1700 2B65 4C 00 00		        jmp $0000
+  1515 2A0D A2 00		        ldx #0
+  1516 2A0F			write_loop
+  1517 2A0F A0 00		        ldy #0
+  1518 2A11 BD 32 89		        lda rx_buffer,x
+  1519 2A14 91 AB		        sta (zp_img_ptr),y
+  1520 2A16 E6 AB		        inc zp_img_ptr
+  1521 2A18 D0 1A		        bne write_next
+  1522 2A1A E6 AC		        inc zp_img_ptr+1
+  1523 2A1C A5 AC		        lda zp_img_ptr+1
+  1524 2A1E C9 80		        cmp #$80
+  1525 2A20 D0 12		        bne write_next
+  1526 2A22 A9 40		        lda #$40
+  1527 2A24 85 AC		        sta zp_img_ptr+1
+  1528 2A26 EE 11 88		        inc img_wr_bank
+  1529 2A29 AD 11 88		        lda img_wr_bank
+  1530 2A2C 09 80		        ora #$80
+  1531 2A2E 85 AD		        sta zp_memb_shadow
+  1532 2A30 A0 5D		        ldy #VBXE_MEMAC_B
+  1533 2A32 91 80		        sta (zp_vbxe_base),y
+  1534
+  1535 2A34			write_next
+  1536 2A34 E8			        inx
+  1537 2A35 E4 A3		        cpx zp_rx_len
+  1538 2A37 D0 D6		        bne write_loop
+  1539 2A39			        memb_off
+Macro: MEMB_OFF [Source: vbxe_const.asm]
+     1 2A39 A9 00		        lda #0
+     2 2A3B 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+     3 2A3D A0 5D		        ldy #VBXE_MEMAC_B
+     4 2A3F 91 80		        sta (zp_vbxe_base),y
+Source: client.asm
+  1540 2A41 58			        cli
+  1541 2A42			write_done
+  1542 2A42 60			        rts
+  1543
+  1544 2A43			generate_demo_image
+  1545 2A43 AD 14 88		        lda demo_phase
+  1546 2A46 18			        clc
+  1547 2A47 69 11		        adc #$11
+  1548 2A49 8D 14 88		        sta demo_phase
+  1549
+  1550 2A4C A9 C8		        lda #DEMO_HEIGHT
+  1551 2A4E 8D 0D 88		        sta img_height
+  1552 2A51 20 CC 29		        jsr init_image_write
+  1553 2A54 20 30 26		        jsr demo_build_row_table
+  1554 2A57 20 8F 2A		        jsr build_demo_palette
+  1555
+  1556 2A5A A9 00		        lda #0
+  1557 2A5C 8D 15 88		        sta demo_row
+  1558 2A5F			demo_row_loop
+  1559 2A5F A9 00		        lda #0
+  1560 2A61 8D 16 88		        sta demo_x_base
+  1561 2A64 A9 A0		        lda #160
+  1562 2A66 8D 17 88		        sta demo_chunk_len
+  1563 2A69 20 BA 2A		        jsr fill_demo_chunk
+  1564
+  1565 2A6C A9 A0		        lda #160
+  1566 2A6E 8D 16 88		        sta demo_x_base
+  1567 2A71 A9 A0		        lda #160
+  1568 2A73 8D 17 88		        sta demo_chunk_len
+  1569 2A76 20 BA 2A		        jsr fill_demo_chunk
+  1570
+  1571 2A79 EE 15 88		        inc demo_row
+  1572 2A7C AD 15 88		        lda demo_row
+  1573 2A7F C9 C8		        cmp #DEMO_HEIGHT
+  1574 2A81 D0 DC		        bne demo_row_loop
+  1575
+  1576 2A83 A9 32		        lda #<img_pal_buf
+  1577 2A85 85 87		        sta zp_tmp_ptr
+  1578 2A87 A9 8A		        lda #>img_pal_buf
+  1579 2A89 85 88		        sta zp_tmp_ptr+1
+  1580 2A8B 20 D8 2A		        jsr set_image_palette
+  1581 2A8E 60			        rts
+  1582
+  1583 2A8F			build_demo_palette
+  1584 2A8F A9 32		        lda #<img_pal_buf
+  1585 2A91 85 87		        sta zp_tmp_ptr
+  1586 2A93 A9 8A		        lda #>img_pal_buf
+  1587 2A95 85 88		        sta zp_tmp_ptr+1
+  1588 2A97 A2 00		        ldx #0
+  1589 2A99			demo_pal_loop
+  1590 2A99 8A			        txa
+  1591 2A9A A0 00		        ldy #0
+  1592 2A9C 91 87		        sta (zp_tmp_ptr),y
+  1593 2A9E 8A			        txa
+  1594 2A9F 0A			        asl
+  1595 2AA0 A0 01		        ldy #1
+  1596 2AA2 91 87		        sta (zp_tmp_ptr),y
+  1597 2AA4 8A			        txa
+  1598 2AA5 49 FF		        eor #$FF
+  1599 2AA7 A0 02		        ldy #2
+  1600 2AA9 91 87		        sta (zp_tmp_ptr),y
+  1601 2AAB 18			        clc
+  1602 2AAC A5 87		        lda zp_tmp_ptr
+  1603 2AAE 69 03		        adc #3
+  1604 2AB0 85 87		        sta zp_tmp_ptr
+  1605 2AB2 90 02		        bcc demo_pal_next
+  1606 2AB4 E6 88		        inc zp_tmp_ptr+1
+  1607 2AB6			demo_pal_next
+  1608 2AB6 E8			        inx
+  1609 2AB7 D0 E0		        bne demo_pal_loop
+  1610 2AB9 60			        rts
+  1611
+  1612 2ABA			fill_demo_chunk
+  1613 2ABA A2 00		        ldx #0
+  1614 2ABC			demo_fill_loop
+  1615 2ABC 8A			        txa
+  1616 2ABD 18			        clc
+  1617 2ABE 6D 16 88		        adc demo_x_base
+  1618 2AC1 4D 15 88		        eor demo_row
+  1619 2AC4 18			        clc
+  1620 2AC5 6D 14 88		        adc demo_phase
+  1621 2AC8 09 08		        ora #8
+  1622 2ACA 9D 32 89		        sta rx_buffer,x
+  1623 2ACD E8			        inx
+  1624 2ACE EC 17 88		        cpx demo_chunk_len
+  1625 2AD1 D0 E9		        bne demo_fill_loop
+  1626 2AD3 86 A3		        stx zp_rx_len
+  1627 2AD5 4C FD 29		        jmp write_pixel_chunk
+  1628
+  1629 2AD8			set_image_palette
+  1630 2AD8 A0 45		        ldy #VBXE_PSEL
+  1631 2ADA A9 01		        lda #1
+  1632 2ADC 91 80		        sta (zp_vbxe_base),y
+  1633
+  1634 2ADE A0 44		        ldy #VBXE_CSEL
+  1635 2AE0 A9 08		        lda #8
+  1636 2AE2 91 80		        sta (zp_vbxe_base),y
+  1637
+  1638 2AE4 18			        clc
+  1639 2AE5 A5 87		        lda zp_tmp_ptr
+  1640 2AE7 69 18		        adc #24
+  1641 2AE9 85 87		        sta zp_tmp_ptr
+  1642 2AEB 90 02		        bcc pal_skip_ok
+  1643 2AED E6 88		        inc zp_tmp_ptr+1
+  1644 2AEF			pal_skip_ok
+  1645 2AEF A2 08		        ldx #8
+  1646 2AF1			setpal_loop
+  1647 2AF1 A0 00		        ldy #0
+  1648 2AF3 B1 87		        lda (zp_tmp_ptr),y
+  1649 2AF5 A0 46		        ldy #VBXE_CR
+  1650 2AF7 91 80		        sta (zp_vbxe_base),y
+  1651 2AF9 A0 01		        ldy #1
+  1652 2AFB B1 87		        lda (zp_tmp_ptr),y
+  1653 2AFD A0 47		        ldy #VBXE_CG
+  1654 2AFF 91 80		        sta (zp_vbxe_base),y
+  1655 2B01 A0 02		        ldy #2
+  1656 2B03 B1 87		        lda (zp_tmp_ptr),y
+  1657 2B05 A0 48		        ldy #VBXE_CB
+  1658 2B07 91 80		        sta (zp_vbxe_base),y
+  1659 2B09 18			        clc
+  1660 2B0A A5 87		        lda zp_tmp_ptr
+  1661 2B0C 69 03		        adc #3
+  1662 2B0E 85 87		        sta zp_tmp_ptr
+  1663 2B10 90 02		        bcc setpal_next
+  1664 2B12 E6 88		        inc zp_tmp_ptr+1
+  1665 2B14			setpal_next
+  1666 2B14 E8			        inx
+  1667 2B15 D0 DA		        bne setpal_loop
+  1668 2B17 60			        rts
+  1669
+  1670 2B18			detect_vbxe
+  1671 2B18 A9 00		        lda #<$D600
+  1672 2B1A 85 80		        sta zp_vbxe_base
+  1673 2B1C A9 D6		        lda #>$D600
+  1674 2B1E 85 81		        sta zp_vbxe_base+1
+  1675 2B20 A0 40		        ldy #VBXE_CORE_VER
+  1676 2B22 A9 00		        lda #0
+  1677 2B24 91 80		        sta (zp_vbxe_base),y
+  1678 2B26 B1 80		        lda (zp_vbxe_base),y
+  1679 2B28 C9 10		        cmp #FX_CORE_VER
+  1680 2B2A F0 16		        beq dv_ok
+  1681
+  1682 2B2C A9 00		        lda #<$D700
+  1683 2B2E 85 80		        sta zp_vbxe_base
+  1684 2B30 A9 D7		        lda #>$D700
+  1685 2B32 85 81		        sta zp_vbxe_base+1
+  1686 2B34 A0 40		        ldy #VBXE_CORE_VER
+  1687 2B36 A9 00		        lda #0
+  1688 2B38 91 80		        sta (zp_vbxe_base),y
+  1689 2B3A B1 80		        lda (zp_vbxe_base),y
+  1690 2B3C C9 10		        cmp #FX_CORE_VER
+  1691 2B3E F0 02		        beq dv_ok
+  1692 2B40 18			        clc
+  1693 2B41 60			        rts
+  1694 2B42			dv_ok
+  1695 2B42 38			        sec
+  1696 2B43 60			        rts
+  1697
+  1698 2B44			show_fullscreen
+  1699 2B44			        memb_on 0
+Macro: MEMB_ON [Source: vbxe_const.asm]
+     1 2B44 A9 80		        lda #$80+0
+     2 2B46 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+     3 2B48 A0 5D		        ldy #VBXE_MEMAC_B
+     4 2B4A 91 80		        sta (zp_vbxe_base),y
+Source: client.asm
+  1700 2B4C A2 00		        ldx #0
   1701
-  1702 2B68 A5 AE		        lda zp_tirq_saved
-  1703 2B6A 85 AD		        sta zp_memb_shadow
-  1704 2B6C F0 02		        beq *+4
-  1705 2B6E 91 80		        sta (zp_vbxe_base),y
-  1706 2B70 68			        pla
-  1707 2B71 A8			        tay
-  1708 2B72 68			        pla
-  1709 2B73 40			        rti
-  1710 2B74			demo_timer_stubs_end
-  1711
-  1712 2B74			demo_mouse_movtab
-  1713 2B74 00 FF 01 00 01 00 +         dta 0,$FF,1,0, 1,0,0,$FF, $FF,0,0,1, 0,1,$FF,0
-  1714
-  1715 2B84			demo_arrow_data
-  1716 2B84 80 C0 E0 F0 F8 E0 +         dta $80,$C0,$E0,$F0,$F8,$E0,$A0,$00
-  1717 2B8C			demo_arrow_data_end
-  1718
-  1719 2B8C			        icl 'fujinet.asm'
+  1702 2B4E A9 74		        lda #<(XDLC_OVOFF|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT)
+  1703 2B50 9D 00 54		        sta MEMB_XDL,x
+  1704 2B53 E8			        inx
+  1705 2B54 A9 09		        lda #>(XDLC_OVOFF|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT)
+  1706 2B56 9D 00 54		        sta MEMB_XDL,x
+  1707 2B59 E8			        inx
+  1708 2B5A A9 17		        lda #24-1
+  1709 2B5C 9D 00 54		        sta MEMB_XDL,x
+  1710 2B5F E8			        inx
+  1711 2B60 A9 00		        lda #<VRAM_SCREEN
+  1712 2B62 9D 00 54		        sta MEMB_XDL,x
+  1713 2B65 E8			        inx
+  1714 2B66 A9 00		        lda #>VRAM_SCREEN
+  1715 2B68 9D 00 54		        sta MEMB_XDL,x
+  1716 2B6B E8			        inx
+  1717 2B6C A9 00		        lda #0
+  1718 2B6E 9D 00 54		        sta MEMB_XDL,x
+  1719 2B71 E8			        inx
+  1720 2B72 A9 A0		        lda #<SCR_STRIDE
+  1721 2B74 9D 00 54		        sta MEMB_XDL,x
+  1722 2B77 E8			        inx
+  1723 2B78 A9 00		        lda #>SCR_STRIDE
+  1724 2B7A 9D 00 54		        sta MEMB_XDL,x
+  1725 2B7D E8			        inx
+  1726 2B7E A9 04		        lda #CHBASE_VAL
+  1727 2B80 9D 00 54		        sta MEMB_XDL,x
+  1728 2B83 E8			        inx
+  1729 2B84 A9 11		        lda #$11
+  1730 2B86 9D 00 54		        sta MEMB_XDL,x
+  1731 2B89 E8			        inx
+  1732 2B8A A9 FF		        lda #$FF
+  1733 2B8C 9D 00 54		        sta MEMB_XDL,x
+  1734 2B8F E8			        inx
+  1735
+  1736 2B90 A9 72		        lda #<(XDLC_GMON|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_OVATT)
+  1737 2B92 9D 00 54		        sta MEMB_XDL,x
+  1738 2B95 E8			        inx
+  1739 2B96 A9 08		        lda #>(XDLC_GMON|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_OVATT)
+  1740 2B98 9D 00 54		        sta MEMB_XDL,x
+  1741 2B9B E8			        inx
+  1742 2B9C AD 0D 88		        lda img_height
+  1743 2B9F 38			        sec
+  1744 2BA0 E9 01		        sbc #1
+  1745 2BA2 9D 00 54		        sta MEMB_XDL,x
+  1746 2BA5 E8			        inx
+  1747 2BA6 AD 0E 88		        lda img_vram
+  1748 2BA9 9D 00 54		        sta MEMB_XDL,x
+  1749 2BAC E8			        inx
+  1750 2BAD AD 0F 88		        lda img_vram+1
+  1751 2BB0 9D 00 54		        sta MEMB_XDL,x
+  1752 2BB3 E8			        inx
+  1753 2BB4 AD 10 88		        lda img_vram+2
+  1754 2BB7 9D 00 54		        sta MEMB_XDL,x
+  1755 2BBA E8			        inx
+  1756 2BBB A9 40		        lda #<320
+  1757 2BBD 9D 00 54		        sta MEMB_XDL,x
+  1758 2BC0 E8			        inx
+  1759 2BC1 A9 01		        lda #>320
+  1760 2BC3 9D 00 54		        sta MEMB_XDL,x
+  1761 2BC6 E8			        inx
+  1762 2BC7 A9 11		        lda #$11
+  1763 2BC9 9D 00 54		        sta MEMB_XDL,x
+  1764 2BCC E8			        inx
+  1765 2BCD A9 FF		        lda #$FF
+  1766 2BCF 9D 00 54		        sta MEMB_XDL,x
+  1767 2BD2 E8			        inx
+  1768
+  1769 2BD3 A9 04		        lda #<(XDLC_OVOFF|XDLC_END)
+  1770 2BD5 9D 00 54		        sta MEMB_XDL,x
+  1771 2BD8 E8			        inx
+  1772 2BD9 A9 80		        lda #>(XDLC_OVOFF|XDLC_END)
+  1773 2BDB 9D 00 54		        sta MEMB_XDL,x
+  1774
+  1775 2BDE			        memb_off
+Macro: MEMB_OFF [Source: vbxe_const.asm]
+     1 2BDE A9 00		        lda #0
+     2 2BE0 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
+     3 2BE2 A0 5D		        ldy #VBXE_MEMAC_B
+     4 2BE4 91 80		        sta (zp_vbxe_base),y
+Source: client.asm
+  1776
+  1777 2BE6 A0 41		        ldy #VBXE_XDL_ADR0
+  1778 2BE8 A9 00		        lda #<VRAM_XDL
+  1779 2BEA 91 80		        sta (zp_vbxe_base),y
+  1780 2BEC C8			        iny
+  1781 2BED A9 14		        lda #>VRAM_XDL
+  1782 2BEF 91 80		        sta (zp_vbxe_base),y
+  1783 2BF1 C8			        iny
+  1784 2BF2 A9 00		        lda #0
+  1785 2BF4 91 80		        sta (zp_vbxe_base),y
+  1786
+  1787 2BF6 A0 40		        ldy #VBXE_VCTL
+  1788 2BF8 A9 03		        lda #VC_XDL_ENABLED|VC_XCOLOR
+  1789 2BFA 91 80		        sta (zp_vbxe_base),y
+  1790 2BFC 60			        rts
+  1791
+  1792 2BFD			print_record
+  1793 2BFD 8D 44 03		        sta ICBAL
+  1794 2C00 8E 45 03		        stx ICBAH
+  1795 2C03 8C 48 03		        sty ICBLL
+  1796 2C06 A9 00		        lda #0
+  1797 2C08 8D 49 03		        sta ICBLH
+  1798 2C0B A9 09		        lda #$09
+  1799 2C0D 8D 42 03		        sta ICCOM
+  1800 2C10 A2 00		        ldx #0
+  1801 2C12 4C 56 E4		        jmp CIOV
+  1802
+  1803 2C15			nibble_to_hex
+  1804 2C15 29 0F		        and #$0F
+  1805 2C17 C9 0A		        cmp #10
+  1806 2C19 90 03		        bcc nibble_digit
+  1807 2C1B 18			        clc
+  1808 2C1C 69 06		        adc #6
+  1809 2C1E			nibble_digit
+  1810 2C1E 18			        clc
+  1811 2C1F 69 30		        adc #'0'
+  1812 2C21 60			        rts
+  1813
+  1814 2C22			write_dbg_hex
+  1815 2C22 48			        pha
+  1816 2C23 4A			        lsr
+  1817 2C24 4A			        lsr
+  1818 2C25 4A			        lsr
+  1819 2C26 4A			        lsr
+  1820 2C27 20 15 2C		        jsr nibble_to_hex
+  1821 2C2A 9D 59 30		        sta dbg_line,x
+  1822 2C2D E8			        inx
+  1823 2C2E 68			        pla
+  1824 2C2F 29 0F		        and #$0F
+  1825 2C31 20 15 2C		        jsr nibble_to_hex
+  1826 2C34 9D 59 30		        sta dbg_line,x
+  1827 2C37 60			        rts
+  1828
+  1829 2C38			report_failure
+  1830 2C38 A9 22		        lda #$22
+  1831 2C3A 8D 2F 02		        sta SDMCTL
+  1832
+  1833 2C3D AD 00 88		        lda debug_stage
+  1834 2C40 C9 11		        cmp #$11
+  1835 2C42 F0 10		        beq report_no_vbxe
+  1836 2C44 C9 12		        cmp #$12
+  1837 2C46 B0 18		        bcs report_img_fail
+  1838
+  1839 2C48 A9 48		        lda #<msg_text_fail
+  1840 2C4A A2 2F		        ldx #>msg_text_fail
+  1841 2C4C A0 12		        ldy #msg_text_fail_end-msg_text_fail
+  1842 2C4E 20 FD 2B		        jsr print_record
+  1843 2C51 4C 69 2C		        jmp report_stage
+  1844
+  1845 2C54			report_no_vbxe
+  1846 2C54 A9 6D		        lda #<msg_no_vbxe
+  1847 2C56 A2 2F		        ldx #>msg_no_vbxe
+  1848 2C58 A0 12		        ldy #msg_no_vbxe_end-msg_no_vbxe
+  1849 2C5A 20 FD 2B		        jsr print_record
+  1850 2C5D 4C D9 2C		        jmp report_dbg
+  1851
+  1852 2C60			report_img_fail
+  1853 2C60 A9 5A		        lda #<msg_img_fail
+  1854 2C62 A2 2F		        ldx #>msg_img_fail
+  1855 2C64 A0 13		        ldy #msg_img_fail_end-msg_img_fail
+  1856 2C66 20 FD 2B		        jsr print_record
+  1857
+  1858 2C69			report_stage
+  1859 2C69 AD 00 88		        lda debug_stage
+  1860 2C6C C9 01		        cmp #1
+  1861 2C6E D0 0C		        bne report_stage_2
+  1862 2C70 A9 DA		        lda #<msg_stage_text_open
+  1863 2C72 A2 2F		        ldx #>msg_stage_text_open
+  1864 2C74 A0 11		        ldy #msg_stage_text_open_end-msg_stage_text_open
+  1865 2C76 20 FD 2B		        jsr print_record
+  1866 2C79 4C D9 2C		        jmp report_dbg
+  1867 2C7C			report_stage_2
+  1868 2C7C C9 02		        cmp #2
+  1869 2C7E D0 0C		        bne report_stage_3
+  1870 2C80 A9 EB		        lda #<msg_stage_text_wait
+  1871 2C82 A2 2F		        ldx #>msg_stage_text_wait
+  1872 2C84 A0 11		        ldy #msg_stage_text_wait_end-msg_stage_text_wait
+  1873 2C86 20 FD 2B		        jsr print_record
+  1874 2C89 4C D9 2C		        jmp report_dbg
+  1875 2C8C			report_stage_3
+  1876 2C8C C9 03		        cmp #3
+  1877 2C8E D0 0C		        bne report_stage_4
+  1878 2C90 A9 FC		        lda #<msg_stage_text_read
+  1879 2C92 A2 2F		        ldx #>msg_stage_text_read
+  1880 2C94 A0 11		        ldy #msg_stage_text_read_end-msg_stage_text_read
+  1881 2C96 20 FD 2B		        jsr print_record
+  1882 2C99 4C D9 2C		        jmp report_dbg
+  1883 2C9C			report_stage_4
+  1884 2C9C C9 12		        cmp #$12
+  1885 2C9E D0 0C		        bne report_stage_5
+  1886 2CA0 A9 0D		        lda #<msg_stage_img_open
+  1887 2CA2 A2 30		        ldx #>msg_stage_img_open
+  1888 2CA4 A0 12		        ldy #msg_stage_img_open_end-msg_stage_img_open
+  1889 2CA6 20 FD 2B		        jsr print_record
+  1890 2CA9 4C D9 2C		        jmp report_dbg
+  1891 2CAC			report_stage_5
+  1892 2CAC C9 13		        cmp #$13
+  1893 2CAE D0 0C		        bne report_stage_6
+  1894 2CB0 A9 1F		        lda #<msg_stage_hdr
+  1895 2CB2 A2 30		        ldx #>msg_stage_hdr
+  1896 2CB4 A0 13		        ldy #msg_stage_hdr_end-msg_stage_hdr
+  1897 2CB6 20 FD 2B		        jsr print_record
+  1898 2CB9 4C D9 2C		        jmp report_dbg
+  1899 2CBC			report_stage_6
+  1900 2CBC C9 14		        cmp #$14
+  1901 2CBE D0 0C		        bne report_stage_7
+  1902 2CC0 A9 32		        lda #<msg_stage_pal
+  1903 2CC2 A2 30		        ldx #>msg_stage_pal
+  1904 2CC4 A0 14		        ldy #msg_stage_pal_end-msg_stage_pal
+  1905 2CC6 20 FD 2B		        jsr print_record
+  1906 2CC9 4C D9 2C		        jmp report_dbg
+  1907 2CCC			report_stage_7
+  1908 2CCC C9 15		        cmp #$15
+  1909 2CCE D0 09		        bne report_dbg
+  1910 2CD0 A9 46		        lda #<msg_stage_pix
+  1911 2CD2 A2 30		        ldx #>msg_stage_pix
+  1912 2CD4 A0 13		        ldy #msg_stage_pix_end-msg_stage_pix
+  1913 2CD6 20 FD 2B		        jsr print_record
+  1914
+  1915 2CD9			report_dbg
+  1916 2CD9 AD 00 88		        lda debug_stage
+  1917 2CDC A2 03		        ldx #3
+  1918 2CDE 20 22 2C		        jsr write_dbg_hex
+  1919 2CE1 AD 01 88		        lda debug_dstats
+  1920 2CE4 A2 09		        ldx #9
+  1921 2CE6 20 22 2C		        jsr write_dbg_hex
+  1922 2CE9 AD 02 88		        lda debug_fn_error
+  1923 2CEC A2 0F		        ldx #15
+  1924 2CEE 20 22 2C		        jsr write_dbg_hex
+  1925 2CF1 AD 03 88		        lda debug_connected
+  1926 2CF4 A2 15		        ldx #21
+  1927 2CF6 20 22 2C		        jsr write_dbg_hex
+  1928 2CF9 AD 04 88		        lda debug_bytes_lo
+  1929 2CFC A2 1B		        ldx #27
+  1930 2CFE 20 22 2C		        jsr write_dbg_hex
+  1931 2D01 AD 05 88		        lda debug_bytes_hi
+  1932 2D04 A2 21		        ldx #33
+  1933 2D06 20 22 2C		        jsr write_dbg_hex
+  1934 2D09 AD 07 88		        lda debug_rx_len
+  1935 2D0C A2 27		        ldx #39
+  1936 2D0E 20 22 2C		        jsr write_dbg_hex
+  1937 2D11 A9 59		        lda #<dbg_line
+  1938 2D13 A2 30		        ldx #>dbg_line
+  1939 2D15 A0 2A		        ldy #dbg_line_end-dbg_line
+  1940 2D17 20 FD 2B		        jsr print_record
+  1941 2D1A 60			        rts
+  1942
+  1943 2D1B			report_text_success
+  1944 2D1B A9 2E		        lda #<msg_text_ok
+  1945 2D1D A2 2F		        ldx #>msg_text_ok
+  1946 2D1F A0 1A		        ldy #msg_text_ok_end-msg_text_ok
+  1947 2D21 20 FD 2B		        jsr print_record
+  1948 2D24 20 D9 2C		        jsr report_dbg
+  1949 2D27 A9 7F		        lda #<msg_payload
+  1950 2D29 A2 2F		        ldx #>msg_payload
+  1951 2D2B A0 09		        ldy #msg_payload_end-msg_payload
+  1952 2D2D 20 FD 2B		        jsr print_record
+  1953 2D30 A9 32		        lda #<rx_buffer
+  1954 2D32 A2 89		        ldx #>rx_buffer
+  1955 2D34 AC 07 88		        ldy debug_rx_len
+  1956 2D37 20 FD 2B		        jsr print_record
+  1957 2D3A A9 88		        lda #<msg_press_space
+  1958 2D3C A2 2F		        ldx #>msg_press_space
+  1959 2D3E A0 28		        ldy #msg_press_space_end-msg_press_space
+  1960 2D40 20 FD 2B		        jsr print_record
+  1961 2D43 60			        rts
+  1962
+  1963 2D44			demo_timer_stubs
+  1964 2D44 98			        tya
+  1965 2D45 48			        pha
+  1966 2D46 A5 AD		        lda zp_memb_shadow
+  1967 2D48 85 AE		        sta zp_tirq_saved
+  1968 2D4A A9 00		        lda #0
+  1969 2D4C 85 AD		        sta zp_memb_shadow
+  1970 2D4E A0 5D		        ldy #VBXE_MEMAC_B
+  1971 2D50 91 80		        sta (zp_vbxe_base),y
+  1972 2D52 4C 00 00		        jmp $0000
+  1973
+  1974 2D55 A5 AE		        lda zp_tirq_saved
+  1975 2D57 85 AD		        sta zp_memb_shadow
+  1976 2D59 F0 02		        beq *+4
+  1977 2D5B 91 80		        sta (zp_vbxe_base),y
+  1978 2D5D 68			        pla
+  1979 2D5E A8			        tay
+  1980 2D5F 68			        pla
+  1981 2D60 40			        rti
+  1982 2D61			demo_timer_stubs_end
+  1983
+  1984 2D61			demo_mouse_movtab
+  1985 2D61 00 FF 01 00 01 00 +         dta 0,$FF,1,0, 1,0,0,$FF, $FF,0,0,1, 0,1,$FF,0
+  1986
+  1987 2D71			demo_font_page_map
+  1988 2D71 02 00 01 03		        dta 2,0,1,3
+  1989
+  1990 2D75			demo_arrow_data
+  1991 2D75 80 C0 E0 F0 F8 E0 +         dta $80,$C0,$E0,$F0,$F8,$E0,$A0,$00
+  1992 2D7D			demo_arrow_data_end
+  1993
+  1994 2D7D			demo_popup_text
+  1995 2D7D 68 65 6C 6C 6F 20 +         dta c'hello world',0
+  1996
+  1997 2D89			        icl 'fujinet.asm'
 Source: fujinet.asm
      1 				; ============================================================================
      2 				; FujiNet N: Device SIO Layer
@@ -2034,7 +2336,7 @@ Source: fujinet.asm
      4
      5 = 0071			FN_DEVID       = $71
      6 = 0001			FN_UNIT        = 1
-     7 2B8C 01			fn_cur_unit    dta FN_UNIT     ; current N: unit (1=page, 2=image)
+     7 2D89 01			fn_cur_unit    dta FN_UNIT     ; current N: unit (1=page, 2=image)
      8 = 004F			FN_CMD_OPEN    = 'O'
      9 = 0043			FN_CMD_CLOSE   = 'C'
     10 = 0052			FN_CMD_READ    = 'R'
@@ -2052,37 +2354,37 @@ Source: fujinet.asm
     22 				; fn_open - Open FujiNet connection (url_buffer -> OPEN)
     23 				; Output: C=0 ok, C=1 error
     24 				; ----------------------------------------------------------------------------
-    25 2B8D			.proc fn_open
-    26 2B8D A9 71		        lda #FN_DEVID
-    27 2B8F 8D 00 03		        sta DDEVIC
-    28 2B92 AD 8C 2B		        lda fn_cur_unit
-    29 2B95 8D 01 03		        sta DUNIT
-    30 2B98 A9 4F		        lda #FN_CMD_OPEN
-    31 2B9A 8D 02 03		        sta DCOMND
-    32 2B9D A9 80		        lda #SIO_WRITE
-    33 2B9F 8D 03 03		        sta DSTATS
-    34 2BA2 A9 27		        lda #<url_buffer
-    35 2BA4 8D 04 03		        sta DBUFLO
-    36 2BA7 A9 88		        lda #>url_buffer
-    37 2BA9 8D 05 03		        sta DBUFHI
-    38 2BAC A9 1E		        lda #FN_TIMEOUT
-    39 2BAE 8D 06 03		        sta DTIMLO
-    40 2BB1 A9 00		        lda #<URL_BUF_SIZE
-    41 2BB3 8D 08 03		        sta DBYTLO
-    42 2BB6 A9 01		        lda #>URL_BUF_SIZE
-    43 2BB8 8D 09 03		        sta DBYTHI
-    44 2BBB A9 04		        lda #FN_OPEN_READ
-    45 2BBD 8D 0A 03		        sta DAUX1
-    46 2BC0 A9 00		        lda #FN_TRANS_NONE
-    47 2BC2 8D 0B 03		        sta DAUX2
+    25 2D8A			.proc fn_open
+    26 2D8A A9 71		        lda #FN_DEVID
+    27 2D8C 8D 00 03		        sta DDEVIC
+    28 2D8F AD 89 2D		        lda fn_cur_unit
+    29 2D92 8D 01 03		        sta DUNIT
+    30 2D95 A9 4F		        lda #FN_CMD_OPEN
+    31 2D97 8D 02 03		        sta DCOMND
+    32 2D9A A9 80		        lda #SIO_WRITE
+    33 2D9C 8D 03 03		        sta DSTATS
+    34 2D9F A9 32		        lda #<url_buffer
+    35 2DA1 8D 04 03		        sta DBUFLO
+    36 2DA4 A9 88		        lda #>url_buffer
+    37 2DA6 8D 05 03		        sta DBUFHI
+    38 2DA9 A9 1E		        lda #FN_TIMEOUT
+    39 2DAB 8D 06 03		        sta DTIMLO
+    40 2DAE A9 00		        lda #<URL_BUF_SIZE
+    41 2DB0 8D 08 03		        sta DBYTLO
+    42 2DB3 A9 01		        lda #>URL_BUF_SIZE
+    43 2DB5 8D 09 03		        sta DBYTHI
+    44 2DB8 A9 04		        lda #FN_OPEN_READ
+    45 2DBA 8D 0A 03		        sta DAUX1
+    46 2DBD A9 00		        lda #FN_TRANS_NONE
+    47 2DBF 8D 0B 03		        sta DAUX2
     48
-    49 2BC5 20 59 E4		        jsr SIOV
-    50 2BC8 AD 03 03		        lda DSTATS
-    51 2BCB 30 02		        bmi ?err
-    52 2BCD 18			        clc
-    53 2BCE 60			        rts
-    54 2BCF 38			?err    sec
-    55 2BD0 60			        rts
+    49 2DC2 20 59 E4		        jsr SIOV
+    50 2DC5 AD 03 03		        lda DSTATS
+    51 2DC8 30 02		        bmi ?err
+    52 2DCA 18			        clc
+    53 2DCB 60			        rts
+    54 2DCC 38			?err    sec
+    55 2DCD 60			        rts
     56 				.endp
     57
     58 				; ----------------------------------------------------------------------------
@@ -2091,45 +2393,45 @@ Source: fujinet.asm
     61 				; Error codes: 0=ok, 136($88)=EOF/closed, other=fatal
     62 				; Output: zp_fn_bytes_lo/hi, zp_fn_connected, zp_fn_error, C=0/1
     63 				; ----------------------------------------------------------------------------
-    64 2BD1			.proc fn_status
-    65 2BD1 A9 71		        lda #FN_DEVID
-    66 2BD3 8D 00 03		        sta DDEVIC
-    67 2BD6 AD 8C 2B		        lda fn_cur_unit
-    68 2BD9 8D 01 03		        sta DUNIT
-    69 2BDC A9 53		        lda #FN_CMD_STATUS
-    70 2BDE 8D 02 03		        sta DCOMND
-    71 2BE1 A9 40		        lda #SIO_READ
-    72 2BE3 8D 03 03		        sta DSTATS
-    73 2BE6 A9 EA		        lda #<DVSTAT
-    74 2BE8 8D 04 03		        sta DBUFLO
-    75 2BEB A9 02		        lda #>DVSTAT
-    76 2BED 8D 05 03		        sta DBUFHI
-    77 2BF0 A9 1E		        lda #FN_TIMEOUT
-    78 2BF2 8D 06 03		        sta DTIMLO
-    79 2BF5 A9 04		        lda #4
-    80 2BF7 8D 08 03		        sta DBYTLO
-    81 2BFA A9 00		        lda #0
-    82 2BFC 8D 09 03		        sta DBYTHI
-    83 2BFF 8D 0A 03		        sta DAUX1
-    84 2C02 8D 0B 03		        sta DAUX2
+    64 2DCE			.proc fn_status
+    65 2DCE A9 71		        lda #FN_DEVID
+    66 2DD0 8D 00 03		        sta DDEVIC
+    67 2DD3 AD 89 2D		        lda fn_cur_unit
+    68 2DD6 8D 01 03		        sta DUNIT
+    69 2DD9 A9 53		        lda #FN_CMD_STATUS
+    70 2DDB 8D 02 03		        sta DCOMND
+    71 2DDE A9 40		        lda #SIO_READ
+    72 2DE0 8D 03 03		        sta DSTATS
+    73 2DE3 A9 EA		        lda #<DVSTAT
+    74 2DE5 8D 04 03		        sta DBUFLO
+    75 2DE8 A9 02		        lda #>DVSTAT
+    76 2DEA 8D 05 03		        sta DBUFHI
+    77 2DED A9 1E		        lda #FN_TIMEOUT
+    78 2DEF 8D 06 03		        sta DTIMLO
+    79 2DF2 A9 04		        lda #4
+    80 2DF4 8D 08 03		        sta DBYTLO
+    81 2DF7 A9 00		        lda #0
+    82 2DF9 8D 09 03		        sta DBYTHI
+    83 2DFC 8D 0A 03		        sta DAUX1
+    84 2DFF 8D 0B 03		        sta DAUX2
     85
-    86 2C05 20 59 E4		        jsr SIOV
-    87 2C08 AD 03 03		        lda DSTATS
-    88 2C0B 30 16		        bmi ?err
+    86 2E02 20 59 E4		        jsr SIOV
+    87 2E05 AD 03 03		        lda DSTATS
+    88 2E08 30 16		        bmi ?err
     89
-    90 2C0D AD EA 02		        lda DVSTAT
-    91 2C10 85 A1		        sta zp_fn_bytes_lo
-    92 2C12 AD EB 02		        lda DVSTAT+1
-    93 2C15 85 A2		        sta zp_fn_bytes_hi
-    94 2C17 AD EC 02		        lda DVSTAT+2
-    95 2C1A 85 9F		        sta zp_fn_connected
-    96 2C1C AD ED 02		        lda DVSTAT+3
-    97 2C1F 85 A0		        sta zp_fn_error
+    90 2E0A AD EA 02		        lda DVSTAT
+    91 2E0D 85 A1		        sta zp_fn_bytes_lo
+    92 2E0F AD EB 02		        lda DVSTAT+1
+    93 2E12 85 A2		        sta zp_fn_bytes_hi
+    94 2E14 AD EC 02		        lda DVSTAT+2
+    95 2E17 85 9F		        sta zp_fn_connected
+    96 2E19 AD ED 02		        lda DVSTAT+3
+    97 2E1C 85 A0		        sta zp_fn_error
     98
-    99 2C21 18			        clc
-   100 2C22 60			        rts
-   101 2C23 38			?err    sec
-   102 2C24 60			        rts
+    99 2E1E 18			        clc
+   100 2E1F 60			        rts
+   101 2E20 38			?err    sec
+   102 2E21 60			        rts
    103 				.endp
    104
    105 				; ----------------------------------------------------------------------------
@@ -2139,173 +2441,185 @@ Source: fujinet.asm
    109 				; DAUX1/DAUX2 must match DBYTLO/DBYTHI (FujiNet requirement)
    110 				; Output: zp_rx_len = bytes read, C=0/1
    111 				; ----------------------------------------------------------------------------
-   112 2C25			.proc fn_read
-   113 2C25 A5 A2		        lda zp_fn_bytes_hi
-   114 2C27 D0 06		        bne ?max
-   115 2C29 A5 A1		        lda zp_fn_bytes_lo
-   116 2C2B F0 1E		        beq ?nothing
-   117 2C2D D0 0F		        bne ?use_lo
+   112 2E22			.proc fn_read
+   113 2E22 A5 A2		        lda zp_fn_bytes_hi
+   114 2E24 D0 06		        bne ?max
+   115 2E26 A5 A1		        lda zp_fn_bytes_lo
+   116 2E28 F0 1E		        beq ?nothing
+   117 2E2A D0 0F		        bne ?use_lo
    118
-   119 2C2F A9 FF		?max    lda #255                       ; Max 255 bytes (fits in 8-bit rx_len)
-   120 2C31 85 A3		        sta zp_rx_len
-   121 2C33 8D 08 03		        sta DBYTLO
-   122 2C36 A9 00		        lda #0
-   123 2C38 8D 09 03		        sta DBYTHI
-   124 2C3B 4C 51 2C		        jmp ?do
+   119 2E2C A9 FF		?max    lda #255                       ; Max 255 bytes (fits in 8-bit rx_len)
+   120 2E2E 85 A3		        sta zp_rx_len
+   121 2E30 8D 08 03		        sta DBYTLO
+   122 2E33 A9 00		        lda #0
+   123 2E35 8D 09 03		        sta DBYTHI
+   124 2E38 4C 4E 2E		        jmp ?do
    125
-   126 2C3E 85 A3		?use_lo sta zp_rx_len
-   127 2C40 8D 08 03		        sta DBYTLO
-   128 2C43 A9 00		        lda #0
-   129 2C45 8D 09 03		        sta DBYTHI
-   130 2C48 4C 51 2C		        jmp ?do
+   126 2E3B 85 A3		?use_lo sta zp_rx_len
+   127 2E3D 8D 08 03		        sta DBYTLO
+   128 2E40 A9 00		        lda #0
+   129 2E42 8D 09 03		        sta DBYTHI
+   130 2E45 4C 4E 2E		        jmp ?do
    131
-   132 2C4B			?nothing
-   133 2C4B A9 00		        lda #0
-   134 2C4D 85 A3		        sta zp_rx_len
-   135 2C4F 18			        clc
-   136 2C50 60			        rts
+   132 2E48			?nothing
+   133 2E48 A9 00		        lda #0
+   134 2E4A 85 A3		        sta zp_rx_len
+   135 2E4C 18			        clc
+   136 2E4D 60			        rts
    137
-   138 2C51 A9 71		?do     lda #FN_DEVID
-   139 2C53 8D 00 03		        sta DDEVIC
-   140 2C56 AD 8C 2B		        lda fn_cur_unit
-   141 2C59 8D 01 03		        sta DUNIT
-   142 2C5C A9 52		        lda #FN_CMD_READ
-   143 2C5E 8D 02 03		        sta DCOMND
-   144 2C61 A9 40		        lda #SIO_READ
-   145 2C63 8D 03 03		        sta DSTATS
-   146 2C66 A9 27		        lda #<rx_buffer
-   147 2C68 8D 04 03		        sta DBUFLO
-   148 2C6B A9 89		        lda #>rx_buffer
-   149 2C6D 8D 05 03		        sta DBUFHI
-   150 2C70 A9 1E		        lda #FN_TIMEOUT
-   151 2C72 8D 06 03		        sta DTIMLO
-   152 2C75 AD 08 03		        lda DBYTLO
-   153 2C78 8D 0A 03		        sta DAUX1
-   154 2C7B AD 09 03		        lda DBYTHI
-   155 2C7E 8D 0B 03		        sta DAUX2
+   138 2E4E A9 71		?do     lda #FN_DEVID
+   139 2E50 8D 00 03		        sta DDEVIC
+   140 2E53 AD 89 2D		        lda fn_cur_unit
+   141 2E56 8D 01 03		        sta DUNIT
+   142 2E59 A9 52		        lda #FN_CMD_READ
+   143 2E5B 8D 02 03		        sta DCOMND
+   144 2E5E A9 40		        lda #SIO_READ
+   145 2E60 8D 03 03		        sta DSTATS
+   146 2E63 A9 32		        lda #<rx_buffer
+   147 2E65 8D 04 03		        sta DBUFLO
+   148 2E68 A9 89		        lda #>rx_buffer
+   149 2E6A 8D 05 03		        sta DBUFHI
+   150 2E6D A9 1E		        lda #FN_TIMEOUT
+   151 2E6F 8D 06 03		        sta DTIMLO
+   152 2E72 AD 08 03		        lda DBYTLO
+   153 2E75 8D 0A 03		        sta DAUX1
+   154 2E78 AD 09 03		        lda DBYTHI
+   155 2E7B 8D 0B 03		        sta DAUX2
    156
-   157 2C81 20 59 E4		        jsr SIOV
-   158 2C84 AD 03 03		        lda DSTATS
-   159 2C87 30 02		        bmi ?err
-   160 2C89 18			        clc
-   161 2C8A 60			        rts
-   162 2C8B 38			?err    sec
-   163 2C8C 60			        rts
+   157 2E7E 20 59 E4		        jsr SIOV
+   158 2E81 AD 03 03		        lda DSTATS
+   159 2E84 30 02		        bmi ?err
+   160 2E86 18			        clc
+   161 2E87 60			        rts
+   162 2E88 38			?err    sec
+   163 2E89 60			        rts
    164 				.endp
    165
    166 				; ----------------------------------------------------------------------------
    167 				; fn_close - Close FujiNet connection
    168 				; ----------------------------------------------------------------------------
-   169 2C8D			.proc fn_close
-   170 2C8D A9 71		        lda #FN_DEVID
-   171 2C8F 8D 00 03		        sta DDEVIC
-   172 2C92 AD 8C 2B		        lda fn_cur_unit
-   173 2C95 8D 01 03		        sta DUNIT
-   174 2C98 A9 43		        lda #FN_CMD_CLOSE
-   175 2C9A 8D 02 03		        sta DCOMND
-   176 2C9D A9 00		        lda #SIO_NONE
-   177 2C9F 8D 03 03		        sta DSTATS
-   178 2CA2 A9 00		        lda #0
-   179 2CA4 8D 04 03		        sta DBUFLO
-   180 2CA7 8D 05 03		        sta DBUFHI
-   181 2CAA 8D 08 03		        sta DBYTLO
-   182 2CAD 8D 09 03		        sta DBYTHI
-   183 2CB0 8D 0A 03		        sta DAUX1
-   184 2CB3 8D 0B 03		        sta DAUX2
-   185 2CB6 A9 1E		        lda #FN_TIMEOUT
-   186 2CB8 8D 06 03		        sta DTIMLO
+   169 2E8A			.proc fn_close
+   170 2E8A A9 71		        lda #FN_DEVID
+   171 2E8C 8D 00 03		        sta DDEVIC
+   172 2E8F AD 89 2D		        lda fn_cur_unit
+   173 2E92 8D 01 03		        sta DUNIT
+   174 2E95 A9 43		        lda #FN_CMD_CLOSE
+   175 2E97 8D 02 03		        sta DCOMND
+   176 2E9A A9 00		        lda #SIO_NONE
+   177 2E9C 8D 03 03		        sta DSTATS
+   178 2E9F A9 00		        lda #0
+   179 2EA1 8D 04 03		        sta DBUFLO
+   180 2EA4 8D 05 03		        sta DBUFHI
+   181 2EA7 8D 08 03		        sta DBYTLO
+   182 2EAA 8D 09 03		        sta DBYTHI
+   183 2EAD 8D 0A 03		        sta DAUX1
+   184 2EB0 8D 0B 03		        sta DAUX2
+   185 2EB3 A9 1E		        lda #FN_TIMEOUT
+   186 2EB5 8D 06 03		        sta DTIMLO
    187
-   188 2CBB 4C 59 E4		        jmp SIOV
+   188 2EB8 4C 59 E4		        jmp SIOV
    189 				.endp
-  1720
-  1721 2CBE 4E 3A 68 74 74 70 + text_url_string  dta c'N:http://127.0.0.1:3000/',0
-  1722 2CD7			text_url_string_end
-  1723 2CD7 4E 3A 68 74 74 70 + slide_url_string dta c'N:http://127.0.0.1:3000/slide/'
-  1724 2CF5 30			slide_url_hex_hi dta c'0'
-  1725 2CF6 30 00		slide_url_hex_lo dta c'0',0
-  1726 2CF8			slide_url_string_end
-  1727
-  1728 2CF8 46 75 6A 69 4E 65 + msg_title            dta c'FujiNet demo: text then image', ATASCII_RET
-  1729 2D16			msg_title_end
-  1730 2D16 54 65 78 74 20 55 + msg_text_url         dta c'Text URL:', ATASCII_RET
-  1731 2D20			msg_text_url_end
-  1732 2D20 46 65 74 63 68 69 + msg_wait_text        dta c'Fetching text...', ATASCII_RET
-  1733 2D31			msg_wait_text_end
-  1734 2D31 54 65 78 74 20 72 + msg_text_ok          dta c'Text received from server', ATASCII_RET
-  1735 2D4B			msg_text_ok_end
-  1736 2D4B 54 65 78 74 20 66 + msg_text_fail        dta c'Text fetch failed', ATASCII_RET
-  1737 2D5D			msg_text_fail_end
-  1738 2D5D 49 6D 61 67 65 20 + msg_img_fail         dta c'Image fetch failed', ATASCII_RET
-  1739 2D70			msg_img_fail_end
-  1740 2D70 56 42 58 45 20 6E + msg_no_vbxe          dta c'VBXE not detected', ATASCII_RET
-  1741 2D82			msg_no_vbxe_end
-  1742 2D82 50 61 79 6C 6F 61 + msg_payload          dta c'Payload:', ATASCII_RET
-  1743 2D8B			msg_payload_end
-  1744 2D8B 50 72 65 73 73 20 + msg_press_space      dta c'Press SPACE for slideshow or D for demo', ATASCII_RET
-  1745 2DB3			msg_press_space_end
-  1746 2DB3 4C 6F 61 64 69 6E + msg_loading_image    dta c'Loading image...', ATASCII_RET
-  1747 2DC4			msg_loading_image_end
-  1748 2DC4 47 65 6E 65 72 61 + msg_generating_demo  dta c'Generating demo image...', ATASCII_RET
-  1749 2DDD			msg_generating_demo_end
-  1750 2DDD 53 74 61 67 65 3A + msg_stage_text_open  dta c'Stage: OPEN TEXT', ATASCII_RET
-  1751 2DEE			msg_stage_text_open_end
-  1752 2DEE 53 74 61 67 65 3A + msg_stage_text_wait  dta c'Stage: WAIT TEXT', ATASCII_RET
-  1753 2DFF			msg_stage_text_wait_end
-  1754 2DFF 53 74 61 67 65 3A + msg_stage_text_read  dta c'Stage: READ TEXT', ATASCII_RET
-  1755 2E10			msg_stage_text_read_end
-  1756 2E10 53 74 61 67 65 3A + msg_stage_img_open   dta c'Stage: OPEN IMAGE', ATASCII_RET
-  1757 2E22			msg_stage_img_open_end
-  1758 2E22 53 74 61 67 65 3A + msg_stage_hdr        dta c'Stage: READ HEADER', ATASCII_RET
-  1759 2E35			msg_stage_hdr_end
-  1760 2E35 53 74 61 67 65 3A + msg_stage_pal        dta c'Stage: READ PALETTE', ATASCII_RET
-  1761 2E49			msg_stage_pal_end
-  1762 2E49 53 74 61 67 65 3A + msg_stage_pix        dta c'Stage: READ PIXELS', ATASCII_RET
-  1763 2E5C			msg_stage_pix_end
-  1764 2E5C 53 54 3D 30 30 20 + dbg_line             dta c'ST=00 DS=00 FE=00 CN=00 BL=00 BH=00 RX=00', ATASCII_RET
-  1765 2E86			dbg_line_end
-  1766
-  1767 2E86			        org $8800
-  1768 8800-8826> 00		debug_stage       dta b(0)
-  1769 8801 00			debug_dstats      dta b(0)
-  1770 8802 00			debug_fn_error    dta b(0)
-  1771 8803 00			debug_connected   dta b(0)
-  1772 8804 00			debug_bytes_lo    dta b(0)
-  1773 8805 00			debug_bytes_hi    dta b(0)
-  1774 8806 00			debug_timeout_ctr dta b(0)
-  1775 8807 00			debug_rx_len      dta b(0)
-  1776 8808 00 00		img_width         dta b(0),b(0)
-  1777 880A 00 00		img_pal_count     dta b(0),b(0)
-  1778 880C 00			img_pal_leftover  dta b(0)
-  1779 880D 00			img_height        dta b(0)
-  1780 880E 00 00 00		img_vram          dta b(0),b(0),b(0)
-  1781 8811 00			img_wr_bank       dta b(0)
-  1782 8812 00			slide_index       dta b(0)
-  1783 8813 00			demo_mode         dta b(0)
-  1784 8814 00			demo_phase        dta b(0)
-  1785 8815 00			demo_row          dta b(0)
-  1786 8816 00			demo_x_base       dta b(0)
-  1787 8817 00			demo_chunk_len    dta b(0)
-  1788 8818 00			demo_input_active dta b(0)
-  1789 8819 00			demo_pending_dx   dta b(0)
-  1790 881A 00			demo_pending_dy   dta b(0)
-  1791 881B 00			demo_mouse_old_x  dta b(0)
-  1792 881C 00			demo_mouse_old_y  dta b(0)
-  1793 881D 00			demo_stick_state  dta b(0)
-  1794 881E 00			demo_cursor_row_ix dta b(0)
-  1795 881F 00			demo_cursor_mask   dta b(0)
-  1796 8820 00			demo_cursor_bank   dta b(0)
-  1797 8821 00			demo_cursor_x2     dta b(0)
-  1798 8822 00			demo_cursor_abs_y  dta b(0)
-  1799 8823 00			demo_cursor_ofs_hi dta b(0)
-  1800 8824 00			demo_rowtab_ptr_lo dta b(0)
-  1801 8825 00			demo_rowtab_ptr_hi dta b(0)
-  1802 8826 00			demo_rowtab_bank   dta b(0)
-  1803
-  1804 = 8827			url_buffer  .ds 256
-  1805 = 8927			rx_buffer   .ds 256
-  1806 = 8A27			img_pal_buf .ds 768
-  1807 = 8D27			demo_row_ptr_lo .ds DEMO_HEIGHT
-  1808 = 8DEF			demo_row_ptr_hi .ds DEMO_HEIGHT
-  1809 = 8EB7			demo_row_bank   .ds DEMO_HEIGHT
-  1810
-  1811 02E0-02E1> 00 20		        run main
+  1998
+  1999 2EBB 4E 3A 68 74 74 70 + text_url_string  dta c'N:http://127.0.0.1:3000/',0
+  2000 2ED4			text_url_string_end
+  2001 2ED4 4E 3A 68 74 74 70 + slide_url_string dta c'N:http://127.0.0.1:3000/slide/'
+  2002 2EF2 30			slide_url_hex_hi dta c'0'
+  2003 2EF3 30 00		slide_url_hex_lo dta c'0',0
+  2004 2EF5			slide_url_string_end
+  2005
+  2006 2EF5 46 75 6A 69 4E 65 + msg_title            dta c'FujiNet demo: text then image', ATASCII_RET
+  2007 2F13			msg_title_end
+  2008 2F13 54 65 78 74 20 55 + msg_text_url         dta c'Text URL:', ATASCII_RET
+  2009 2F1D			msg_text_url_end
+  2010 2F1D 46 65 74 63 68 69 + msg_wait_text        dta c'Fetching text...', ATASCII_RET
+  2011 2F2E			msg_wait_text_end
+  2012 2F2E 54 65 78 74 20 72 + msg_text_ok          dta c'Text received from server', ATASCII_RET
+  2013 2F48			msg_text_ok_end
+  2014 2F48 54 65 78 74 20 66 + msg_text_fail        dta c'Text fetch failed', ATASCII_RET
+  2015 2F5A			msg_text_fail_end
+  2016 2F5A 49 6D 61 67 65 20 + msg_img_fail         dta c'Image fetch failed', ATASCII_RET
+  2017 2F6D			msg_img_fail_end
+  2018 2F6D 56 42 58 45 20 6E + msg_no_vbxe          dta c'VBXE not detected', ATASCII_RET
+  2019 2F7F			msg_no_vbxe_end
+  2020 2F7F 50 61 79 6C 6F 61 + msg_payload          dta c'Payload:', ATASCII_RET
+  2021 2F88			msg_payload_end
+  2022 2F88 50 72 65 73 73 20 + msg_press_space      dta c'Press SPACE for slideshow or D for demo', ATASCII_RET
+  2023 2FB0			msg_press_space_end
+  2024 2FB0 4C 6F 61 64 69 6E + msg_loading_image    dta c'Loading image...', ATASCII_RET
+  2025 2FC1			msg_loading_image_end
+  2026 2FC1 47 65 6E 65 72 61 + msg_generating_demo  dta c'Generating demo image...', ATASCII_RET
+  2027 2FDA			msg_generating_demo_end
+  2028 2FDA 53 74 61 67 65 3A + msg_stage_text_open  dta c'Stage: OPEN TEXT', ATASCII_RET
+  2029 2FEB			msg_stage_text_open_end
+  2030 2FEB 53 74 61 67 65 3A + msg_stage_text_wait  dta c'Stage: WAIT TEXT', ATASCII_RET
+  2031 2FFC			msg_stage_text_wait_end
+  2032 2FFC 53 74 61 67 65 3A + msg_stage_text_read  dta c'Stage: READ TEXT', ATASCII_RET
+  2033 300D			msg_stage_text_read_end
+  2034 300D 53 74 61 67 65 3A + msg_stage_img_open   dta c'Stage: OPEN IMAGE', ATASCII_RET
+  2035 301F			msg_stage_img_open_end
+  2036 301F 53 74 61 67 65 3A + msg_stage_hdr        dta c'Stage: READ HEADER', ATASCII_RET
+  2037 3032			msg_stage_hdr_end
+  2038 3032 53 74 61 67 65 3A + msg_stage_pal        dta c'Stage: READ PALETTE', ATASCII_RET
+  2039 3046			msg_stage_pal_end
+  2040 3046 53 74 61 67 65 3A + msg_stage_pix        dta c'Stage: READ PIXELS', ATASCII_RET
+  2041 3059			msg_stage_pix_end
+  2042 3059 53 54 3D 30 30 20 + dbg_line             dta c'ST=00 DS=00 FE=00 CN=00 BL=00 BH=00 RX=00', ATASCII_RET
+  2043 3083			dbg_line_end
+  2044
+  2045 3083			        org $8800
+  2046 8800-8831> 00		debug_stage       dta b(0)
+  2047 8801 00			debug_dstats      dta b(0)
+  2048 8802 00			debug_fn_error    dta b(0)
+  2049 8803 00			debug_connected   dta b(0)
+  2050 8804 00			debug_bytes_lo    dta b(0)
+  2051 8805 00			debug_bytes_hi    dta b(0)
+  2052 8806 00			debug_timeout_ctr dta b(0)
+  2053 8807 00			debug_rx_len      dta b(0)
+  2054 8808 00 00		img_width         dta b(0),b(0)
+  2055 880A 00 00		img_pal_count     dta b(0),b(0)
+  2056 880C 00			img_pal_leftover  dta b(0)
+  2057 880D 00			img_height        dta b(0)
+  2058 880E 00 00 00		img_vram          dta b(0),b(0),b(0)
+  2059 8811 00			img_wr_bank       dta b(0)
+  2060 8812 00			slide_index       dta b(0)
+  2061 8813 00			demo_mode         dta b(0)
+  2062 8814 00			demo_phase        dta b(0)
+  2063 8815 00			demo_row          dta b(0)
+  2064 8816 00			demo_x_base       dta b(0)
+  2065 8817 00			demo_chunk_len    dta b(0)
+  2066 8818 00			demo_input_active dta b(0)
+  2067 8819 00			demo_pending_dx   dta b(0)
+  2068 881A 00			demo_pending_dy   dta b(0)
+  2069 881B 00			demo_mouse_old_x  dta b(0)
+  2070 881C 00			demo_mouse_old_y  dta b(0)
+  2071 881D 00			demo_stick_state  dta b(0)
+  2072 881E 00			demo_cursor_row_ix dta b(0)
+  2073 881F 00			demo_cursor_mask   dta b(0)
+  2074 8820 00			demo_cursor_bank   dta b(0)
+  2075 8821 00			demo_cursor_x2     dta b(0)
+  2076 8822 00			demo_cursor_abs_y  dta b(0)
+  2077 8823 00			demo_cursor_ofs_hi dta b(0)
+  2078 8824 00			demo_cursor_save_ix dta b(0)
+  2079 8825 00			demo_stamp_phase   dta b(0)
+  2080 8826 00			demo_stamp_width   dta b(0)
+  2081 8827 00			demo_stamp_height  dta b(0)
+  2082 8828 00			demo_stamp_row     dta b(0)
+  2083 8829 00			demo_popup_x       dta b(0)
+  2084 882A 00			demo_popup_y       dta b(0)
+  2085 882B 00			demo_popup_row     dta b(0)
+  2086 882C 00			demo_popup_char_ix dta b(0)
+  2087 882D 00			demo_popup_text_row dta b(0)
+  2088 882E 00			demo_popup_font_bits dta b(0)
+  2089 882F 00			demo_rowtab_ptr_lo dta b(0)
+  2090 8830 00			demo_rowtab_ptr_hi dta b(0)
+  2091 8831 00			demo_rowtab_bank   dta b(0)
+  2092
+  2093 = 8832			url_buffer  .ds 256
+  2094 = 8932			rx_buffer   .ds 256
+  2095 = 8A32			img_pal_buf .ds 768
+  2096 = 8D32			demo_cursor_saved .ds DEMO_CURSOR_WIDTH*(demo_arrow_data_end-demo_arrow_data)
+  2097 = 8DB2			demo_row_ptr_lo .ds DEMO_HEIGHT
+  2098 = 8E7A			demo_row_ptr_hi .ds DEMO_HEIGHT
+  2099 = 8F42			demo_row_bank   .ds DEMO_HEIGHT
+  2100
+  2101 02E0-02E1> 00 20		        run main

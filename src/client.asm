@@ -13,11 +13,22 @@ VIEW_TIMEOUT = 240
 READ_LIMIT   = 96
 KEY_D        = $3A
 DEMO_HEIGHT  = 200
+DEMO_STAMP_SIZE = 20
 DEMO_CURSOR_MAX_X = 152
 DEMO_CURSOR_MAX_Y = 192
 DEMO_CURSOR_START_X = 76
 DEMO_CURSOR_START_Y = 96
 DEMO_CURSOR_COLOR = 1
+DEMO_CURSOR_WIDTH = 16
+DEMO_POPUP_WIDTH = 96
+DEMO_POPUP_INNER_WIDTH = 94
+DEMO_POPUP_HEIGHT = 12
+DEMO_POPUP_LAST_ROW = 11
+DEMO_POPUP_MAX_X = 112
+DEMO_POPUP_MAX_Y = 188
+DEMO_POPUP_BORDER_COLOR = 250
+DEMO_POPUP_FILL_COLOR = 24
+DEMO_POPUP_TEXT_COLOR = 252
 
 STUB_BASE      = $0600
 STUB_TIRQ_EXIT = STUB_BASE+17
@@ -107,12 +118,25 @@ demo_wait
         jsr demo_update_input
         jsr demo_draw_cursor
         jsr demo_poll_click
-        bcs demo_next
+        bcc demo_key_check
+        jsr demo_click_stamp
+        jmp demo_wait
+demo_key_check
         lda CH
         cmp #KEY_NONE
         beq demo_wait
+        cmp #KEY_SPACE
+        beq demo_popup_key
+        cmp #CH_SPACE
+        beq demo_popup_key
         lda #KEY_NONE
         sta CH
+        jmp demo_next
+demo_popup_key
+        lda #KEY_NONE
+        sta CH
+        jsr demo_show_popup
+        jmp demo_wait
 
 demo_next
         jsr generate_demo_image
@@ -485,6 +509,164 @@ demo_click_held
         clc
         rts
 
+demo_click_stamp
+        lda zp_demo_prev_y
+        cmp #$FF
+        beq demo_click_stamp_patch
+        jsr demo_restore_cursor
+        lda #$FF
+        sta zp_demo_prev_x
+        sta zp_demo_prev_y
+demo_click_stamp_patch
+        jsr demo_apply_stamp
+        jsr demo_draw_cursor
+        rts
+
+demo_show_popup
+        lda zp_demo_prev_y
+        cmp #$FF
+        beq demo_show_popup_draw
+        jsr demo_restore_cursor
+        lda #$FF
+        sta zp_demo_prev_x
+        sta zp_demo_prev_y
+demo_show_popup_draw
+        jsr demo_draw_popup_box
+        jsr demo_draw_popup_text
+        jsr demo_draw_cursor
+        rts
+
+demo_draw_popup_box
+        lda zp_demo_cursor_x
+        cmp #DEMO_POPUP_MAX_X
+        bcc demo_popup_x_ok
+        lda #DEMO_POPUP_MAX_X
+demo_popup_x_ok
+        sta demo_popup_x
+
+        lda zp_demo_cursor_y
+        cmp #DEMO_POPUP_MAX_Y
+        bcc demo_popup_y_ok
+        lda #DEMO_POPUP_MAX_Y
+demo_popup_y_ok
+        sta demo_popup_y
+
+        lda #0
+        sta demo_popup_row
+demo_popup_box_row_loop
+        lda demo_popup_y
+        clc
+        adc demo_popup_row
+        ldx demo_popup_x
+        jsr demo_prepare_cursor_row_table
+        jsr demo_mem_open
+        lda demo_popup_row
+        beq demo_popup_border_row
+        cmp #DEMO_POPUP_LAST_ROW
+        beq demo_popup_border_row
+
+        lda #DEMO_POPUP_BORDER_COLOR
+        jsr demo_mem_put
+        ldx #0
+demo_popup_fill_loop
+        lda #DEMO_POPUP_FILL_COLOR
+        jsr demo_mem_put
+        inx
+        cpx #DEMO_POPUP_INNER_WIDTH
+        bne demo_popup_fill_loop
+        lda #DEMO_POPUP_BORDER_COLOR
+        jsr demo_mem_put
+        jmp demo_popup_box_row_done
+
+demo_popup_border_row
+        ldx #0
+demo_popup_border_fill_loop
+        lda #DEMO_POPUP_BORDER_COLOR
+        jsr demo_mem_put
+        inx
+        cpx #DEMO_POPUP_WIDTH
+        bne demo_popup_border_fill_loop
+
+demo_popup_box_row_done
+        memb_off
+        inc demo_popup_row
+        lda demo_popup_row
+        cmp #DEMO_POPUP_HEIGHT
+        bne demo_popup_box_row_loop
+        rts
+
+demo_draw_popup_text
+        lda #0
+        sta demo_popup_text_row
+demo_popup_text_row_loop
+        lda demo_popup_y
+        clc
+        adc demo_popup_text_row
+        adc #2
+        ldx demo_popup_x
+        inx
+        inx
+        jsr demo_prepare_cursor_row_table
+        jsr demo_mem_open
+
+        lda #0
+        sta demo_popup_char_ix
+demo_popup_char_loop
+        ldy demo_popup_char_ix
+        lda demo_popup_text,y
+        beq demo_popup_text_row_done
+        jsr demo_get_popup_font_bits
+        sta demo_popup_font_bits
+        ldx #0
+demo_popup_font_bit_loop
+        lda demo_popup_font_bits
+        asl
+        sta demo_popup_font_bits
+        bcc demo_popup_font_skip
+        lda #DEMO_POPUP_TEXT_COLOR
+        jsr demo_mem_put
+        jmp demo_popup_font_next
+demo_popup_font_skip
+        jsr demo_mem_advance
+demo_popup_font_next
+        inx
+        cpx #8
+        bne demo_popup_font_bit_loop
+        inc demo_popup_char_ix
+        jmp demo_popup_char_loop
+
+demo_popup_text_row_done
+        memb_off
+        inc demo_popup_text_row
+        lda demo_popup_text_row
+        cmp #8
+        bne demo_popup_text_row_loop
+        rts
+
+demo_get_popup_font_bits
+        sta zp_tmp1
+        and #$1F
+        asl
+        asl
+        asl
+        clc
+        adc demo_popup_text_row
+        sta zp_tmp_ptr2
+        lda zp_tmp1
+        lsr
+        lsr
+        lsr
+        lsr
+        lsr
+        tax
+        lda CHBAS
+        clc
+        adc demo_font_page_map,x
+        sta zp_tmp_ptr2+1
+        ldy #0
+        lda (zp_tmp_ptr2),y
+        rts
+
 demo_draw_cursor
         lda zp_demo_prev_y
         cmp #$FF
@@ -499,6 +681,7 @@ demo_draw_move
         jsr demo_restore_cursor
 
 demo_draw_new
+        jsr demo_save_cursor_under
         jsr demo_plot_cursor
         lda zp_demo_cursor_x
         sta zp_demo_prev_x
@@ -507,9 +690,39 @@ demo_draw_new
 demo_draw_done
         rts
 
+demo_save_cursor_under
+        lda #0
+        sta demo_cursor_row_ix
+        sta demo_cursor_save_ix
+demo_save_row_loop
+        lda zp_demo_cursor_y
+        clc
+        adc demo_cursor_row_ix
+        ldx zp_demo_cursor_x
+        jsr demo_prepare_cursor_row_table
+        jsr demo_mem_open
+        ldx #0
+demo_save_pix_loop
+        ldy #0
+        lda (zp_tmp_ptr),y
+        ldy demo_cursor_save_ix
+        sta demo_cursor_saved,y
+        inc demo_cursor_save_ix
+        jsr demo_mem_advance
+        inx
+        cpx #DEMO_CURSOR_WIDTH
+        bne demo_save_pix_loop
+        memb_off
+        inc demo_cursor_row_ix
+        lda demo_cursor_row_ix
+        cmp #demo_arrow_data_end-demo_arrow_data
+        bne demo_save_row_loop
+        rts
+
 demo_restore_cursor
         lda #0
         sta demo_cursor_row_ix
+        sta demo_cursor_save_ix
 demo_restore_row_loop
         lda zp_demo_prev_y
         clc
@@ -519,22 +732,81 @@ demo_restore_row_loop
         jsr demo_mem_open
         ldx #0
 demo_restore_pix_loop
-        txa
-        clc
-        adc demo_cursor_x2
-        eor demo_cursor_abs_y
-        clc
-        adc demo_phase
-        ora #8
+        ldy demo_cursor_save_ix
+        lda demo_cursor_saved,y
+        inc demo_cursor_save_ix
         jsr demo_mem_put
         inx
-        cpx #16
+        cpx #DEMO_CURSOR_WIDTH
         bne demo_restore_pix_loop
         memb_off
         inc demo_cursor_row_ix
         lda demo_cursor_row_ix
         cmp #demo_arrow_data_end-demo_arrow_data
         bne demo_restore_row_loop
+        rts
+
+demo_apply_stamp
+        lda demo_stamp_phase
+        clc
+        adc #$29
+        sta demo_stamp_phase
+
+        lda #160
+        sec
+        sbc zp_demo_cursor_x
+        cmp #10
+        bcc demo_stamp_width_clip
+        lda #DEMO_STAMP_SIZE
+        bne demo_stamp_width_done
+demo_stamp_width_clip
+        asl
+demo_stamp_width_done
+        sta demo_stamp_width
+
+        lda #DEMO_HEIGHT
+        sec
+        sbc zp_demo_cursor_y
+        cmp #DEMO_STAMP_SIZE
+        bcc demo_stamp_height_clip
+        lda #DEMO_STAMP_SIZE
+demo_stamp_height_clip
+        sta demo_stamp_height
+
+        lda demo_stamp_width
+        beq demo_apply_stamp_done
+        lda demo_stamp_height
+        beq demo_apply_stamp_done
+
+        lda #0
+        sta demo_stamp_row
+demo_stamp_row_loop
+        lda zp_demo_cursor_y
+        clc
+        adc demo_stamp_row
+        ldx zp_demo_cursor_x
+        jsr demo_prepare_cursor_row_table
+        jsr demo_mem_open
+        ldx #0
+demo_stamp_pix_loop
+        txa
+        asl
+        clc
+        adc demo_stamp_row
+        eor demo_stamp_phase
+        clc
+        adc zp_demo_cursor_x
+        ora #$18
+        jsr demo_mem_put
+        inx
+        cpx demo_stamp_width
+        bne demo_stamp_pix_loop
+        memb_off
+        inc demo_stamp_row
+        lda demo_stamp_row
+        cmp demo_stamp_height
+        bne demo_stamp_row_loop
+demo_apply_stamp_done
         rts
 
 demo_plot_cursor
@@ -1712,9 +1984,15 @@ demo_timer_stubs_end
 demo_mouse_movtab
         dta 0,$FF,1,0, 1,0,0,$FF, $FF,0,0,1, 0,1,$FF,0
 
+demo_font_page_map
+        dta 2,0,1,3
+
 demo_arrow_data
         dta $80,$C0,$E0,$F0,$F8,$E0,$A0,$00
 demo_arrow_data_end
+
+demo_popup_text
+        dta c'hello world',0
 
         icl 'fujinet.asm'
 
@@ -1797,6 +2075,17 @@ demo_cursor_bank   dta b(0)
 demo_cursor_x2     dta b(0)
 demo_cursor_abs_y  dta b(0)
 demo_cursor_ofs_hi dta b(0)
+demo_cursor_save_ix dta b(0)
+demo_stamp_phase   dta b(0)
+demo_stamp_width   dta b(0)
+demo_stamp_height  dta b(0)
+demo_stamp_row     dta b(0)
+demo_popup_x       dta b(0)
+demo_popup_y       dta b(0)
+demo_popup_row     dta b(0)
+demo_popup_char_ix dta b(0)
+demo_popup_text_row dta b(0)
+demo_popup_font_bits dta b(0)
 demo_rowtab_ptr_lo dta b(0)
 demo_rowtab_ptr_hi dta b(0)
 demo_rowtab_bank   dta b(0)
@@ -1804,6 +2093,7 @@ demo_rowtab_bank   dta b(0)
 url_buffer  .ds 256
 rx_buffer   .ds 256
 img_pal_buf .ds 768
+demo_cursor_saved .ds DEMO_CURSOR_WIDTH*(demo_arrow_data_end-demo_arrow_data)
 demo_row_ptr_lo .ds DEMO_HEIGHT
 demo_row_ptr_hi .ds DEMO_HEIGHT
 demo_row_bank   .ds DEMO_HEIGHT
