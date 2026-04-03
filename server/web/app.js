@@ -9,17 +9,23 @@ const uploadButton = document.getElementById('upload-button');
 const refreshButton = document.getElementById('refresh-button');
 const statusNode = document.getElementById('status');
 const slideList = document.getElementById('slide-list');
+const roomPreviewCanvas = document.getElementById('room-preview');
+const roomPreviewMeta = document.getElementById('room-preview-meta');
 
 uploadForm.addEventListener('submit', onUploadSubmit);
 refreshButton.addEventListener('click', refreshSlides);
 
 void refreshSlides();
+window.setInterval(() => {
+  void refreshRoomPreview(true);
+}, 1500);
 
 async function refreshSlides() {
   setStatus('Loading slideshow state...');
   try {
     const data = await fetchJson('/api/slides');
     renderSlides(data.slides || []);
+    await refreshRoomPreview(true);
     if ((data.slides || []).length === 0) {
       setStatus('No uploaded slides yet. The server will use its generated demo image until you upload one.');
     } else {
@@ -27,6 +33,18 @@ async function refreshSlides() {
     }
   } catch (error) {
     setStatus(error.message, true);
+  }
+}
+
+async function refreshRoomPreview(silent = false) {
+  try {
+    const room = await fetchJson('/api/rooms/room1');
+    renderRoomPreview(room);
+  } catch (error) {
+    if (!silent) {
+      throw error;
+    }
+    roomPreviewMeta.textContent = `Room preview refresh failed: ${error.message}`;
   }
 }
 
@@ -61,6 +79,16 @@ function renderSlides(slides) {
 
     slideList.appendChild(item);
   });
+}
+
+function renderRoomPreview(room) {
+  const vbxe = base64ToBytes(room.vbxeBase64 || '');
+  drawVbxeToCanvas(roomPreviewCanvas, vbxe, room.lastClick || null);
+
+  const clickText = room.lastClick
+    ? `Last click: ${room.lastClick.x}, ${room.lastClick.y}`
+    : 'Last click: none yet';
+  roomPreviewMeta.textContent = `${room.title} • ${room.width}x${room.height} • Atari URL ${room.atariUrl} • ${clickText}`;
 }
 
 function makeButton(label, disabled, handler) {
@@ -293,6 +321,43 @@ function bytesToBase64(bytes) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
   }
   return btoa(binary);
+}
+
+function base64ToBytes(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function drawVbxeToCanvas(canvas, vbxe, lastClick) {
+  const width = vbxe[0] | (vbxe[1] << 8);
+  const height = vbxe[2];
+  const paletteOffset = 3;
+  const pixelOffset = 3 + 768;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+  canvas.width = width;
+  canvas.height = height;
+
+  const imageData = ctx.createImageData(width, height);
+  for (let i = 0; i < width * height; i += 1) {
+    const colorIndex = vbxe[pixelOffset + i];
+    const paletteIndex = paletteOffset + (colorIndex * 3);
+    const out = i * 4;
+    imageData.data[out] = vbxe[paletteIndex];
+    imageData.data[out + 1] = vbxe[paletteIndex + 1];
+    imageData.data[out + 2] = vbxe[paletteIndex + 2];
+    imageData.data[out + 3] = 255;
+  }
+  ctx.putImageData(imageData, 0, 0);
+
+  if (lastClick) {
+    ctx.fillStyle = '#ff3b30';
+    ctx.fillRect(lastClick.x, lastClick.y, 2, 2);
+  }
 }
 
 async function fetchJson(url, options = {}) {

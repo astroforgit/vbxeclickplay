@@ -6,6 +6,7 @@ const { URL } = require('url');
 const PORT = Number(process.env.PORT || 3000);
 const IMAGE_WIDTH = 320;
 const IMAGE_HEIGHT = 200;
+const CLICK_MARKER_COLOR = 5;
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const ROOT_DIR = path.resolve(__dirname, '../..');
 const DATA_DIR = path.join(ROOT_DIR, 'data');
@@ -88,6 +89,7 @@ function buildDemoImagePayload() {
 }
 
 const demoImagePayload = buildDemoImagePayload();
+const roomClickState = new Map();
 
 function validateVbxePayload(buffer) {
     if (!Buffer.isBuffer(buffer) || buffer.length < 3 + 768 + 64) {
@@ -120,6 +122,10 @@ function getSlidesWithOrder() {
     }));
 }
 
+function normalizeRoomName(name) {
+    return String(name || '').trim().toLowerCase();
+}
+
 function getSlidePayload(index) {
     const store = loadStore();
     if (store.slides.length === 0) {
@@ -149,6 +155,73 @@ function getSlidePayload(index) {
         totalSlides: store.slides.length,
         isDemo: false
     };
+}
+
+function getRoomPayload(roomName) {
+    const normalized = normalizeRoomName(roomName);
+    const store = loadStore();
+
+    const namedIndex = store.slides.findIndex((slide) => normalizeRoomName(slide.title) === normalized);
+    if (namedIndex !== -1) {
+        return getSlidePayload(namedIndex);
+    }
+
+    const numberedMatch = normalized.match(/^room([1-9][0-9]*)$/);
+    if (numberedMatch) {
+        const roomIndex = Number.parseInt(numberedMatch[1], 10) - 1;
+        return getSlidePayload(roomIndex);
+    }
+
+    return null;
+}
+
+function getRoomPreviewPayload(roomName) {
+    const slide = getRoomPayload(roomName);
+    if (!slide) {
+        return null;
+    }
+
+    const normalized = normalizeRoomName(roomName);
+    const lastClick = roomClickState.get(normalized) || null;
+    return {
+        roomName: normalized,
+        title: slide.title,
+        width: slide.width,
+        height: slide.height,
+        atariUrl: `/room/${normalized}`,
+        vbxeBase64: buildRoomPreviewBuffer(slide.buffer, slide.width, slide.height, lastClick).toString('base64'),
+        lastClick
+    };
+}
+
+function buildRoomPreviewBuffer(buffer, width, height, lastClick) {
+    if (!lastClick) {
+        return buffer;
+    }
+
+    const preview = Buffer.from(buffer);
+    const pixelOffset = 3 + 768;
+    for (let dy = 0; dy < 2; dy += 1) {
+        const y = lastClick.y + dy;
+        if (y < 0 || y >= height) {
+            continue;
+        }
+        for (let dx = 0; dx < 2; dx += 1) {
+            const x = lastClick.x + dx;
+            if (x < 0 || x >= width) {
+                continue;
+            }
+            preview[pixelOffset + (y * width) + x] = CLICK_MARKER_COLOR;
+        }
+    }
+    return preview;
+}
+
+function parseHexByte(value) {
+    if (!/^[0-9a-fA-F]{2}$/.test(value)) {
+        return null;
+    }
+    return Number.parseInt(value, 16);
 }
 
 function sendJson(res, statusCode, payload) {
@@ -364,6 +437,18 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
+        const roomApiMatch = pathname.match(/^\/api\/rooms\/([^/]+)$/);
+        if (req.method === 'GET' && roomApiMatch) {
+            const requestedRoom = decodeURIComponent(roomApiMatch[1]);
+            const payload = getRoomPreviewPayload(requestedRoom);
+            if (!payload) {
+                sendJson(res, 404, { error: `Room not found: ${requestedRoom}` });
+                return;
+            }
+            sendJson(res, 200, payload);
+            return;
+        }
+
         if (req.method === 'POST' && pathname === '/api/slides') {
             await handleCreateSlide(req, res);
             return;
@@ -384,6 +469,53 @@ const server = http.createServer(async (req, res) => {
             const slide = getSlidePayload(0);
             sendBinary(res, slide.buffer);
             console.log(`[RES] image alias -> slide 00 (${slide.width}x${slide.height})`);
+            return;
+        }
+
+        const clickMatch = pathname.match(/^\/click\/([^/]+)\/([0-9A-Fa-f]{2})\/([0-9A-Fa-f]{2})$/);
+        if (req.method === 'GET' && clickMatch) {
+            const requestedRoom = decodeURIComponent(clickMatch[1]);
+            const logicalX = parseHexByte(clickMatch[2]);
+            const y = parseHexByte(clickMatch[3]);
+            const slide = getRoomPayload(requestedRoom);
+
+            if (!slide) {
+                sendText(res, 404, `Room not found: ${requestedRoom}\n`);
+                return;
+            }
+            if (logicalX === null || y === null || logicalX >= 160 || y >= IMAGE_HEIGHT) {
+                sendText(res, 400, 'Invalid click coordinates\n');
+                return;
+            }
+
+            const normalizedRoom = normalizeRoomName(requestedRoom);
+            roomClickState.set(normalizedRoom, {
+                logicalX,
+                x: logicalX * 2,
+                y,
+                updatedAt: new Date().toISOString()
+            });
+
+            sendText(res, 200, 'OK\n');
+            console.log(
+                `[EVENT] click ${normalizedRoom} logical=(${logicalX},${y}) pixel=(${logicalX * 2},${y})`
+            );
+            return;
+        }
+
+        const roomMatch = pathname.match(/^\/room\/([^/]+)$/);
+        if (req.method === 'GET' && roomMatch) {
+            const requestedRoom = decodeURIComponent(roomMatch[1]);
+            const slide = getRoomPayload(requestedRoom);
+            if (!slide) {
+                sendText(res, 404, `Room not found: ${requestedRoom}\n`);
+                return;
+            }
+            sendBinary(res, slide.buffer);
+            console.log(
+                `[RES] room ${requestedRoom} -> ${slide.position} ` +
+                `"${slide.title}" ${slide.width}x${slide.height} ${slide.buffer.length} bytes`
+            );
             return;
         }
 
@@ -425,6 +557,7 @@ server.listen(PORT, '0.0.0.0', () => {
     console.log(`FujiNet slideshow server running on port ${PORT}`);
     console.log(`Text URL:   N:http://127.0.0.1:${PORT}/`);
     console.log(`Slide URL:  N:http://127.0.0.1:${PORT}/slide/00`);
+    console.log(`Room URL:   N:http://127.0.0.1:${PORT}/room/room1`);
     console.log(`Image URL:  N:http://127.0.0.1:${PORT}/image`);
     console.log(`Web UI:     http://127.0.0.1:${PORT}/web`);
 });

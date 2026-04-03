@@ -48,38 +48,22 @@ main
         lda #$22
         sta SDMCTL
         jsr clear_debug
-        jsr copy_text_url_to_buffer
-        jsr show_banner
-        jsr fetch_text_payload
-        bcc text_ok
-        jsr report_failure
-fail_loop
-        jmp fail_loop
-
-text_ok
-        jsr report_text_success
-        jsr wait_for_start_key
 
         jsr detect_vbxe
         bcc no_vbxe
 
-        lda demo_mode
-        bne start_demo
-
-        lda #<msg_loading_image
-        ldx #>msg_loading_image
-        ldy #msg_loading_image_end-msg_loading_image
+        lda #<msg_loading_room
+        ldx #>msg_loading_room
+        ldy #msg_loading_room_end-msg_loading_room
         jsr print_record
 
-        lda #0
-        sta slide_index
-
-load_slide
+load_room
         jsr clear_debug
-        jsr copy_slide_url_to_buffer
+        jsr copy_room_url_to_buffer
         jsr fetch_room_image
         bcc image_ok
         jsr report_failure
+fail_loop
         jmp fail_loop
 
 no_vbxe
@@ -88,26 +72,59 @@ no_vbxe
         jsr report_failure
         jmp fail_loop
 
-start_demo
-        lda #<msg_generating_demo
-        ldx #>msg_generating_demo
-        ldy #msg_generating_demo_end-msg_generating_demo
-        jsr print_record
-        jsr generate_demo_image
-        jmp image_ok
-
 image_ok
         lda #0
         sta SDMCTL
         jsr show_fullscreen
         lda demo_mode
-        bne demo_image_loop
-image_loop
-        jsr wait_for_any_key
-        lda demo_mode
-        bne demo_next
-        inc slide_index
-        jmp load_slide
+        beq room_image_loop
+        jmp demo_image_loop
+
+room_image_loop
+        lda #0
+        sta demo_input_active
+        jsr demo_init_input
+        jsr demo_draw_cursor
+room_wait
+        jsr wait_one_frame
+        jsr demo_update_input
+        jsr demo_draw_cursor
+        jsr demo_poll_click
+        bcc room_key_check
+        jsr room_handle_click
+        jmp room_wait
+room_key_check
+        lda CH
+        cmp #KEY_NONE
+        beq room_wait
+        lda #KEY_NONE
+        sta CH
+        lda zp_demo_prev_y
+        cmp #$FF
+        beq room_reload
+        jsr demo_restore_cursor
+        lda #$FF
+        sta zp_demo_prev_x
+        sta zp_demo_prev_y
+room_reload
+        jmp load_room
+
+room_handle_click
+        lda zp_demo_prev_y
+        cmp #$FF
+        beq room_click_send
+        jsr demo_restore_cursor
+        lda #$FF
+        sta zp_demo_prev_x
+        sta zp_demo_prev_y
+room_click_send
+        jsr demo_suspend_input_irq
+        jsr copy_click_url_to_buffer
+        jsr fetch_text_payload
+        jsr demo_resume_input_irq
+room_click_done
+        jsr demo_draw_cursor
+        rts
 
 demo_image_loop
         lda #0
@@ -508,6 +525,33 @@ demo_click_pressed
         rts
 demo_click_held
         clc
+        rts
+
+demo_suspend_input_irq
+        lda demo_input_active
+        beq demo_suspend_done
+        sei
+        lda POKMSK
+        and #$FD
+        sta POKMSK
+        sta IRQEN
+        cli
+demo_suspend_done
+        rts
+
+demo_resume_input_irq
+        lda demo_input_active
+        beq demo_resume_done
+        sei
+        lda POKMSK
+        ora #$02
+        sta POKMSK
+        sta IRQEN
+        lda #$40
+        sta AUDF2
+        sta STIMER
+        cli
+demo_resume_done
         rts
 
 demo_click_stamp
@@ -1114,6 +1158,44 @@ copy_text_url_to_buffer
         sta zp_tmp_ptr+1
         jmp copy_string_to_buffer
 
+copy_room_url_to_buffer
+        lda #<room_url_string
+        sta zp_tmp_ptr
+        lda #>room_url_string
+        sta zp_tmp_ptr+1
+        jmp copy_string_to_buffer
+
+copy_click_url_to_buffer
+        lda zp_demo_cursor_x
+        lsr
+        lsr
+        lsr
+        lsr
+        jsr nibble_to_hex
+        sta click_url_x_hi
+
+        lda zp_demo_cursor_x
+        jsr nibble_to_hex
+        sta click_url_x_lo
+
+        lda zp_demo_cursor_y
+        lsr
+        lsr
+        lsr
+        lsr
+        jsr nibble_to_hex
+        sta click_url_y_hi
+
+        lda zp_demo_cursor_y
+        jsr nibble_to_hex
+        sta click_url_y_lo
+
+        lda #<click_url_string
+        sta zp_tmp_ptr
+        lda #>click_url_string
+        sta zp_tmp_ptr+1
+        jmp copy_string_to_buffer
+
 copy_slide_url_to_buffer
         lda slide_index
         lsr
@@ -1312,6 +1394,7 @@ fetch_header_ok
 
 fetch_palette_ok
         jsr init_image_write
+        jsr demo_build_row_table
         lda img_pal_leftover
         sta zp_rx_len
         jsr write_pixel_chunk
@@ -1733,6 +1816,40 @@ set_image_palette
         sta (zp_vbxe_base),y
 
         ldy #VBXE_CSEL
+        lda #0
+        sta (zp_vbxe_base),y
+        ldy #VBXE_CR
+        lda #0
+        sta (zp_vbxe_base),y
+        ldy #VBXE_CG
+        sta (zp_vbxe_base),y
+        ldy #VBXE_CB
+        sta (zp_vbxe_base),y
+
+        ldy #VBXE_CSEL
+        lda #COL_WHITE
+        sta (zp_vbxe_base),y
+        ldy #VBXE_CR
+        lda #$FF
+        sta (zp_vbxe_base),y
+        ldy #VBXE_CG
+        sta (zp_vbxe_base),y
+        ldy #VBXE_CB
+        sta (zp_vbxe_base),y
+
+        ldy #VBXE_CSEL
+        lda #COL_RED
+        sta (zp_vbxe_base),y
+        ldy #VBXE_CR
+        lda #$FF
+        sta (zp_vbxe_base),y
+        ldy #VBXE_CG
+        lda #0
+        sta (zp_vbxe_base),y
+        ldy #VBXE_CB
+        sta (zp_vbxe_base),y
+
+        ldy #VBXE_CSEL
         lda #8
         sta (zp_vbxe_base),y
 
@@ -2099,6 +2216,15 @@ demo_popup_text
 
 text_url_string  dta c'N:http://127.0.0.1:3000/',0
 text_url_string_end
+room_url_string  dta c'N:http://127.0.0.1:3000/room/room1',0
+room_url_string_end
+click_url_string dta c'N:http://127.0.0.1:3000/click/room1/'
+click_url_x_hi   dta c'0'
+click_url_x_lo   dta c'0'
+                 dta c'/'
+click_url_y_hi   dta c'0'
+click_url_y_lo   dta c'0',0
+click_url_string_end
 slide_url_string dta c'N:http://127.0.0.1:3000/slide/'
 slide_url_hex_hi dta c'0'
 slide_url_hex_lo dta c'0',0
@@ -2124,6 +2250,8 @@ msg_press_space      dta c'Press SPACE for slideshow or D for demo', ATASCII_RET
 msg_press_space_end
 msg_loading_image    dta c'Loading image...', ATASCII_RET
 msg_loading_image_end
+msg_loading_room     dta c'Loading room1...', ATASCII_RET
+msg_loading_room_end
 msg_generating_demo  dta c'Generating demo image...', ATASCII_RET
 msg_generating_demo_end
 msg_stage_text_open  dta c'Stage: OPEN TEXT', ATASCII_RET

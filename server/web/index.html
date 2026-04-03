@@ -21,6 +21,7 @@
     .meta { color: #9ca3af; font-size: .95rem; }
     .actions { display: inline-flex; gap: 8px; margin-left: 12px; }
     code { color: #fde68a; }
+    .preview-canvas { width: 100%; max-width: 640px; height: auto; image-rendering: pixelated; border: 1px solid #374151; background: #000; }
   </style>
 </head>
 <body>
@@ -40,6 +41,13 @@
       </form>
       <p class="meta">Images are resized to fit within 320×200 and quantized to 248 colors + 8 reserved VBXE entries.</p>
       <div id="status" class="status"></div>
+    </section>
+
+    <section class="card">
+      <h2>Room1 preview</h2>
+      <p class="meta">Preview of the VBXE room image served at <code>/room/room1</code>. The red marker shows the last click received by the server.</p>
+      <canvas id="room-preview" class="preview-canvas" width="320" height="200"></canvas>
+      <p id="room-preview-meta" class="meta"></p>
     </section>
 
     <section class="card">
