@@ -3,58 +3,815 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>VBXE Slideshow Manager</title>
+  <title>VBXE Room Studio</title>
   <style>
-    :root { color-scheme: dark light; font-family: system-ui, sans-serif; }
-    body { margin: 0; background: #111827; color: #e5e7eb; }
-    main { max-width: 960px; margin: 0 auto; padding: 24px; }
-    .card { background: #1f2937; border: 1px solid #374151; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    :root { 
+      color-scheme: dark light; 
+      font-family: system-ui, sans-serif; 
+      --bg-primary: #111827;
+      --bg-secondary: #1f2937;
+      --bg-tertiary: #374151;
+      --text-primary: #e5e7eb;
+      --text-secondary: #9ca3af;
+      --text-accent: #93c5fd;
+      --text-error: #fca5a5;
+      --border: #374151;
+      --accent: #3b82f6;
+    }
+    
+    * { box-sizing: border-box; }
+    
+    body { 
+      margin: 0; 
+      background: var(--bg-primary); 
+      color: var(--text-primary); 
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    .sidebar {
+      width: 250px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: bold;
+      font-size: 1.1em;
+    }
+    
+    .room-list {
+      flex: 1;
+      overflow-y: auto;
+    }
+    
+    .room-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: background-color 0.2s;
+    }
+    
+    .room-item:hover {
+      background: var(--bg-tertiary);
+    }
+    
+    .room-item.active {
+      background: var(--accent);
+      color: white;
+    }
+    
+    .room-name {
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+    
+    .room-meta {
+      font-size: 0.85em;
+      color: var(--text-secondary);
+    }
+    
+    .room-item.active .room-meta {
+      color: rgba(255, 255, 255, 0.8);
+    }
+    
+    .add-room-btn {
+      margin: 16px;
+      padding: 8px 12px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+    
+    .add-room-btn:hover {
+      background: #2563eb;
+    }
+
+    .sidebar-subtitle {
+      margin-top: 6px;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      font-weight: 400;
+      line-height: 1.4;
+    }
+    
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+    }
+    
+    .card { 
+      background: var(--bg-secondary); 
+      border: 1px solid var(--border); 
+      border-radius: 12px; 
+      padding: 16px; 
+      margin-bottom: 16px; 
+    }
+
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: minmax(420px, 1.25fr) minmax(320px, 0.95fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .card-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .card-title-row h2,
+    .card-title-row h3 {
+      margin: 0;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(59, 130, 246, 0.12);
+      color: var(--text-accent);
+      font-size: 0.85rem;
+      white-space: nowrap;
+    }
+
+    .upload-intro {
+      line-height: 1.5;
+      margin-bottom: 14px;
+    }
+    
     h1, h2, p { margin-top: 0; }
+    
     button, input { font: inherit; }
-    button { padding: 8px 12px; border-radius: 8px; border: 1px solid #4b5563; background: #374151; color: #f9fafb; cursor: pointer; }
-    button:disabled { opacity: .6; cursor: wait; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-    .status { min-height: 1.5em; color: #93c5fd; }
-    .status.error { color: #fca5a5; }
-    ol { padding-left: 20px; }
-    li { margin-bottom: 10px; }
-    .meta { color: #9ca3af; font-size: .95rem; }
-    .actions { display: inline-flex; gap: 8px; margin-left: 12px; }
-    code { color: #fde68a; }
-    .preview-canvas { width: 100%; max-width: 640px; height: auto; image-rendering: pixelated; border: 1px solid #374151; background: #000; }
+    
+    button { 
+      padding: 8px 12px; 
+      border-radius: 8px; 
+      border: 1px solid var(--border); 
+      background: var(--bg-tertiary); 
+      color: var(--text-primary); 
+      cursor: pointer; 
+    }
+    
+    button:disabled { 
+      opacity: .6; 
+      cursor: wait; 
+    }
+    
+    button.primary {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+    
+    button.primary:hover {
+      background: #2563eb;
+    }
+    
+    .row { 
+      display: flex; 
+      gap: 12px; 
+      flex-wrap: wrap; 
+      align-items: center; 
+    }
+    
+    .status { 
+      min-height: 1.5em; 
+      color: var(--text-accent); 
+    }
+    
+    .status.error { 
+      color: var(--text-error); 
+    }
+    
+    ol { 
+      padding-left: 20px; 
+    }
+    
+    li { 
+      margin-bottom: 10px; 
+    }
+    
+    .meta { 
+      color: var(--text-secondary); 
+      font-size: .95rem; 
+    }
+    
+    .actions { 
+      display: inline-flex; 
+      gap: 8px; 
+      margin-left: 12px; 
+    }
+    
+    code { 
+      color: #fde68a; 
+    }
+    
+    .preview-canvas { 
+      width: 100%; 
+      max-width: 640px; 
+      height: auto; 
+      image-rendering: pixelated; 
+      border: 1px solid var(--border); 
+      background: #000; 
+    }
+    
+    .crop-container {
+      position: relative;
+      margin: 16px 0;
+      width: 100%;
+      display: none;
+    }
+
+    .crop-workspace {
+      display: grid;
+      grid-template-columns: minmax(320px, 2fr) minmax(220px, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .crop-panel {
+      background: rgba(17, 24, 39, 0.55);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .crop-canvas {
+      border: 1px solid var(--border);
+      width: 100%;
+      max-width: 640px;
+      aspect-ratio: 320 / 200;
+      height: auto;
+      border-radius: 10px;
+      background: #020617;
+      display: block;
+    }
+
+    .preview-frame {
+      width: 100%;
+      max-width: 320px;
+      aspect-ratio: 320 / 200;
+      height: auto;
+      image-rendering: pixelated;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #000;
+      display: block;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .crop-controls {
+      margin: 16px 0 0;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .crop-info {
+      font-size: 0.9em;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+    
+    .room-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    
+    .room-title {
+      font-size: 1.5em;
+      font-weight: bold;
+    }
+
+    .room-subtitle {
+      margin-top: 6px;
+      color: var(--text-secondary);
+    }
+
+    .room-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .room-action-btn {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: rgba(17, 24, 39, 0.65);
+      color: var(--text-primary);
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .room-action-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .panel-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .editor-placeholder {
+      padding: 24px;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      background: rgba(17, 24, 39, 0.35);
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .room-editor-layout {
+      display: grid;
+      grid-template-columns: minmax(340px, 1.4fr) minmax(260px, 0.9fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .room-stage {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      aspect-ratio: 320 / 200;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .room-stage .preview-canvas {
+      max-width: none;
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    .selection-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+    }
+
+    .selection-box {
+      position: absolute;
+      border: 2px solid rgba(96, 165, 250, 0.95);
+      background: rgba(59, 130, 246, 0.18);
+      box-sizing: border-box;
+      cursor: move;
+      border-radius: 6px;
+      min-width: 6px;
+      min-height: 6px;
+      user-select: none;
+    }
+
+    .selection-box.active {
+      border-color: #fbbf24;
+      background: rgba(251, 191, 36, 0.2);
+      box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.18);
+    }
+
+    .selection-label {
+      position: absolute;
+      left: 6px;
+      top: 6px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.88);
+      color: #fff;
+      font-size: 0.75rem;
+      line-height: 1.2;
+      pointer-events: none;
+      white-space: nowrap;
+      max-width: calc(100% - 20px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .selection-handle {
+      position: absolute;
+      right: -6px;
+      bottom: -6px;
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: #fbbf24;
+      border: 2px solid rgba(15, 23, 42, 0.95);
+      cursor: nwse-resize;
+    }
+
+    .selection-sidebar {
+      display: grid;
+      gap: 14px;
+      align-content: start;
+    }
+
+    .selection-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .selection-list button {
+      text-align: left;
+      justify-content: flex-start;
+      width: 100%;
+    }
+
+    .selection-list button.active {
+      background: rgba(59, 130, 246, 0.16);
+      border-color: rgba(59, 130, 246, 0.45);
+      color: var(--text-accent);
+    }
+
+    .selection-form {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(17, 24, 39, 0.45);
+    }
+
+    .selection-form label {
+      display: grid;
+      gap: 6px;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+
+    .selection-form input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .selection-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    
+    .delete-room-btn {
+      background: #dc2626;
+      color: white;
+      border-color: #dc2626;
+    }
+    
+    .delete-room-btn:hover {
+      background: #b91c1c;
+    }
+    
+    .no-room-selected {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-secondary);
+      font-size: 1.2em;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+    }
+    
+    .modal-content {
+      background: var(--bg-secondary);
+      margin: 15% auto;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 300px;
+    }
+    
+    .modal-header {
+      font-weight: bold;
+      margin-bottom: 16px;
+    }
+    
+    .modal-input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 16px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text-primary);
+    }
+    
+    .modal-buttons {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .empty-panel {
+      padding: 18px;
+      color: var(--text-secondary);
+      text-align: center;
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      background: rgba(17, 24, 39, 0.35);
+      margin: 12px;
+    }
+
+    .slide-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .slide-item {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(17, 24, 39, 0.45);
+    }
+
+    .slide-index {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(59, 130, 246, 0.15);
+      color: var(--text-accent);
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+
+    .slide-main {
+      min-width: 0;
+    }
+
+    .slide-title {
+      font-weight: 700;
+      margin-bottom: 4px;
+      overflow-wrap: anywhere;
+    }
+
+    .slide-actions {
+      display: inline-flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .button-danger {
+      background: rgba(220, 38, 38, 0.12);
+      color: #fecaca;
+      border-color: rgba(220, 38, 38, 0.35);
+    }
+
+    .tips-list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+
+    .tips-list li {
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 1100px) {
+      .workspace-grid,
+      .crop-workspace,
+      .room-editor-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 860px) {
+      body {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+        overflow: auto;
+      }
+
+      .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        max-height: 260px;
+      }
+
+      .room-header {
+        align-items: flex-start;
+      }
+    }
   </style>
 </head>
 <body>
-  <main>
-    <section class="card">
-      <h1>VBXE Slideshow Manager</h1>
-      <p>Upload images, convert them to VBXE in the browser, and control the order used by the Atari slideshow.</p>
-      <p>The Atari client fetches slides from <code>/slide/00</code>, <code>/slide/01</code>, <code>/slide/02</code>...</p>
-    </section>
+  <div class="sidebar">
+    <div class="sidebar-header">
+      VBXE Rooms
+      <div class="sidebar-subtitle">Create rooms, upload a single background image per room, and preview what FujiNet will show.</div>
+    </div>
+    <div class="room-list" id="room-list">
+      <!-- Rooms will be populated here -->
+    </div>
+    <button class="add-room-btn" id="add-room-btn">+ Add Room</button>
+  </div>
 
-    <section class="card">
-      <h2>Upload images</h2>
-      <form id="upload-form" class="row">
-        <input id="file-input" type="file" accept="image/*" multiple>
-        <button id="upload-button" type="submit">Convert and upload</button>
-        <button id="refresh-button" type="button">Refresh</button>
-      </form>
-      <p class="meta">Images are resized to fit within 320×200 and quantized to 248 colors + 8 reserved VBXE entries.</p>
-      <div id="status" class="status"></div>
-    </section>
+  <div class="main-content">
+    <div class="content-area">
+      <div id="no-room-selected" class="no-room-selected">
+        Select a room to manage
+      </div>
+      
+      <div id="room-content" style="display: none;">
+        <div class="room-header">
+          <div>
+            <div class="room-title" id="room-title">Room Name</div>
+            <div class="room-subtitle">Upload a room image when needed, then switch to room editing and preview mode.</div>
+          </div>
+          <button class="delete-room-btn" id="delete-room-btn">Delete Room</button>
+        </div>
 
-    <section class="card">
-      <h2>Room1 preview</h2>
-      <p class="meta">Preview of the VBXE room image served at <code>/room/room1</code>. The red marker shows the last click received by the server.</p>
-      <canvas id="room-preview" class="preview-canvas" width="320" height="200"></canvas>
-      <p id="room-preview-meta" class="meta"></p>
-    </section>
+        <div class="room-actions">
+          <button id="room-upload-tab-btn" class="room-action-btn" type="button">Upload room image</button>
+          <button id="room-edit-tab-btn" class="room-action-btn" type="button">Room edit</button>
+        </div>
 
-    <section class="card">
-      <h2>Slideshow order</h2>
-      <ol id="slide-list"></ol>
-    </section>
-  </main>
+        <div id="upload-panel" class="panel-stack">
+          <section class="card">
+            <div class="card-title-row">
+              <h2>Upload & crop room image</h2>
+              <span class="pill">One image per room</span>
+            </div>
+            <p class="meta upload-intro">Choose a single image for this room. Uploading again replaces the current room background. The crop editor prepares a final 320×200 VBXE frame with 8 reserved colors and 248 quantized palette entries.</p>
+            <form id="upload-form" class="row">
+              <input id="file-input" type="file" accept="image/*">
+              <button id="upload-button" type="submit" class="primary">Convert and upload</button>
+            </form>
+
+            <div id="crop-container" class="crop-container">
+              <div class="crop-workspace">
+                <div class="crop-panel">
+                  <div class="card-title-row">
+                    <h3>Crop editor</h3>
+                    <span id="crop-source-meta" class="meta">No image loaded</span>
+                  </div>
+                  <canvas id="crop-canvas" class="crop-canvas" width="640" height="400"></canvas>
+                </div>
+
+                <div class="crop-panel">
+                  <div class="card-title-row">
+                    <h3>Final 320×200 preview</h3>
+                    <span class="pill">VBXE output</span>
+                  </div>
+                  <canvas id="crop-preview-canvas" class="preview-frame" width="320" height="200"></canvas>
+                  <div class="crop-info" id="crop-info">Drag the large preview to frame the final image.</div>
+                </div>
+              </div>
+
+              <div class="crop-controls">
+                <label>
+                  Zoom: <input type="range" id="scale-slider" min="1" max="4" step="0.05" value="1">
+                  <span id="scale-value">100%</span>
+                </label>
+                <button id="reset-crop-btn" type="button">Reset view</button>
+                <button id="cancel-crop-btn" type="button">Cancel</button>
+                <button id="apply-crop-btn" type="button" class="primary">Apply crop</button>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div id="edit-panel" class="panel-stack" style="display: none;">
+          <section class="card">
+            <div class="card-title-row">
+              <h2>Room image</h2>
+              <div class="row">
+                <span id="room-url-pill" class="pill">Atari URL pending</span>
+                <button id="refresh-button" type="button">Refresh</button>
+              </div>
+            </div>
+            <p class="meta">Preview of the current VBXE room image. The red marker shows the last click received by the server. Use the right-side selection list to create and edit rectangular zones.</p>
+            <div class="room-editor-layout">
+              <div>
+                <div id="room-stage" class="room-stage">
+                  <canvas id="room-preview" class="preview-canvas" width="320" height="200"></canvas>
+                  <div id="selection-overlay" class="selection-overlay"></div>
+                </div>
+                <p id="room-preview-meta" class="meta"></p>
+              </div>
+
+              <aside class="selection-sidebar">
+                <div class="card-title-row">
+                  <h3>Selections</h3>
+                  <button id="add-selection-btn" type="button" class="primary">Add selection</button>
+                </div>
+                <div id="selection-list" class="selection-list"></div>
+                <div id="selection-empty" class="empty-panel" style="display: none; margin: 0;">No selections yet. Add one and then drag or resize it on the room image.</div>
+                <div id="selection-form-placeholder" class="empty-panel" style="margin: 0;">Select a selection on the right to edit its name and rectangle values.</div>
+
+                <form id="selection-form" class="selection-form" style="display: none;">
+                  <label>
+                    Name
+                    <input id="selection-name-input" type="text" maxlength="80">
+                  </label>
+
+                  <div class="selection-grid">
+                    <label>
+                      X
+                      <input id="selection-x-input" type="number" min="0" max="319">
+                    </label>
+                    <label>
+                      Y
+                      <input id="selection-y-input" type="number" min="0" max="199">
+                    </label>
+                    <label>
+                      Width
+                      <input id="selection-width-input" type="number" min="1" max="320">
+                    </label>
+                    <label>
+                      Height
+                      <input id="selection-height-input" type="number" min="1" max="200">
+                    </label>
+                  </div>
+
+                  <div class="row">
+                    <button id="delete-selection-btn" type="button" class="button-danger">Delete selection</button>
+                  </div>
+                </form>
+              </aside>
+            </div>
+          </section>
+        </div>
+
+        <div id="status" class="status"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Room Modal -->
+  <div id="add-room-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">Create New Room</div>
+      <input type="text" id="room-name-input" class="modal-input" placeholder="Room name (e.g., room1)" maxlength="20">
+      <div class="modal-buttons">
+        <button onclick="closeAddRoomModal()">Cancel</button>
+        <button onclick="createRoom()" class="primary">Create</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/web/app.js"></script>
 </body>
