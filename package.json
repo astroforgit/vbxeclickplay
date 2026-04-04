@@ -4,7 +4,8 @@
   "description": "Node.js VBXE Game Server for Atari",
   "main": "src/server/server.js",
   "scripts": {
-    "start": "node server/server.js"
+    "start": "node server/server.js",
+    "startdebug": "node --inspect server/server.js"
   },
   "engines": {
     "node": ">=14.0.0"

@@ -47,7 +47,16 @@ room_wait
         jsr demo_poll_click
         bcc room_key_check
         jsr room_handle_click
-        jmp room_wait
+        lda room_action_pending_reload
+        beq room_wait
+        lda #0
+        sta room_action_pending_reload
+        jsr demo_suspend_input_irq
+        lda #0
+        sta demo_input_active
+        lda #$22
+        sta SDMCTL
+        jmp load_room
 room_key_check
         lda CH
         cmp #KEY_NONE
@@ -62,6 +71,11 @@ room_key_check
         sta zp_demo_prev_x
         sta zp_demo_prev_y
 room_reload
+        jsr demo_suspend_input_irq
+        lda #0
+        sta demo_input_active
+        lda #$22
+        sta SDMCTL
         jmp load_room
 
 room_handle_click
@@ -79,14 +93,12 @@ room_click_send
         bcs room_click_resume
         jsr room_process_click_response
 room_click_resume
-        jsr demo_resume_input_irq
         lda room_action_pending_reload
-        beq room_click_done
-        lda #0
-        sta room_action_pending_reload
-        jmp load_room
+        bne room_click_done_reload
+        jsr demo_resume_input_irq
 room_click_done
         jsr demo_draw_cursor
+room_click_done_reload
         rts
 
 demo_image_loop
