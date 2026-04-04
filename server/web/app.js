@@ -35,6 +35,8 @@ const selectionYInput = document.getElementById('selection-y-input');
 const selectionWidthInput = document.getElementById('selection-width-input');
 const selectionHeightInput = document.getElementById('selection-height-input');
 const deleteSelectionBtn = document.getElementById('delete-selection-btn');
+const clickScriptEditor = document.getElementById('click-script-editor');
+const saveClickScriptBtn = document.getElementById('save-click-script-btn');
 
 // Crop elements
 const cropContainer = document.getElementById('crop-container');
@@ -59,6 +61,7 @@ let currentRoomPanel = 'upload';
 let selectedSelectionId = null;
 let rooms = [];
 let selectionInteraction = null;
+let clickScriptLoaded = false;
 let cropState = {
   image: null,
   fileName: '',
@@ -83,6 +86,7 @@ roomEditTabBtn.addEventListener('click', () => setRoomPanel('edit'));
 addSelectionBtn.addEventListener('click', createSelection);
 selectionForm.addEventListener('input', onSelectionFormInput);
 deleteSelectionBtn.addEventListener('click', deleteSelection);
+saveClickScriptBtn.addEventListener('click', saveClickScript);
 
 // Crop event listeners
 scaleSlider.addEventListener('input', onScaleChange);
@@ -111,6 +115,9 @@ setInterval(() => {
 
 async function refreshRooms() {
   try {
+    if (!clickScriptLoaded) {
+      await loadClickScript();
+    }
     const data = await fetchJson('/api/rooms');
     rooms = data.rooms || [];
     renderRooms();
@@ -685,6 +692,20 @@ async function uploadRoomImage(filename, vbxeData) {
       vbxeBase64: bytesToBase64(vbxeData)
     })
   });
+}
+
+async function loadClickScript() {
+  const data = await fetchJson('/api/script/click');
+  clickScriptEditor.value = data.script || '';
+  clickScriptLoaded = true;
+}
+
+async function saveClickScript() {
+  await fetchJson('/api/script/click', {
+    method: 'PUT',
+    body: JSON.stringify({ script: clickScriptEditor.value })
+  });
+  setStatus('Click script saved. Future Atari clicks will use the updated JavaScript.');
 }
 
 async function createSelection() {

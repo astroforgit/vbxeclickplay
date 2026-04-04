@@ -491,6 +491,29 @@
       grid-template-columns: 1fr 1fr;
       gap: 12px;
     }
+
+    .script-editor {
+      display: grid;
+      gap: 12px;
+    }
+
+    .mono-textarea {
+      width: 100%;
+      min-height: 240px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #020617;
+      color: #e2e8f0;
+      font: 0.92rem/1.5 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+      resize: vertical;
+    }
+
+    .script-help {
+      color: var(--text-secondary);
+      line-height: 1.6;
+      font-size: 0.92rem;
+    }
     
     .delete-room-btn {
       background: #dc2626;
@@ -792,6 +815,17 @@
                   </div>
                 </form>
               </aside>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-title-row">
+              <h2>Click JavaScript</h2>
+              <button id="save-click-script-btn" type="button" class="primary">Save script</button>
+            </div>
+            <div class="script-editor">
+              <p class="script-help">This global script runs on every Atari click after the server stores the red marker. Available values include <code>roomName</code>, <code>requestedRoomName</code>, <code>logicalX</code>, <code>x</code>, <code>y</code>, <code>roomSelections</code>, <code>selections</code>, and <code>rooms</code>. Return <code>changeRoom('room2')</code>, <code>displayText('hello')</code>, or <code>replaceGraphics({ room: 'patchroom', x: 120, y: 40, width: 32, height: 24 })</code>.</p>
+              <textarea id="click-script-editor" class="mono-textarea" spellcheck="false"></textarea>
             </div>
           </section>
         </div>

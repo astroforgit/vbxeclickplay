@@ -6,42 +6,50 @@ copy_text_url_to_buffer
         jmp copy_string_to_buffer
 
 copy_room_url_to_buffer
-        lda #<room_url_string
+        lda #<room_url_prefix
         sta zp_tmp_ptr
-        lda #>room_url_string
+        lda #>room_url_prefix
         sta zp_tmp_ptr+1
-        jmp copy_string_to_buffer
+        jsr copy_string_to_buffer
+        ldy #0
+copy_room_find_end
+        lda url_buffer,y
+        beq copy_room_append_name
+        iny
+        bne copy_room_find_end
+copy_room_append_name
+        jsr append_current_room_name
+        lda #0
+        sta url_buffer,y
+        rts
 
 copy_click_url_to_buffer
-        lda zp_demo_cursor_x
-        lsr
-        lsr
-        lsr
-        lsr
-        jsr nibble_to_hex
-        sta click_url_x_hi
-
-        lda zp_demo_cursor_x
-        jsr nibble_to_hex
-        sta click_url_x_lo
-
-        lda zp_demo_cursor_y
-        lsr
-        lsr
-        lsr
-        lsr
-        jsr nibble_to_hex
-        sta click_url_y_hi
-
-        lda zp_demo_cursor_y
-        jsr nibble_to_hex
-        sta click_url_y_lo
-
-        lda #<click_url_string
+        lda #<click_url_prefix
         sta zp_tmp_ptr
-        lda #>click_url_string
+        lda #>click_url_prefix
         sta zp_tmp_ptr+1
-        jmp copy_string_to_buffer
+        jsr copy_string_to_buffer
+        ldy #0
+copy_click_find_end
+        lda url_buffer,y
+        beq copy_click_append_room
+        iny
+        bne copy_click_find_end
+copy_click_append_room
+        jsr append_current_room_name
+        lda #'/'
+        sta url_buffer,y
+        iny
+        lda zp_demo_cursor_x
+        jsr append_hex_byte_to_buffer
+        lda #'/'
+        sta url_buffer,y
+        iny
+        lda zp_demo_cursor_y
+        jsr append_hex_byte_to_buffer
+        lda #0
+        sta url_buffer,y
+        rts
 
 copy_slide_url_to_buffer
         lda slide_index
@@ -78,6 +86,34 @@ copy_url_copy_loop
         iny
         bne copy_url_copy_loop
 copy_url_done
+        rts
+
+append_current_room_name
+        ldx #0
+append_room_name_loop
+        lda current_room_name,x
+        beq append_room_name_done
+        sta url_buffer,y
+        iny
+        inx
+        cpx #ROOM_NAME_MAX
+        bcc append_room_name_loop
+append_room_name_done
+        rts
+
+append_hex_byte_to_buffer
+        pha
+        lsr
+        lsr
+        lsr
+        lsr
+        jsr nibble_to_hex
+        sta url_buffer,y
+        iny
+        pla
+        jsr nibble_to_hex
+        sta url_buffer,y
+        iny
         rts
 
 fetch_text_payload
@@ -211,4 +247,9 @@ sanitize_next
         inx
         jmp sanitize_loop
 sanitize_done
+        cpx #255
+        beq sanitize_no_term
+        lda #0
+        sta rx_buffer,x
+sanitize_no_term
         rts

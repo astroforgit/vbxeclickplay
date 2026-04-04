@@ -31,18 +31,19 @@ demo_arrow_data_end
 
 demo_popup_text
         dta c'hello world',0
+        .ds DEMO_POPUP_TEXT_MAX+1-(12)
+
+default_room_name
+        dta c'room1',0
 
 text_url_string  dta c'N:http://127.0.0.1:3000/',0
 text_url_string_end
-room_url_string  dta c'N:http://127.0.0.1:3000/room/room1',0
-room_url_string_end
-click_url_string dta c'N:http://127.0.0.1:3000/click/room1/'
-click_url_x_hi   dta c'0'
-click_url_x_lo   dta c'0'
-                 dta c'/'
-click_url_y_hi   dta c'0'
-click_url_y_lo   dta c'0',0
-click_url_string_end
+room_url_prefix  dta c'N:http://127.0.0.1:3000/room/',0
+room_url_prefix_end
+click_url_prefix dta c'N:http://127.0.0.1:3000/click/',0
+click_url_prefix_end
+gfx_url_prefix   dta c'N:http://127.0.0.1:3000/gfx/',0
+gfx_url_prefix_end
 slide_url_string dta c'N:http://127.0.0.1:3000/slide/'
 slide_url_hex_hi dta c'0'
 slide_url_hex_lo dta c'0',0

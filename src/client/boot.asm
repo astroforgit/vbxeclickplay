@@ -2,6 +2,7 @@ main
         lda #$22
         sta SDMCTL
         jsr clear_debug
+        jsr init_current_room_name
 
         jsr detect_vbxe
         bcc no_vbxe
@@ -75,7 +76,15 @@ room_click_send
         jsr demo_suspend_input_irq
         jsr copy_click_url_to_buffer
         jsr fetch_text_payload
+        bcs room_click_resume
+        jsr room_process_click_response
+room_click_resume
         jsr demo_resume_input_irq
+        lda room_action_pending_reload
+        beq room_click_done
+        lda #0
+        sta room_action_pending_reload
+        jmp load_room
 room_click_done
         jsr demo_draw_cursor
         rts

@@ -14,22 +14,24 @@ READ_LIMIT   = 96
 KEY_D        = $3A
 DEMO_HEIGHT  = 200
 DEMO_STAMP_SIZE = 20
+ROOM_NAME_MAX = 16
 DEMO_CURSOR_MAX_X = 159
 DEMO_CURSOR_MAX_Y = 199
 DEMO_CURSOR_START_X = 76
 DEMO_CURSOR_START_Y = 96
 DEMO_CURSOR_COLOR = 1
 DEMO_CURSOR_WIDTH = 16
-DEMO_POPUP_WIDTH = 96
-DEMO_POPUP_WIDTH_LOGICAL = 48
-DEMO_POPUP_INNER_WIDTH = 94
+DEMO_POPUP_WIDTH = 160
+DEMO_POPUP_WIDTH_LOGICAL = 80
+DEMO_POPUP_INNER_WIDTH = 158
 DEMO_POPUP_HEIGHT = 12
 DEMO_POPUP_LAST_ROW = 11
-DEMO_POPUP_MAX_X = 112
+DEMO_POPUP_MAX_X = 80
 DEMO_POPUP_MAX_Y = 188
 DEMO_POPUP_BORDER_COLOR = 250
 DEMO_POPUP_FILL_COLOR = 24
 DEMO_POPUP_TEXT_COLOR = 252
+DEMO_POPUP_TEXT_MAX = 19
 
 STUB_BASE      = $0600
 STUB_TIRQ_EXIT = STUB_BASE+17
@@ -49,6 +51,8 @@ zp_demo_prev_y   = $B6
         icl 'client/popup.asm'
         icl 'client/cursor.asm'
         icl 'client/text_io.asm'
+        icl 'client/room_actions.asm'
+        icl 'client/graphics_patch.asm'
         icl 'client/image_io.asm'
         icl 'client/demo_image.asm'
         icl 'client/display_debug.asm'

@@ -48,7 +48,18 @@ demo_popup_font_bits dta b(0)
 demo_rowtab_ptr_lo dta b(0)
 demo_rowtab_ptr_hi dta b(0)
 demo_rowtab_bank   dta b(0)
+room_action_pending_reload dta b(0)
+room_patch_x_lo    dta b(0)
+room_patch_x_hi    dta b(0)
+room_patch_y       dta b(0)
+room_patch_width   dta b(0)
+room_patch_height  dta b(0)
+room_patch_cur_y   dta b(0)
+room_patch_row_remaining dta b(0)
+room_patch_rows_left dta b(0)
 
+current_room_name  .ds ROOM_NAME_MAX+1
+room_patch_source_room .ds ROOM_NAME_MAX+1
 url_buffer        .ds 256
 rx_buffer         .ds 256
 img_pal_buf       .ds 768

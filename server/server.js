@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const { URL } = require('url');
+const vm = require('vm');
 
 const PORT = Number(process.env.PORT || 3000);
 const IMAGE_WIDTH = 320;
@@ -17,6 +18,20 @@ const LEGACY_ROOMS_DIR = path.join(LEGACY_DATA_DIR, 'rooms');
 const LEGACY_STORE_FILE = path.join(LEGACY_DATA_DIR, 'rooms.json');
 const WEB_INDEX_FILE = path.join(__dirname, 'web', 'index.html');
 const WEB_APP_FILE = path.join(__dirname, 'web', 'app.js');
+const DEFAULT_CLICK_SCRIPT = `// Available values: roomName, requestedRoomName, logicalX, x, y,
+// roomSelections, selections, rooms
+// Available helpers: changeRoom(name), displayText(text), replaceGraphics(payload)
+
+const hit = roomSelections.find((selection) => {
+  return x >= selection.x && x < selection.x + selection.width && y >= selection.y && y < selection.y + selection.height;
+});
+
+if (hit) {
+  return displayText(hit.name);
+}
+
+return null;
+`;
 
 function copyDirectoryRecursive(srcDir, destDir) {
   if (!fs.existsSync(srcDir)) return;
@@ -57,27 +72,39 @@ function loadStore() {
   try {
     const parsed = JSON.parse(fs.readFileSync(STORE_FILE, 'utf8'));
     if (!Array.isArray(parsed.rooms)) {
-      return { rooms: [] };
+      return { rooms: [], clickScript: DEFAULT_CLICK_SCRIPT };
     }
     return {
       rooms: parsed.rooms
         .filter((room) => room && typeof room.id === 'string' && typeof room.name === 'string')
-        .map((room) => normalizeRoomRecord(room))
+        .map((room) => normalizeRoomRecord(room)),
+      clickScript: typeof parsed.clickScript === 'string' ? parsed.clickScript : DEFAULT_CLICK_SCRIPT
     };
   } catch (error) {
     console.warn(`[WARN] Failed to load store: ${error.message}`);
-    return { rooms: [] };
+    return { rooms: [], clickScript: DEFAULT_CLICK_SCRIPT };
   }
 }
 
 function saveStore(store) {
   ensureStore();
-  fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2));
+  fs.writeFileSync(STORE_FILE, JSON.stringify({
+    rooms: Array.isArray(store.rooms) ? store.rooms : [],
+    clickScript: typeof store.clickScript === 'string' ? store.clickScript : DEFAULT_CLICK_SCRIPT
+  }, null, 2));
 }
 
 function sanitizeTitle(title) {
   const safe = String(title || 'Untitled').replace(/[\r\n\t]+/g, ' ').trim();
   return safe.slice(0, 80) || 'Untitled';
+}
+
+function sanitizeActionText(text) {
+  const safe = String(text || '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/[^\x20-\x7E]/g, ' ')
+    .trim();
+  return safe.slice(0, 19);
 }
 
 function sanitizeRoomName(name) {
@@ -126,6 +153,10 @@ function getRoomFromStore(store, roomName) {
   const exactRoom = store.rooms.find((room) => room.name === normalized);
   if (exactRoom) {
     return exactRoom;
+  }
+
+  if (normalized === 'room1' && store.rooms.length > 0) {
+    return store.rooms[0];
   }
 
   if (store.rooms.length === 1) {
@@ -313,6 +344,172 @@ function getRoomPreviewPayload(roomName) {
     selections: room.selections || [],
     lastClick
   };
+}
+
+function buildSelectionsForScript(store) {
+  return store.rooms.flatMap((room) => (room.selections || []).map((selection) => ({
+    roomName: room.name,
+    id: selection.id,
+    name: selection.name,
+    x: selection.x,
+    y: selection.y,
+    width: selection.width,
+    height: selection.height
+  })));
+}
+
+function buildRoomsForScript(store) {
+  return store.rooms.map((room) => ({
+    name: room.name,
+    hasImage: (room.slides || []).length > 0,
+    selections: (room.selections || []).map((selection) => ({
+      id: selection.id,
+      name: selection.name,
+      x: selection.x,
+      y: selection.y,
+      width: selection.width,
+      height: selection.height
+    }))
+  }));
+}
+
+function formatHexByte(value) {
+  return (value & 0xff).toString(16).padStart(2, '0').toUpperCase();
+}
+
+function extractPaletteColors(buffer) {
+  const colors = new Array(256);
+  for (let index = 0; index < 256; index += 1) {
+    const offset = 3 + (index * 3);
+    colors[index] = [buffer[offset], buffer[offset + 1], buffer[offset + 2]];
+  }
+  return colors;
+}
+
+function buildPaletteRemap(sourceBuffer, targetBuffer) {
+  const sourcePalette = extractPaletteColors(sourceBuffer);
+  const targetPalette = extractPaletteColors(targetBuffer);
+  return sourcePalette.map(([sr, sg, sb]) => {
+    let bestIndex = 0;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (let index = 0; index < targetPalette.length; index += 1) {
+      const [tr, tg, tb] = targetPalette[index];
+      const distance = ((sr - tr) ** 2) + ((sg - tg) ** 2) + ((sb - tb) ** 2);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = index;
+      }
+    }
+    return bestIndex;
+  });
+}
+
+function buildGraphicsPatchPayload(sourceRoomName, targetRoomName, width, height) {
+  const sourceSlide = getRoomSlidePayload(sourceRoomName, 0);
+  const targetSlide = getRoomSlidePayload(targetRoomName, 0);
+  const patchWidth = Math.max(1, Math.min(clampInteger(width, 1), 255, sourceSlide.width, IMAGE_WIDTH));
+  const patchHeight = Math.max(1, Math.min(clampInteger(height, 1), 255, sourceSlide.height, IMAGE_HEIGHT));
+  const remap = buildPaletteRemap(sourceSlide.buffer, targetSlide.buffer);
+  const pixelOffset = 3 + 768;
+  const patch = Buffer.alloc(patchWidth * patchHeight);
+
+  for (let row = 0; row < patchHeight; row += 1) {
+    const srcRowOffset = pixelOffset + (row * sourceSlide.width);
+    const dstRowOffset = row * patchWidth;
+    for (let column = 0; column < patchWidth; column += 1) {
+      const sourceIndex = sourceSlide.buffer[srcRowOffset + column];
+      patch[dstRowOffset + column] = remap[sourceIndex] ?? sourceIndex;
+    }
+  }
+
+  return {
+    width: patchWidth,
+    height: patchHeight,
+    buffer: patch,
+    sourceTitle: sourceSlide.title,
+    targetTitle: targetSlide.title
+  };
+}
+
+function normalizeClickActionResult(result, currentRoomName) {
+  if (!result) return null;
+  const candidate = Array.isArray(result) ? result.find(Boolean) : result;
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+
+  switch (candidate.type) {
+    case 'changeRoom': {
+      const room = sanitizeRoomName(candidate.room);
+      return room ? { type: 'changeRoom', room } : null;
+    }
+    case 'displayText': {
+      const text = sanitizeActionText(candidate.text);
+      return text ? { type: 'displayText', text } : null;
+    }
+    case 'replaceGraphics': {
+      const sourceRoom = sanitizeRoomName(candidate.payload?.room || candidate.payload?.sourceRoom || currentRoomName);
+      const sourceSlide = getRoomSlidePayload(sourceRoom, 0);
+      const x = Math.max(0, Math.min(IMAGE_WIDTH - 1, clampInteger(candidate.payload?.x, 0)));
+      const y = Math.max(0, Math.min(IMAGE_HEIGHT - 1, clampInteger(candidate.payload?.y, 0)));
+      const width = Math.max(1, Math.min(255, sourceSlide.width, IMAGE_WIDTH - x, clampInteger(candidate.payload?.width, sourceSlide.width)));
+      const height = Math.max(1, Math.min(255, sourceSlide.height, IMAGE_HEIGHT - y, clampInteger(candidate.payload?.height, sourceSlide.height)));
+      return { type: 'replaceGraphics', room: sourceRoom, x, y, width, height };
+    }
+    default:
+      return null;
+  }
+}
+
+function encodeClickActionText(action) {
+  if (!action) return 'OK\n';
+  switch (action.type) {
+    case 'changeRoom':
+      return `ROOM:${action.room}\n`;
+    case 'displayText':
+      return `TEXT:${sanitizeActionText(action.text)}\n`;
+    case 'replaceGraphics':
+      return `GFX:${action.room},${formatHexByte(action.x >> 8)},${formatHexByte(action.x)},${formatHexByte(action.y)},${formatHexByte(action.width)},${formatHexByte(action.height)}\n`;
+    default:
+      return 'OK\n';
+  }
+}
+
+function executeClickScript(requestedRoomName, room, logicalX, y) {
+  const store = loadStore();
+  const x = logicalX * 2;
+  const roomSelections = (room.selections || []).map((selection) => ({
+    id: selection.id,
+    name: selection.name,
+    x: selection.x,
+    y: selection.y,
+    width: selection.width,
+    height: selection.height
+  }));
+
+  const sandbox = {
+    roomName: room.name,
+    requestedRoomName,
+    logicalX,
+    x,
+    y,
+    roomSelections,
+    selections: buildSelectionsForScript(store),
+    rooms: buildRoomsForScript(store),
+    changeRoom: (roomName) => ({ type: 'changeRoom', room: roomName }),
+    displayText: (text) => ({ type: 'displayText', text }),
+    replaceGraphics: (payload = {}) => ({ type: 'replaceGraphics', payload })
+  };
+
+  const wrappedSource = `(function () {\n${store.clickScript || DEFAULT_CLICK_SCRIPT}\n})()`;
+  try {
+    const script = new vm.Script(wrappedSource, { filename: 'click-script.vm.js' });
+    const result = script.runInNewContext(sandbox, { timeout: 50 });
+    return normalizeClickActionResult(result, room.name);
+  } catch (error) {
+    console.error(`[SCRIPT] click handler failed: ${error.stack || error.message}`);
+    return { type: 'displayText', text: 'SCRIPT ERROR' };
+  }
 }
 
 function buildRoomPreviewBuffer(buffer, width, height, lastClick) {
@@ -607,6 +804,20 @@ async function handleCreateSelection(req, res, roomName) {
   sendJson(res, 201, { ok: true, selection });
 }
 
+function handleGetClickScript(res) {
+  const store = loadStore();
+  sendJson(res, 200, { script: store.clickScript || DEFAULT_CLICK_SCRIPT });
+}
+
+async function handleSaveClickScript(req, res) {
+  const body = await readJsonBody(req);
+  const script = typeof body.script === 'string' ? body.script : '';
+  const store = loadStore();
+  store.clickScript = script || DEFAULT_CLICK_SCRIPT;
+  saveStore(store);
+  sendJson(res, 200, { ok: true, script: store.clickScript });
+}
+
 async function handleUpdateSelection(req, res, roomName, selectionId) {
   const body = await readJsonBody(req);
   const store = loadStore();
@@ -770,6 +981,16 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.method === 'GET' && pathname === '/api/script/click') {
+      handleGetClickScript(res);
+      return;
+    }
+
+    if (req.method === 'PUT' && pathname === '/api/script/click') {
+      await handleSaveClickScript(req, res);
+      return;
+    }
+
     if (req.method === 'POST' && pathname === '/api/rooms') {
       await handleCreateRoom(req, res);
       return;
@@ -874,6 +1095,7 @@ const server = http.createServer(async (req, res) => {
 
       const resolvedRoom = getRoom(requestedRoom);
       const clickRoomName = (resolvedRoom && resolvedRoom.name) || sanitizeRoomName(requestedRoom);
+      const clickAction = executeClickScript(requestedRoom, resolvedRoom || { name: clickRoomName, selections: [] }, logicalX, y);
       roomClickState.set(clickRoomName, {
         logicalX,
         x: logicalX * 2,
@@ -881,9 +1103,28 @@ const server = http.createServer(async (req, res) => {
         updatedAt: new Date().toISOString()
       });
 
-      sendText(res, 200, 'OK\n');
+      sendText(res, 200, encodeClickActionText(clickAction));
       console.log(
-        `[EVENT] click ${clickRoomName} logical=(${logicalX},${y}) pixel=(${logicalX * 2},${y})`
+        `[EVENT] click ${clickRoomName} logical=(${logicalX},${y}) pixel=(${logicalX * 2},${y})` +
+        (clickAction ? ` action=${clickAction.type}` : '')
+      );
+      return;
+    }
+
+    const gfxMatch = pathname.match(/^\/gfx\/([^/]+)\/([^/]+)\/([0-9A-Fa-f]{2})\/([0-9A-Fa-f]{2})$/);
+    if (req.method === 'GET' && gfxMatch) {
+      const sourceRoom = decodeURIComponent(gfxMatch[1]);
+      const targetRoom = decodeURIComponent(gfxMatch[2]);
+      const width = parseHexByte(gfxMatch[3]);
+      const height = parseHexByte(gfxMatch[4]);
+      if (width === null || height === null || width < 1 || height < 1) {
+        sendText(res, 400, 'Invalid patch dimensions\n');
+        return;
+      }
+      const patch = buildGraphicsPatchPayload(sourceRoom, targetRoom, width, height);
+      sendBinary(res, patch.buffer);
+      console.log(
+        `[RES] gfx ${sourceRoom} -> ${targetRoom} ${patch.width}x${patch.height} ${patch.buffer.length} bytes`
       );
       return;
     }
