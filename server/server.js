@@ -107,6 +107,19 @@ function sanitizeActionText(text) {
   return safe.slice(0, 19);
 }
 
+function isPngBuffer(buffer) {
+  return Buffer.isBuffer(buffer)
+    && buffer.length >= 8
+    && buffer[0] === 0x89
+    && buffer[1] === 0x50
+    && buffer[2] === 0x4E
+    && buffer[3] === 0x47
+    && buffer[4] === 0x0D
+    && buffer[5] === 0x0A
+    && buffer[6] === 0x1A
+    && buffer[7] === 0x0A;
+}
+
 function sanitizeRoomName(name) {
   const safe = String(name || 'room1').replace(/[^a-zA-Z0-9_-]/g, '').toLowerCase();
   return safe || 'room1';
@@ -120,6 +133,7 @@ function clampInteger(value, fallback = 0) {
 function sanitizeSelectionRecord(selection, defaults = {}) {
   const maxWidth = defaults.maxWidth || IMAGE_WIDTH;
   const maxHeight = defaults.maxHeight || IMAGE_HEIGHT;
+  const type = selection?.type === 'image' ? 'image' : 'rect';
   const baseX = clampInteger(selection?.x, defaults.x ?? 24);
   const baseY = clampInteger(selection?.y, defaults.y ?? 24);
   const x = Math.max(0, Math.min(maxWidth - 1, baseX));
@@ -129,11 +143,16 @@ function sanitizeSelectionRecord(selection, defaults = {}) {
 
   return {
     id: String(selection?.id || defaults.id || `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`),
+    type,
     name: sanitizeTitle(selection?.name || defaults.name || 'Selection'),
     x,
     y,
     width,
     height,
+    visible: selection?.visible !== false,
+    locked: type === 'image' ? selection?.locked !== false : false,
+    imageFileName: type === 'image' && typeof selection?.imageFileName === 'string' ? selection.imageFileName : null,
+    patchFileName: type === 'image' && typeof selection?.patchFileName === 'string' ? selection.patchFileName : null,
     createdAt: selection?.createdAt || defaults.createdAt || new Date().toISOString()
   };
 }
@@ -207,8 +226,11 @@ function buildDemoImagePayload() {
 const demoImagePayload = buildDemoImagePayload();
 const roomClickState = new Map();
 
-function validateVbxePayload(buffer) {
-  if (!Buffer.isBuffer(buffer) || buffer.length < 3 + 768 + 64) {
+function validateVbxePayload(buffer, options = {}) {
+  const minPixels = Math.max(1, clampInteger(options.minPixels, 64));
+  const minWidth = Math.max(1, clampInteger(options.minWidth, 8));
+  const minHeight = Math.max(1, clampInteger(options.minHeight, 8));
+  if (!Buffer.isBuffer(buffer) || buffer.length < 3 + 768 + minPixels) {
     throw new Error('VBXE payload is too small');
   }
 
@@ -216,10 +238,10 @@ function validateVbxePayload(buffer) {
   const height = buffer[2];
   const expectedLength = 3 + 768 + (width * height);
 
-  if (width < 8 || width > 320) {
+  if (width < minWidth || width > 320) {
     throw new Error(`Invalid VBXE width: ${width}`);
   }
-  if (height < 8 || height > 208) {
+  if (height < minHeight || height > 208) {
     throw new Error(`Invalid VBXE height: ${height}`);
   }
   if (buffer.length !== expectedLength) {
@@ -313,6 +335,19 @@ function getRoomPreviewPayload(roomName) {
   const room = getRoom(roomName);
   if (!room) return null;
 
+  const previewSelections = (room.selections || []).map((selection) => {
+    if (selection.type !== 'image' || !selection.imageFileName) {
+      return selection;
+    }
+
+    const imagePath = path.join(ROOMS_DIR, room.id, selection.imageFileName);
+    return {
+      ...selection,
+      imagePngBase64: fs.existsSync(imagePath) ? fs.readFileSync(imagePath).toString('base64') : null,
+      needsPatchRebuild: !selection.patchFileName
+    };
+  });
+
   const image = getRoomImageEntry(roomName);
   if (!image) {
     return {
@@ -324,7 +359,7 @@ function getRoomPreviewPayload(roomName) {
       vbxeBase64: demoImagePayload.toString('base64'),
       hasCustomImage: false,
       imageTitle: null,
-      selections: room.selections || [],
+      selections: previewSelections,
       lastClick: roomClickState.get(room.name) || null
     };
   }
@@ -341,7 +376,7 @@ function getRoomPreviewPayload(roomName) {
     vbxeBase64: buildRoomPreviewBuffer(slide.buffer, slide.width, slide.height, lastClick).toString('base64'),
     hasCustomImage: true,
     imageTitle: slide.title,
-    selections: room.selections || [],
+    selections: previewSelections,
     lastClick
   };
 }
@@ -350,11 +385,14 @@ function buildSelectionsForScript(store) {
   return store.rooms.flatMap((room) => (room.selections || []).map((selection) => ({
     roomName: room.name,
     id: selection.id,
+    type: selection.type || 'rect',
     name: selection.name,
     x: selection.x,
     y: selection.y,
     width: selection.width,
-    height: selection.height
+    height: selection.height,
+    visible: selection.visible !== false,
+    locked: selection.locked === true
   })));
 }
 
@@ -364,11 +402,14 @@ function buildRoomsForScript(store) {
     hasImage: (room.slides || []).length > 0,
     selections: (room.selections || []).map((selection) => ({
       id: selection.id,
+      type: selection.type || 'rect',
       name: selection.name,
       x: selection.x,
       y: selection.y,
       width: selection.width,
-      height: selection.height
+      height: selection.height,
+      visible: selection.visible !== false,
+      locked: selection.locked === true
     }))
   }));
 }
@@ -404,20 +445,18 @@ function buildPaletteRemap(sourceBuffer, targetBuffer) {
   });
 }
 
-function buildGraphicsPatchPayload(sourceRoomName, targetRoomName, width, height) {
-  const sourceSlide = getRoomSlidePayload(sourceRoomName, 0);
-  const targetSlide = getRoomSlidePayload(targetRoomName, 0);
-  const patchWidth = Math.max(1, Math.min(clampInteger(width, 1), 255, sourceSlide.width, IMAGE_WIDTH));
-  const patchHeight = Math.max(1, Math.min(clampInteger(height, 1), 255, sourceSlide.height, IMAGE_HEIGHT));
-  const remap = buildPaletteRemap(sourceSlide.buffer, targetSlide.buffer);
+function buildRemappedPatchPayload(sourceBuffer, sourceWidth, sourceHeight, targetBuffer, width, height, sourceTitle, targetTitle) {
+  const patchWidth = Math.max(1, Math.min(clampInteger(width, 1), 255, sourceWidth, IMAGE_WIDTH));
+  const patchHeight = Math.max(1, Math.min(clampInteger(height, 1), 255, sourceHeight, IMAGE_HEIGHT));
+  const remap = buildPaletteRemap(sourceBuffer, targetBuffer);
   const pixelOffset = 3 + 768;
   const patch = Buffer.alloc(patchWidth * patchHeight);
 
   for (let row = 0; row < patchHeight; row += 1) {
-    const srcRowOffset = pixelOffset + (row * sourceSlide.width);
+    const srcRowOffset = pixelOffset + (row * sourceWidth);
     const dstRowOffset = row * patchWidth;
     for (let column = 0; column < patchWidth; column += 1) {
-      const sourceIndex = sourceSlide.buffer[srcRowOffset + column];
+      const sourceIndex = sourceBuffer[srcRowOffset + column];
       patch[dstRowOffset + column] = remap[sourceIndex] ?? sourceIndex;
     }
   }
@@ -426,9 +465,165 @@ function buildGraphicsPatchPayload(sourceRoomName, targetRoomName, width, height
     width: patchWidth,
     height: patchHeight,
     buffer: patch,
-    sourceTitle: sourceSlide.title,
-    targetTitle: targetSlide.title
+    sourceTitle,
+    targetTitle
   };
+}
+
+function buildRoomGraphicsPatchPayload(sourceRoomName, targetRoomName, width, height) {
+  const sourceSlide = getRoomSlidePayload(sourceRoomName, 0);
+  const targetSlide = getRoomSlidePayload(targetRoomName, 0);
+  return buildRemappedPatchPayload(
+    sourceSlide.buffer,
+    sourceSlide.width,
+    sourceSlide.height,
+    targetSlide.buffer,
+    width,
+    height,
+    sourceSlide.title,
+    targetSlide.title
+  );
+}
+
+function findImageSelectionReference(store, selectionName, currentRoomName, explicitRoomName = null) {
+  if (typeof selectionName !== 'string' || !selectionName.trim()) {
+    return null;
+  }
+
+  const exactMatches = [];
+  const lowerNeedle = selectionName.trim().toLowerCase();
+  const looseMatches = [];
+
+  for (const room of store.rooms) {
+    if (explicitRoomName && room.name !== explicitRoomName) {
+      continue;
+    }
+    for (const selection of room.selections || []) {
+      if (selection.type !== 'image') continue;
+      const reference = { room, selection };
+      if (selection.name === selectionName.trim()) {
+        exactMatches.push(reference);
+      }
+      if (selection.name.toLowerCase() === lowerNeedle) {
+        looseMatches.push(reference);
+      }
+    }
+  }
+
+  const matches = exactMatches.length ? exactMatches : looseMatches;
+  if (!matches.length) {
+    return null;
+  }
+
+  const currentRoomMatch = matches.find((entry) => entry.room.name === currentRoomName);
+  if (currentRoomMatch) {
+    return currentRoomMatch;
+  }
+
+  return matches.length === 1 ? matches[0] : null;
+}
+
+function findImageSelectionByToken(store, sourceToken) {
+  if (!String(sourceToken || '').startsWith('imgsel-')) {
+    return null;
+  }
+  const selectionId = String(sourceToken).slice('imgsel-'.length);
+  for (const room of store.rooms) {
+    const selection = (room.selections || []).find((entry) => entry.id === selectionId && entry.type === 'image');
+    if (selection) {
+      return { room, selection };
+    }
+  }
+  return null;
+}
+
+function buildImageSelectionGraphicsPatchPayload(sourceToken, targetRoomName, width, height) {
+  const store = loadStore();
+  const match = findImageSelectionByToken(store, sourceToken);
+  if (!match) {
+    throw new Error(`Image selection not found for ${sourceToken}`);
+  }
+  if (!match.selection.patchFileName) {
+    throw new Error(`Image selection ${match.selection.name} has no stored graphics patch yet`);
+  }
+
+  const patchPath = path.join(ROOMS_DIR, match.room.id, match.selection.patchFileName);
+  if (!fs.existsSync(patchPath)) {
+    throw new Error(`Missing graphics patch file for image selection ${match.selection.name}`);
+  }
+
+  const sourceBuffer = fs.readFileSync(patchPath);
+  const sourceDimensions = validateVbxePayload(sourceBuffer, { minPixels: 1, minWidth: 1, minHeight: 1 });
+  const targetSlide = getRoomSlidePayload(targetRoomName, 0);
+  return buildRemappedPatchPayload(
+    sourceBuffer,
+    sourceDimensions.width,
+    sourceDimensions.height,
+    targetSlide.buffer,
+    width,
+    height,
+    `${match.room.name}/${match.selection.name}`,
+    targetSlide.title
+  );
+}
+
+function buildGraphicsPatchPayload(sourceToken, targetRoomName, width, height) {
+  const selectionMatch = findImageSelectionByToken(loadStore(), sourceToken);
+  if (selectionMatch) {
+    return buildImageSelectionGraphicsPatchPayload(sourceToken, targetRoomName, width, height);
+  }
+  return buildRoomGraphicsPatchPayload(sourceToken, targetRoomName, width, height);
+}
+
+function normalizeReplaceGraphicsPayload(rawPayload) {
+  if (typeof rawPayload === 'string') {
+    return { selection: rawPayload };
+  }
+  if (rawPayload && typeof rawPayload === 'object') {
+    return rawPayload;
+  }
+  return {};
+}
+
+function resolveReplaceGraphicsAction(payloadInput, currentRoomName) {
+  const payload = normalizeReplaceGraphicsPayload(payloadInput);
+  const store = loadStore();
+
+  if (typeof payload.selection === 'string' && payload.selection.trim()) {
+    const explicitRoomName = typeof payload.room === 'string' && payload.room.trim()
+      ? sanitizeRoomName(payload.room)
+      : null;
+    const match = findImageSelectionReference(store, payload.selection, currentRoomName, explicitRoomName);
+    if (!match) {
+      console.warn(`[SCRIPT] image selection not found or ambiguous: ${payload.selection}`);
+      return null;
+    }
+    if (!match.selection.patchFileName) {
+      console.warn(`[SCRIPT] image selection ${match.selection.name} is missing a stored graphics patch`);
+      return null;
+    }
+
+    const x = Math.max(0, Math.min(IMAGE_WIDTH - 1, clampInteger(payload.x, match.selection.x)));
+    const y = Math.max(0, Math.min(IMAGE_HEIGHT - 1, clampInteger(payload.y, match.selection.y)));
+    const width = Math.max(1, Math.min(255, match.selection.width, IMAGE_WIDTH - x, clampInteger(payload.width, match.selection.width)));
+    const height = Math.max(1, Math.min(255, match.selection.height, IMAGE_HEIGHT - y, clampInteger(payload.height, match.selection.height)));
+    return {
+      type: 'replaceGraphics',
+      sourceKey: `imgsel-${match.selection.id}`,
+      x,
+      y,
+      width,
+      height
+    };
+  }
+
+  const sourceRoom = sanitizeRoomName(payload.room || payload.sourceRoom || currentRoomName);
+  const sourceSlide = getRoomSlidePayload(sourceRoom, 0);
+  const x = Math.max(0, Math.min(IMAGE_WIDTH - 1, clampInteger(payload.x, 0)));
+  const y = Math.max(0, Math.min(IMAGE_HEIGHT - 1, clampInteger(payload.y, 0)));
+  const width = Math.max(1, Math.min(255, sourceSlide.width, IMAGE_WIDTH - x, clampInteger(payload.width, sourceSlide.width)));
+  const height = Math.max(1, Math.min(255, sourceSlide.height, IMAGE_HEIGHT - y, clampInteger(payload.height, sourceSlide.height)));
+  return { type: 'replaceGraphics', sourceKey: sourceRoom, x, y, width, height };
 }
 
 function normalizeClickActionResult(result, currentRoomName) {
@@ -447,15 +642,8 @@ function normalizeClickActionResult(result, currentRoomName) {
       const text = sanitizeActionText(candidate.text);
       return text ? { type: 'displayText', text } : null;
     }
-    case 'replaceGraphics': {
-      const sourceRoom = sanitizeRoomName(candidate.payload?.room || candidate.payload?.sourceRoom || currentRoomName);
-      const sourceSlide = getRoomSlidePayload(sourceRoom, 0);
-      const x = Math.max(0, Math.min(IMAGE_WIDTH - 1, clampInteger(candidate.payload?.x, 0)));
-      const y = Math.max(0, Math.min(IMAGE_HEIGHT - 1, clampInteger(candidate.payload?.y, 0)));
-      const width = Math.max(1, Math.min(255, sourceSlide.width, IMAGE_WIDTH - x, clampInteger(candidate.payload?.width, sourceSlide.width)));
-      const height = Math.max(1, Math.min(255, sourceSlide.height, IMAGE_HEIGHT - y, clampInteger(candidate.payload?.height, sourceSlide.height)));
-      return { type: 'replaceGraphics', room: sourceRoom, x, y, width, height };
-    }
+    case 'replaceGraphics':
+      return resolveReplaceGraphicsAction(candidate.payload, currentRoomName);
     default:
       return null;
   }
@@ -469,7 +657,7 @@ function encodeClickActionText(action) {
     case 'displayText':
       return `TEXT:${sanitizeActionText(action.text)}\n`;
     case 'replaceGraphics':
-      return `GFX:${action.room},${formatHexByte(action.x >> 8)},${formatHexByte(action.x)},${formatHexByte(action.y)},${formatHexByte(action.width)},${formatHexByte(action.height)}\n`;
+      return `GFX:${action.sourceKey},${formatHexByte(action.x >> 8)},${formatHexByte(action.x)},${formatHexByte(action.y)},${formatHexByte(action.width)},${formatHexByte(action.height)}\n`;
     default:
       return 'OK\n';
   }
@@ -480,11 +668,14 @@ function executeClickScript(requestedRoomName, room, logicalX, y) {
   const x = logicalX * 2;
   const roomSelections = (room.selections || []).map((selection) => ({
     id: selection.id,
+    type: selection.type || 'rect',
     name: selection.name,
     x: selection.x,
     y: selection.y,
     width: selection.width,
-    height: selection.height
+    height: selection.height,
+    visible: selection.visible !== false,
+    locked: selection.locked === true
   }));
 
   const sandbox = {
@@ -755,8 +946,10 @@ async function handleReplaceRoomImage(req, res, roomName) {
   const fileName = `${id}.vbxe`;
   const roomDir = path.join(ROOMS_DIR, room.id);
 
-  fs.rmSync(roomDir, { recursive: true, force: true });
-  fs.mkdirSync(roomDir, { recursive: true });
+  if (!fs.existsSync(roomDir)) {
+    fs.mkdirSync(roomDir, { recursive: true });
+  }
+  
   fs.writeFileSync(path.join(roomDir, fileName), buffer);
 
   room.slides = [{
@@ -782,6 +975,73 @@ async function handleReplaceRoomImage(req, res, roomName) {
   });
 }
 
+async function handleSaveCroppedImage(req, res, roomName) {
+  const normalizedRoomName = sanitizeRoomName(roomName);
+  
+  const store = loadStore();
+  const room = getRoomFromStore(store, normalizedRoomName);
+  if (!room) {
+    sendJson(res, 404, { error: 'Room not found' });
+    return;
+  }
+
+  const roomDir = path.join(ROOMS_DIR, room.id);
+  if (!fs.existsSync(roomDir)) {
+    fs.mkdirSync(roomDir, { recursive: true });
+  }
+
+  const chunks = [];
+  let total = 0;
+
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > MAX_BODY_BYTES) {
+      sendJson(res, 400, { error: 'Request body too large' });
+      return;
+    }
+    chunks.push(chunk);
+  }
+
+  const buffer = Buffer.concat(chunks);
+  if (!isPngBuffer(buffer)) {
+    sendJson(res, 400, { error: 'Expected raw PNG upload data' });
+    return;
+  }
+
+  const croppedImagePath = path.join(roomDir, 'cropped.png');
+  fs.writeFileSync(croppedImagePath, buffer);
+
+  sendJson(res, 200, { ok: true });
+}
+
+async function handleGetCroppedImage(req, res, roomName) {
+  const normalizedRoomName = sanitizeRoomName(roomName);
+  
+  const store = loadStore();
+  const room = getRoomFromStore(store, normalizedRoomName);
+  if (!room) {
+    sendJson(res, 404, { error: 'Room not found' });
+    return;
+  }
+
+  const roomDir = path.join(ROOMS_DIR, room.id);
+  const croppedImagePath = path.join(roomDir, 'cropped.png');
+  
+  if (!fs.existsSync(croppedImagePath)) {
+    sendJson(res, 404, { error: 'Cropped image not found' });
+    return;
+  }
+
+  const buffer = fs.readFileSync(croppedImagePath);
+  res.writeHead(200, {
+    'Content-Type': 'image/png',
+    'Content-Length': buffer.length,
+    'Cache-Control': 'no-store',
+    'Connection': 'close'
+  });
+  res.end(buffer);
+}
+
 async function handleCreateSelection(req, res, roomName) {
   const body = await readJsonBody(req);
   const store = loadStore();
@@ -798,6 +1058,34 @@ async function handleCreateSelection(req, res, roomName) {
     width: 48,
     height: 32
   });
+
+  if (selection.type === 'image') {
+    const imagePngBase64 = typeof body.imagePngBase64 === 'string' ? body.imagePngBase64 : '';
+    const imageBuffer = Buffer.from(imagePngBase64, 'base64');
+    if (!isPngBuffer(imageBuffer)) {
+      sendJson(res, 400, { error: 'Image selections require a valid PNG fragment.' });
+      return;
+    }
+
+    const imageVbxeBase64 = typeof body.imageVbxeBase64 === 'string' ? body.imageVbxeBase64 : '';
+    const patchBuffer = Buffer.from(imageVbxeBase64, 'base64');
+    try {
+      validateVbxePayload(patchBuffer, { minPixels: 1, minWidth: 1, minHeight: 1 });
+    } catch (error) {
+      sendJson(res, 400, { error: `Image selections require a valid VBXE patch: ${error.message}` });
+      return;
+    }
+
+    const roomDir = path.join(ROOMS_DIR, room.id);
+    if (!fs.existsSync(roomDir)) {
+      fs.mkdirSync(roomDir, { recursive: true });
+    }
+
+    selection.imageFileName = `selection-${selection.id}.png`;
+    selection.patchFileName = `selection-${selection.id}.vbxe`;
+    fs.writeFileSync(path.join(roomDir, selection.imageFileName), imageBuffer);
+    fs.writeFileSync(path.join(roomDir, selection.patchFileName), patchBuffer);
+  }
 
   room.selections = [...(room.selections || []), selection];
   saveStore(store);
@@ -841,6 +1129,35 @@ async function handleUpdateSelection(req, res, roomName, selectionId) {
     createdAt: current.createdAt
   });
 
+  if (updated.type === 'image') {
+    const roomDir = path.join(ROOMS_DIR, room.id);
+    if (!fs.existsSync(roomDir)) {
+      fs.mkdirSync(roomDir, { recursive: true });
+    }
+
+    if (typeof body.imagePngBase64 === 'string' && body.imagePngBase64) {
+      const imageBuffer = Buffer.from(body.imagePngBase64, 'base64');
+      if (!isPngBuffer(imageBuffer)) {
+        sendJson(res, 400, { error: 'Image selection PNG fragment is invalid.' });
+        return;
+      }
+      updated.imageFileName = updated.imageFileName || `selection-${updated.id}.png`;
+      fs.writeFileSync(path.join(roomDir, updated.imageFileName), imageBuffer);
+    }
+
+    if (typeof body.imageVbxeBase64 === 'string' && body.imageVbxeBase64) {
+      const patchBuffer = Buffer.from(body.imageVbxeBase64, 'base64');
+      try {
+        validateVbxePayload(patchBuffer, { minPixels: 1, minWidth: 1, minHeight: 1 });
+      } catch (error) {
+        sendJson(res, 400, { error: `Image selection VBXE patch is invalid: ${error.message}` });
+        return;
+      }
+      updated.patchFileName = updated.patchFileName || `selection-${updated.id}.vbxe`;
+      fs.writeFileSync(path.join(roomDir, updated.patchFileName), patchBuffer);
+    }
+  }
+
   room.selections[index] = updated;
   saveStore(store);
   sendJson(res, 200, { ok: true, selection: updated });
@@ -855,10 +1172,24 @@ function handleDeleteSelection(res, roomName, selectionId) {
   }
 
   const beforeCount = (room.selections || []).length;
+  const removedSelection = (room.selections || []).find((selection) => selection.id === selectionId) || null;
   room.selections = (room.selections || []).filter((selection) => selection.id !== selectionId);
   if (room.selections.length === beforeCount) {
     sendJson(res, 404, { error: 'Selection not found' });
     return;
+  }
+
+  if (removedSelection?.imageFileName) {
+    const imagePath = path.join(ROOMS_DIR, room.id, removedSelection.imageFileName);
+    if (fs.existsSync(imagePath)) {
+      fs.unlinkSync(imagePath);
+    }
+  }
+  if (removedSelection?.patchFileName) {
+    const patchPath = path.join(ROOMS_DIR, room.id, removedSelection.patchFileName);
+    if (fs.existsSync(patchPath)) {
+      fs.unlinkSync(patchPath);
+    }
   }
 
   saveStore(store);
@@ -1015,6 +1346,19 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    const croppedImageApiMatch = pathname.match(/^\/api\/rooms\/([^/]+)\/cropped-image$/);
+    if (req.method === 'POST' && croppedImageApiMatch) {
+      const requestedRoom = decodeURIComponent(croppedImageApiMatch[1]);
+      await handleSaveCroppedImage(req, res, requestedRoom);
+      return;
+    }
+
+    if (req.method === 'GET' && croppedImageApiMatch) {
+      const requestedRoom = decodeURIComponent(croppedImageApiMatch[1]);
+      await handleGetCroppedImage(req, res, requestedRoom);
+      return;
+    }
+
     const roomSelectionsApiMatch = pathname.match(/^\/api\/rooms\/([^/]+)\/selections$/);
     if (req.method === 'POST' && roomSelectionsApiMatch) {
       const requestedRoom = decodeURIComponent(roomSelectionsApiMatch[1]);
@@ -1113,7 +1457,7 @@ const server = http.createServer(async (req, res) => {
 
     const gfxMatch = pathname.match(/^\/gfx\/([^/]+)\/([^/]+)\/([0-9A-Fa-f]{2})\/([0-9A-Fa-f]{2})$/);
     if (req.method === 'GET' && gfxMatch) {
-      const sourceRoom = decodeURIComponent(gfxMatch[1]);
+      const sourceToken = decodeURIComponent(gfxMatch[1]);
       const targetRoom = decodeURIComponent(gfxMatch[2]);
       const width = parseHexByte(gfxMatch[3]);
       const height = parseHexByte(gfxMatch[4]);
@@ -1121,10 +1465,10 @@ const server = http.createServer(async (req, res) => {
         sendText(res, 400, 'Invalid patch dimensions\n');
         return;
       }
-      const patch = buildGraphicsPatchPayload(sourceRoom, targetRoom, width, height);
+      const patch = buildGraphicsPatchPayload(sourceToken, targetRoom, width, height);
       sendBinary(res, patch.buffer);
       console.log(
-        `[RES] gfx ${sourceRoom} -> ${targetRoom} ${patch.width}x${patch.height} ${patch.buffer.length} bytes`
+        `[RES] gfx ${sourceToken} -> ${targetRoom} ${patch.width}x${patch.height} ${patch.buffer.length} bytes`
       );
       return;
     }

@@ -385,6 +385,19 @@
       display: block;
     }
 
+    .room-stage-preview-image {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      display: none;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
     .selection-overlay {
       position: absolute;
       inset: 0;
@@ -449,6 +462,13 @@
       gap: 8px;
     }
 
+    .selection-list-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 8px;
+      align-items: center;
+    }
+
     .selection-list button {
       text-align: left;
       justify-content: flex-start;
@@ -459,6 +479,59 @@
       background: rgba(59, 130, 246, 0.16);
       border-color: rgba(59, 130, 246, 0.45);
       color: var(--text-accent);
+    }
+
+    .selection-tool-button {
+      min-width: 42px;
+      padding: 10px 12px;
+    }
+
+    .selection-tool-button.is-off {
+      opacity: 0.6;
+    }
+
+    .selection-box.image-selection {
+      border: none;
+      background: transparent;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .selection-box.draft-selection {
+      border: 2px dashed #fbbf24;
+      background: rgba(251, 191, 36, 0.14);
+    }
+
+    .selection-box.draft-selection .selection-label {
+      display: block;
+    }
+
+    .selection-box.image-selection.editable {
+      outline: 2px dashed rgba(251, 191, 36, 0.95);
+      outline-offset: -2px;
+    }
+
+    .selection-box.image-selection .selection-label {
+      display: none;
+    }
+
+    .selection-overlay-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    .selection-overlay-image.full-source {
+      inset: auto;
+      width: auto;
+      height: auto;
+      max-width: none;
+      max-height: none;
     }
 
     .selection-form {
@@ -764,13 +837,16 @@
               <div class="row">
                 <span id="room-url-pill" class="pill">Atari URL pending</span>
                 <button id="refresh-button" type="button">Refresh</button>
+                <button id="download-cropped-button" type="button">Download cropped image</button>
               </div>
+            </div>
             </div>
             <p class="meta">Preview of the current VBXE room image. The red marker shows the last click received by the server. Use the right-side selection list to create and edit rectangular zones.</p>
             <div class="room-editor-layout">
               <div>
                 <div id="room-stage" class="room-stage">
                   <canvas id="room-preview" class="preview-canvas" width="320" height="200"></canvas>
+                  <img id="room-stage-preview-image" class="room-stage-preview-image" alt="Temporary image selection preview">
                   <div id="selection-overlay" class="selection-overlay"></div>
                 </div>
                 <p id="room-preview-meta" class="meta"></p>
@@ -779,13 +855,18 @@
               <aside class="selection-sidebar">
                 <div class="card-title-row">
                   <h3>Selections</h3>
-                  <button id="add-selection-btn" type="button" class="primary">Add selection</button>
+                  <div class="row">
+                    <button id="add-selection-btn" type="button" class="primary">Add selection</button>
+                    <button id="add-image-selection-btn" type="button">Image selection</button>
+                  </div>
                 </div>
+                <input id="image-selection-file-input" type="file" accept="image/*" style="display: none;">
                 <div id="selection-list" class="selection-list"></div>
                 <div id="selection-empty" class="empty-panel" style="display: none; margin: 0;">No selections yet. Add one and then drag or resize it on the room image.</div>
                 <div id="selection-form-placeholder" class="empty-panel" style="margin: 0;">Select a selection on the right to edit its name and rectangle values.</div>
 
                 <form id="selection-form" class="selection-form" style="display: none;">
+                  <p id="selection-form-meta" class="meta" style="margin: 0;"></p>
                   <label>
                     Name
                     <input id="selection-name-input" type="text" maxlength="80">
@@ -811,6 +892,7 @@
                   </div>
 
                   <div class="row">
+                    <button id="save-image-selection-btn" type="button" class="primary" style="display: none;">Save image selection</button>
                     <button id="delete-selection-btn" type="button" class="button-danger">Delete selection</button>
                   </div>
                 </form>
@@ -824,7 +906,7 @@
               <button id="save-click-script-btn" type="button" class="primary">Save script</button>
             </div>
             <div class="script-editor">
-              <p class="script-help">This global script runs on every Atari click after the server stores the red marker. Available values include <code>roomName</code>, <code>requestedRoomName</code>, <code>logicalX</code>, <code>x</code>, <code>y</code>, <code>roomSelections</code>, <code>selections</code>, and <code>rooms</code>. Return <code>changeRoom('room2')</code>, <code>displayText('hello')</code>, or <code>replaceGraphics({ room: 'patchroom', x: 120, y: 40, width: 32, height: 24 })</code>.</p>
+              <p class="script-help">This global script runs on every Atari click after the server stores the red marker. Available values include <code>roomName</code>, <code>requestedRoomName</code>, <code>logicalX</code>, <code>x</code>, <code>y</code>, <code>roomSelections</code>, <code>selections</code>, and <code>rooms</code>. Return <code>changeRoom('room2')</code>, <code>displayText('hello')</code>, <code>replaceGraphics('lamp_on')</code> for a saved image selection, or <code>replaceGraphics({ room: 'patchroom', x: 120, y: 40, width: 32, height: 24 })</code>.</p>
               <textarea id="click-script-editor" class="mono-textarea" spellcheck="false"></textarea>
             </div>
           </section>

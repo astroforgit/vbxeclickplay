@@ -8,6 +8,7 @@ const fileInput = document.getElementById('file-input');
 const uploadForm = document.getElementById('upload-form');
 const uploadButton = document.getElementById('upload-button');
 const refreshButton = document.getElementById('refresh-button');
+const downloadCroppedButton = document.getElementById('download-cropped-button');
 const statusNode = document.getElementById('status');
 const roomUploadTabBtn = document.getElementById('room-upload-tab-btn');
 const roomEditTabBtn = document.getElementById('room-edit-tab-btn');
@@ -15,6 +16,7 @@ const uploadPanel = document.getElementById('upload-panel');
 const editPanel = document.getElementById('edit-panel');
 const roomStage = document.getElementById('room-stage');
 const roomPreviewCanvas = document.getElementById('room-preview');
+const roomStagePreviewImage = document.getElementById('room-stage-preview-image');
 const selectionOverlay = document.getElementById('selection-overlay');
 const roomPreviewMeta = document.getElementById('room-preview-meta');
 const roomUrlPill = document.getElementById('room-url-pill');
@@ -25,15 +27,19 @@ const roomContent = document.getElementById('room-content');
 const noRoomSelected = document.getElementById('no-room-selected');
 const deleteRoomBtn = document.getElementById('delete-room-btn');
 const addSelectionBtn = document.getElementById('add-selection-btn');
+const addImageSelectionBtn = document.getElementById('add-image-selection-btn');
+const imageSelectionFileInput = document.getElementById('image-selection-file-input');
 const selectionList = document.getElementById('selection-list');
 const selectionEmpty = document.getElementById('selection-empty');
 const selectionForm = document.getElementById('selection-form');
 const selectionFormPlaceholder = document.getElementById('selection-form-placeholder');
+const selectionFormMeta = document.getElementById('selection-form-meta');
 const selectionNameInput = document.getElementById('selection-name-input');
 const selectionXInput = document.getElementById('selection-x-input');
 const selectionYInput = document.getElementById('selection-y-input');
 const selectionWidthInput = document.getElementById('selection-width-input');
 const selectionHeightInput = document.getElementById('selection-height-input');
+const saveImageSelectionBtn = document.getElementById('save-image-selection-btn');
 const deleteSelectionBtn = document.getElementById('delete-selection-btn');
 const clickScriptEditor = document.getElementById('click-script-editor');
 const saveClickScriptBtn = document.getElementById('save-click-script-btn');
@@ -61,7 +67,9 @@ let currentRoomPanel = 'upload';
 let selectedSelectionId = null;
 let rooms = [];
 let selectionInteraction = null;
+let imageSelectionDraft = null;
 let clickScriptLoaded = false;
+let imageSelectionPatchRepairInFlight = false;
 let cropState = {
   image: null,
   fileName: '',
@@ -79,12 +87,16 @@ let cropState = {
 // Event listeners
 uploadForm.addEventListener('submit', onUploadSubmit);
 refreshButton.addEventListener('click', () => refreshRoomPreview());
+downloadCroppedButton.addEventListener('click', downloadCroppedImage);
 addRoomBtn.addEventListener('click', openAddRoomModal);
 deleteRoomBtn.addEventListener('click', deleteRoom);
 roomUploadTabBtn.addEventListener('click', () => setRoomPanel('upload'));
 roomEditTabBtn.addEventListener('click', () => setRoomPanel('edit'));
 addSelectionBtn.addEventListener('click', createSelection);
+addImageSelectionBtn.addEventListener('click', beginImageSelectionFlow);
+imageSelectionFileInput.addEventListener('change', onImageSelectionFileSelected);
 selectionForm.addEventListener('input', onSelectionFormInput);
+saveImageSelectionBtn.addEventListener('click', saveImageSelectionDraft);
 deleteSelectionBtn.addEventListener('click', deleteSelection);
 saveClickScriptBtn.addEventListener('click', saveClickScript);
 
@@ -108,7 +120,7 @@ window.onclick = function(event) {
 // Initialize
 refreshRooms();
 setInterval(() => {
-  if (currentRoom && currentRoomPanel === 'edit' && !document.hidden && !selectionInteraction) {
+  if (currentRoom && currentRoomPanel === 'edit' && !document.hidden && !selectionInteraction && !imageSelectionDraft) {
     refreshRoomPreview(true);
   }
 }, 1500);
@@ -172,6 +184,7 @@ function renderRooms() {
 async function selectRoom(roomName) {
   currentRoom = roomName;
   selectedSelectionId = null;
+  imageSelectionDraft = null;
   renderRooms();
   hideCropInterface();
   
@@ -189,10 +202,13 @@ async function refreshRoomPreview(silent = false) {
   try {
     const room = await fetchJson(`/api/rooms/${encodeURIComponent(currentRoom)}`);
     currentRoomData = room;
-    if (!getSelections().some((selection) => selection.id === selectedSelectionId)) {
+    if (!getEditorSelections().some((selection) => selection.id === selectedSelectionId)) {
       selectedSelectionId = null;
     }
     renderRoomPreview(room);
+    repairMissingImageSelectionPatches(room).catch((error) => {
+      setStatus(`Failed to rebuild one or more image selection patches: ${error.message}`, true);
+    });
     if (!silent) {
       if (room.hasCustomImage) {
         setStatus(`Loaded room image "${room.imageTitle}" in ${currentRoom}.`);
@@ -243,8 +259,27 @@ function getSelections() {
   return currentRoomData?.selections || [];
 }
 
+function getDraftSelection() {
+  return imageSelectionDraft?.selection || null;
+}
+
+function getEditorSelections() {
+  return getDraftSelection() ? [...getSelections(), getDraftSelection()] : getSelections();
+}
+
 function getSelectionById(selectionId) {
+  if (getDraftSelection()?.id === selectionId) {
+    return getDraftSelection();
+  }
   return getSelections().find((selection) => selection.id === selectionId) || null;
+}
+
+function isImageSelection(selection) {
+  return selection?.type === 'image';
+}
+
+function isDraftSelection(selection) {
+  return Boolean(selection?.draft);
 }
 
 function clampSelection(selection) {
@@ -256,15 +291,23 @@ function clampSelection(selection) {
   const height = Math.max(1, Math.min(maxHeight - y, Number.parseInt(selection.height, 10) || 1));
   return {
     ...selection,
+    type: selection.type === 'image' ? 'image' : 'rect',
     name: String(selection.name || 'Selection').slice(0, 80) || 'Selection',
     x,
     y,
     width,
-    height
+    height,
+    visible: selection.visible !== false,
+    locked: selection.type === 'image' ? selection.locked !== false : false
   };
 }
 
 function updateSelectionInState(selectionId, updater) {
+  if (getDraftSelection()?.id === selectionId) {
+    imageSelectionDraft.selection = clampSelection(updater(getDraftSelection()));
+    return imageSelectionDraft.selection;
+  }
+
   if (!currentRoomData) return null;
   const index = getSelections().findIndex((selection) => selection.id === selectionId);
   if (index === -1) return null;
@@ -274,9 +317,21 @@ function updateSelectionInState(selectionId, updater) {
 }
 
 function renderSelectionEditor() {
+  renderStagePreviewImage();
   renderSelectionOverlay();
   renderSelectionList();
   renderSelectionForm();
+}
+
+function renderStagePreviewImage() {
+  if (imageSelectionDraft?.sourceUrl) {
+    roomStagePreviewImage.src = imageSelectionDraft.sourceUrl;
+    roomStagePreviewImage.style.display = 'block';
+    return;
+  }
+
+  roomStagePreviewImage.removeAttribute('src');
+  roomStagePreviewImage.style.display = 'none';
 }
 
 function renderSelectionOverlay() {
@@ -285,28 +340,52 @@ function renderSelectionOverlay() {
 
   const width = currentRoomData.width || MAX_WIDTH;
   const height = currentRoomData.height || MAX_HEIGHT;
-  getSelections().forEach((selection) => {
+  getEditorSelections().forEach((selection) => {
+    if (selection.visible === false) {
+      return;
+    }
+
     const box = document.createElement('div');
     box.className = 'selection-box';
+    if (isImageSelection(selection) && !isDraftSelection(selection)) {
+      box.classList.add('image-selection');
+    }
+    if (isDraftSelection(selection)) {
+      box.classList.add('draft-selection');
+    }
     if (selection.id === selectedSelectionId) {
       box.classList.add('active');
+    }
+    if (isImageSelection(selection) && !selection.locked) {
+      box.classList.add('editable');
     }
     box.style.left = `${(selection.x / width) * 100}%`;
     box.style.top = `${(selection.y / height) * 100}%`;
     box.style.width = `${(selection.width / width) * 100}%`;
     box.style.height = `${(selection.height / height) * 100}%`;
 
-    const label = document.createElement('div');
-    label.className = 'selection-label';
-    label.textContent = selection.name;
-    box.appendChild(label);
+    if (isImageSelection(selection) && !isDraftSelection(selection)) {
+      const image = document.createElement('img');
+      image.className = 'selection-overlay-image';
+      if (selection.imagePngBase64) {
+        image.src = `data:image/png;base64,${selection.imagePngBase64}`;
+      }
+      box.appendChild(image);
+    } else {
+      const label = document.createElement('div');
+      label.className = 'selection-label';
+      label.textContent = isDraftSelection(selection) ? `${selection.name} draft` : selection.name;
+      box.appendChild(label);
+    }
 
-    const handle = document.createElement('div');
-    handle.className = 'selection-handle';
-    handle.addEventListener('pointerdown', (event) => beginSelectionInteraction(event, selection.id, 'resize'));
-    box.appendChild(handle);
+    if (!isImageSelection(selection) || !selection.locked) {
+      const handle = document.createElement('div');
+      handle.className = 'selection-handle';
+      handle.addEventListener('pointerdown', (event) => beginSelectionInteraction(event, selection.id, 'resize'));
+      box.appendChild(handle);
+      box.addEventListener('pointerdown', (event) => beginSelectionInteraction(event, selection.id, 'move'));
+    }
 
-    box.addEventListener('pointerdown', (event) => beginSelectionInteraction(event, selection.id, 'move'));
     box.addEventListener('click', (event) => {
       event.stopPropagation();
       setSelectedSelection(selection.id);
@@ -318,18 +397,57 @@ function renderSelectionOverlay() {
 
 function renderSelectionList() {
   selectionList.innerHTML = '';
-  const selections = getSelections();
+  const selections = getEditorSelections();
   selectionEmpty.style.display = selections.length ? 'none' : 'block';
 
   selections.forEach((selection) => {
+    const row = document.createElement('div');
+    row.className = 'selection-list-row';
+
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = selection.name;
+    button.textContent = `${isImageSelection(selection) ? '🖼 ' : ''}${selection.name}`;
     if (selection.id === selectedSelectionId) {
       button.classList.add('active');
     }
+    if (selection.visible === false) {
+      button.classList.add('is-off');
+    }
     button.addEventListener('click', () => setSelectedSelection(selection.id));
-    selectionList.appendChild(button);
+    row.appendChild(button);
+
+    const visibilityButton = document.createElement('button');
+    visibilityButton.type = 'button';
+    visibilityButton.className = 'selection-tool-button';
+    visibilityButton.textContent = selection.visible === false ? '🙈' : '👁';
+    visibilityButton.title = selection.visible === false ? 'Show selection' : 'Hide selection';
+    if (selection.visible === false) {
+      visibilityButton.classList.add('is-off');
+    }
+    visibilityButton.addEventListener('click', (event) => {
+      event.stopPropagation();
+      toggleSelectionVisibility(selection.id);
+    });
+    row.appendChild(visibilityButton);
+
+    const lockButton = document.createElement('button');
+    lockButton.type = 'button';
+    lockButton.className = 'selection-tool-button';
+    if (isImageSelection(selection)) {
+      lockButton.textContent = selection.locked ? '🔒' : '🔓';
+      lockButton.title = selection.locked ? 'Unlock image selection' : 'Lock image selection';
+      lockButton.addEventListener('click', (event) => {
+        event.stopPropagation();
+        toggleSelectionLock(selection.id);
+      });
+    } else {
+      lockButton.textContent = '•';
+      lockButton.disabled = true;
+      lockButton.classList.add('is-off');
+    }
+    row.appendChild(lockButton);
+
+    selectionList.appendChild(row);
   });
 }
 
@@ -343,11 +461,22 @@ function renderSelectionForm() {
 
   selectionForm.style.display = 'grid';
   selectionFormPlaceholder.style.display = 'none';
+  selectionFormMeta.textContent = isDraftSelection(selection)
+    ? 'New image selection draft. Adjust the rectangle, then save it.'
+    : isImageSelection(selection)
+      ? `Image selection • ${selection.locked ? 'Locked' : 'Unlocked'} • ${selection.visible === false ? 'Hidden' : 'Visible'}`
+      : `Selection • ${selection.visible === false ? 'Hidden' : 'Visible'}`;
   selectionNameInput.value = selection.name;
   selectionXInput.value = selection.x;
   selectionYInput.value = selection.y;
   selectionWidthInput.value = selection.width;
   selectionHeightInput.value = selection.height;
+  const geometryLocked = isImageSelection(selection) && selection.locked;
+  selectionXInput.disabled = geometryLocked;
+  selectionYInput.disabled = geometryLocked;
+  selectionWidthInput.disabled = geometryLocked;
+  selectionHeightInput.disabled = geometryLocked;
+  saveImageSelectionBtn.style.display = isDraftSelection(selection) ? 'inline-flex' : 'none';
 }
 
 function setSelectedSelection(selectionId) {
@@ -369,9 +498,10 @@ function onSelectionFormInput() {
   }));
 
   if (!updated) return;
-  renderSelectionOverlay();
-  renderSelectionList();
-  saveSelection(updated).catch((error) => setStatus(error.message, true));
+  renderSelectionEditor();
+  if (!isDraftSelection(updated)) {
+    saveSelection(updated).catch((error) => setStatus(error.message, true));
+  }
 }
 
 function beginSelectionInteraction(event, selectionId, mode) {
@@ -380,6 +510,11 @@ function beginSelectionInteraction(event, selectionId, mode) {
 
   const selection = getSelectionById(selectionId);
   if (!selection || !roomStage) return;
+
+   if (isImageSelection(selection) && selection.locked) {
+    setSelectedSelection(selectionId);
+    return;
+  }
 
   setSelectedSelection(selectionId);
   selectionInteraction = {
@@ -430,10 +565,148 @@ async function onSelectionPointerUp() {
   const selection = getSelectionById(activeInteraction.selectionId);
   if (!selection) return;
 
+  if (!isDraftSelection(selection)) {
+    try {
+      await saveSelection(selection);
+    } catch (error) {
+      setStatus(error.message, true);
+    }
+  }
+}
+
+function beginImageSelectionFlow() {
+  if (!currentRoomData) {
+    setStatus('Select a room before creating an image selection.', true);
+    return;
+  }
+
+  imageSelectionFileInput.value = '';
+  imageSelectionFileInput.click();
+}
+
+async function onImageSelectionFileSelected(event) {
+  const file = event.target.files?.[0];
+  if (!file || !currentRoomData) return;
+
   try {
-    await saveSelection(selection);
+    const image = await loadImageFromFile(file);
+    if (image.width !== currentRoomData.width || image.height !== currentRoomData.height) {
+      throw new Error(`Image selection source must be exactly ${currentRoomData.width}×${currentRoomData.height}.`);
+    }
+
+    imageSelectionDraft = {
+      sourceUrl: image.src,
+      sourceImage: image,
+      selection: {
+        id: `draft-image-${Date.now()}`,
+        draft: true,
+        type: 'image',
+        name: file.name.replace(/\.[^.]+$/, '') || 'Image selection',
+        x: 24,
+        y: 24,
+        width: 64,
+        height: 48,
+        visible: true,
+        locked: false
+      }
+    };
+
+    selectedSelectionId = imageSelectionDraft.selection.id;
+    renderSelectionEditor();
+    setStatus(`Image selection draft loaded from ${file.name}. Resize or move it, then save.`);
   } catch (error) {
     setStatus(error.message, true);
+  }
+}
+
+async function saveImageSelectionDraft() {
+  const draft = getDraftSelection();
+  if (!draft || !imageSelectionDraft?.sourceImage || !currentRoom) return;
+
+  try {
+    const draftCanvas = buildDraftImageSelectionCanvas(draft, imageSelectionDraft.sourceImage);
+    const imagePngBase64 = draftCanvas.toDataURL('image/png').split(',')[1];
+    const imageVbxeBase64 = cropDraftImageSelectionToVbxeBase64(draftCanvas);
+    const response = await fetchJson(`/api/rooms/${encodeURIComponent(currentRoom)}/selections`, {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'image',
+        name: draft.name,
+        x: draft.x,
+        y: draft.y,
+        width: draft.width,
+        height: draft.height,
+        visible: draft.visible !== false,
+        locked: true,
+        imagePngBase64,
+        imageVbxeBase64
+      })
+    });
+
+    currentRoomData.selections = [...getSelections(), response.selection];
+    selectedSelectionId = response.selection.id;
+    imageSelectionDraft = null;
+    await refreshRoomPreview(true);
+    renderSelectionEditor();
+    setStatus(`Saved image selection "${response.selection.name}".`);
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+function buildDraftImageSelectionCanvas(selection, sourceImage) {
+  const canvas = document.createElement('canvas');
+  canvas.width = selection.width;
+  canvas.height = selection.height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(
+    sourceImage,
+    selection.x,
+    selection.y,
+    selection.width,
+    selection.height,
+    0,
+    0,
+    selection.width,
+    selection.height
+  );
+  return canvas;
+}
+
+function cropDraftImageSelectionToVbxeBase64(canvas) {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const vbxe = convertImageDataToVbxe(imageData, canvas.width, canvas.height);
+  return bytesToBase64(vbxe);
+}
+
+function toggleSelectionVisibility(selectionId) {
+  const selection = getSelectionById(selectionId);
+  if (!selection) return;
+
+  const updated = updateSelectionInState(selectionId, (current) => ({
+    ...current,
+    visible: current.visible === false
+  }));
+  if (!updated) return;
+  renderSelectionEditor();
+  if (!isDraftSelection(updated)) {
+    saveSelection(updated).catch((error) => setStatus(error.message, true));
+  }
+}
+
+function toggleSelectionLock(selectionId) {
+  const selection = getSelectionById(selectionId);
+  if (!selection || !isImageSelection(selection)) return;
+
+  const updated = updateSelectionInState(selectionId, (current) => ({
+    ...current,
+    locked: !current.locked
+  }));
+  if (!updated) return;
+  renderSelectionEditor();
+  if (!isDraftSelection(updated)) {
+    saveSelection(updated).catch((error) => setStatus(error.message, true));
   }
 }
 
@@ -455,6 +728,9 @@ async function onUploadSubmit(event) {
       setStatus('Upload cancelled.', true);
       return;
     }
+
+    setStatus(`Saving cropped image...`);
+    await saveCroppedImage(croppedImage);
 
     setStatus(`Converting ${file.name} to VBXE...`);
     const vbxe = await convertImageToVbxe(croppedImage);
@@ -678,10 +954,67 @@ function applyCrop() {
   resolve(canvas);
 }
 
+async function downloadCroppedImage() {
+  if (!currentRoom) {
+    setStatus('No room selected.', true);
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/api/rooms/${encodeURIComponent(currentRoom)}/cropped-image`);
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to download cropped image');
+    }
+    
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${currentRoom}-cropped.png`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setStatus('Cropped image downloaded.');
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
 async function convertImageToVbxe(canvas) {
   const ctx = canvas.getContext('2d');
   const imageData = ctx.getImageData(0, 0, MAX_WIDTH, MAX_HEIGHT);
   return convertImageDataToVbxe(imageData, MAX_WIDTH, MAX_HEIGHT);
+}
+
+async function saveCroppedImage(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('Failed to create blob from canvas'));
+        return;
+      }
+      
+      fetch(`/api/rooms/${encodeURIComponent(currentRoom)}/cropped-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'image/png'
+        },
+        body: blob
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(data => {
+            throw new Error(data.error || 'Failed to save cropped image');
+          });
+        }
+        return response.json();
+      })
+      .then(() => resolve())
+      .catch(error => reject(error));
+    }, 'image/png');
+  });
 }
 
 async function uploadRoomImage(filename, vbxeData) {
@@ -714,11 +1047,14 @@ async function createSelection() {
   const response = await fetchJson(`/api/rooms/${encodeURIComponent(currentRoom)}/selections`, {
     method: 'POST',
     body: JSON.stringify({
+      type: 'rect',
       name: `Selection ${getSelections().length + 1}`,
       x: 24,
       y: 24,
       width: 48,
-      height: 32
+      height: 32,
+      visible: true,
+      locked: false
     })
   });
 
@@ -733,6 +1069,8 @@ async function saveSelection(selection) {
     method: 'PUT',
     body: JSON.stringify({
       name: selection.name,
+      visible: selection.visible !== false,
+      locked: selection.locked === true,
       x: selection.x,
       y: selection.y,
       width: selection.width,
@@ -741,9 +1079,64 @@ async function saveSelection(selection) {
   });
 }
 
+async function repairMissingImageSelectionPatches(room) {
+  if (imageSelectionPatchRepairInFlight || imageSelectionDraft || !room?.selections?.length || !currentRoom) {
+    return;
+  }
+
+  const repairTargets = room.selections.filter((selection) => (
+    selection.type === 'image'
+    && selection.needsPatchRebuild
+    && selection.imagePngBase64
+  ));
+
+  if (!repairTargets.length) {
+    return;
+  }
+
+  imageSelectionPatchRepairInFlight = true;
+  try {
+    for (const selection of repairTargets) {
+      const vbxeBase64 = await buildImageSelectionPatchFromBase64(selection);
+      await fetchJson(`/api/rooms/${encodeURIComponent(currentRoom)}/selections/${encodeURIComponent(selection.id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          imageVbxeBase64: vbxeBase64
+        })
+      });
+    }
+
+    if (currentRoom === room.roomName) {
+      await refreshRoomPreview(true);
+    }
+  } finally {
+    imageSelectionPatchRepairInFlight = false;
+  }
+}
+
+async function buildImageSelectionPatchFromBase64(selection) {
+  const image = await loadImageFromSrc(`data:image/png;base64,${selection.imagePngBase64}`, selection.name || 'image selection');
+  const canvas = document.createElement('canvas');
+  canvas.width = selection.width;
+  canvas.height = selection.height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(image, 0, 0, selection.width, selection.height);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  return bytesToBase64(convertImageDataToVbxe(imageData, canvas.width, canvas.height));
+}
+
 async function deleteSelection() {
   const selection = getSelectionById(selectedSelectionId);
   if (!selection || !currentRoomData) return;
+
+  if (isDraftSelection(selection)) {
+    imageSelectionDraft = null;
+    selectedSelectionId = null;
+    renderSelectionEditor();
+    setStatus('Discarded image selection draft.');
+    return;
+  }
+
   if (!window.confirm(`Delete selection "${selection.name}"?`)) {
     return;
   }
@@ -802,6 +1195,7 @@ async function deleteRoom() {
     currentRoom = null;
     currentRoomData = null;
     selectedSelectionId = null;
+    imageSelectionDraft = null;
     await refreshRooms();
     
     if (rooms.length > 0) {
@@ -826,15 +1220,21 @@ async function convertFileToVbxe(file) {
   return convertImageDataToVbxe(imageData, width, height);
 }
 
+function loadImageFromSrc(src, label = 'image') {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onerror = () => reject(new Error(`Failed to decode ${label}`));
+    img.onload = () => resolve(img);
+    img.src = src;
+  });
+}
+
 function loadImageFromFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
     reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error(`Failed to decode ${file.name}`));
-      img.onload = () => resolve(img);
-      img.src = reader.result;
+      loadImageFromSrc(reader.result, file.name).then(resolve).catch(reject);
     };
     reader.readAsDataURL(file);
   });

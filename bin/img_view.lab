@@ -294,7 +294,7 @@ Source: vbxe_const.asm
     14 = 003A			KEY_D        = $3A
     15 = 00C8			DEMO_HEIGHT  = 200
     16 = 0014			DEMO_STAMP_SIZE = 20
-    17 = 0010			ROOM_NAME_MAX = 16
+    17 = 0020			ROOM_NAME_MAX = 32
     18 = 009F			DEMO_CURSOR_MAX_X = 159
     19 = 00C7			DEMO_CURSOR_MAX_Y = 199
     20 = 004C			DEMO_CURSOR_START_X = 76
@@ -933,9 +933,9 @@ Source: popup.asm
     70 2403 60			        rts
     71
     72 2404			demo_save_popup_under
-    73 2404 A9 E0		        lda #<demo_popup_saved
+    73 2404 A9 00		        lda #<demo_popup_saved
     74 2406 85 89		        sta zp_tmp_ptr2
-    75 2408 A9 8D		        lda #>demo_popup_saved
+    75 2408 A9 8E		        lda #>demo_popup_saved
     76 240A 85 8A		        sta zp_tmp_ptr2+1
     77 240C A9 00		        lda #0
     78 240E 8D 2E 88		        sta demo_popup_row
@@ -974,9 +974,9 @@ Source: popup.asm
    105 244B 60			        rts
    106
    107 244C			demo_restore_popup_under
-   108 244C A9 E0		        lda #<demo_popup_saved
+   108 244C A9 00		        lda #<demo_popup_saved
    109 244E 85 89		        sta zp_tmp_ptr2
-   110 2450 A9 8D		        lda #>demo_popup_saved
+   110 2450 A9 8E		        lda #>demo_popup_saved
    111 2452 85 8A		        sta zp_tmp_ptr2+1
    112 2454 A9 00		        lda #0
    113 2456 8D 2E 88		        sta demo_popup_row
@@ -1194,7 +1194,7 @@ Source: cursor.asm
     48 25C7 A0 00		        ldy #0
     49 25C9 B1 87		        lda (zp_tmp_ptr),y
     50 25CB AC 24 88		        ldy demo_cursor_save_ix
-    51 25CE 99 60 8D		        sta demo_cursor_saved,y
+    51 25CE 99 80 8D		        sta demo_cursor_saved,y
     52 25D1 EE 24 88		        inc demo_cursor_save_ix
     53 25D4 20 32 28		        jsr demo_mem_advance
     54 25D7 E8			        inx
@@ -1237,7 +1237,7 @@ Source: cursor.asm
     85 2618 EC 25 88		        cpx demo_cursor_clip_w
     86 261B F0 0F		        beq demo_restore_row_done
     87 261D AC 24 88		        ldy demo_cursor_save_ix
-    88 2620 B9 60 8D		        lda demo_cursor_saved,y
+    88 2620 B9 80 8D		        lda demo_cursor_saved,y
     89 2623 EE 24 88		        inc demo_cursor_save_ix
     90 2626 20 2B 28		        jsr demo_mem_put
     91 2629 E8			        inx
@@ -1462,11 +1462,11 @@ Source: cursor.asm
    292 2793			demo_prepare_cursor_row_table
    293 2793 8D 22 88		        sta demo_cursor_abs_y
    294 2796 A8			        tay
-   295 2797 B9 60 95		        lda demo_row_ptr_lo,y
+   295 2797 B9 80 95		        lda demo_row_ptr_lo,y
    296 279A 85 87		        sta zp_tmp_ptr
-   297 279C B9 28 96		        lda demo_row_ptr_hi,y
+   297 279C B9 48 96		        lda demo_row_ptr_hi,y
    298 279F 85 88		        sta zp_tmp_ptr+1
-   299 27A1 B9 F0 96		        lda demo_row_bank,y
+   299 27A1 B9 10 97		        lda demo_row_bank,y
    300 27A4 8D 20 88		        sta demo_cursor_bank
    301
    302 27A7 8A			        txa
@@ -1507,11 +1507,11 @@ Source: cursor.asm
    337 27E7 A0 00		        ldy #0
    338 27E9			demo_build_row_loop
    339 27E9 AD 32 88		        lda demo_rowtab_ptr_lo
-   340 27EC 99 60 95		        sta demo_row_ptr_lo,y
+   340 27EC 99 80 95		        sta demo_row_ptr_lo,y
    341 27EF AD 33 88		        lda demo_rowtab_ptr_hi
-   342 27F2 99 28 96		        sta demo_row_ptr_hi,y
+   342 27F2 99 48 96		        sta demo_row_ptr_hi,y
    343 27F5 AD 34 88		        lda demo_rowtab_bank
-   344 27F8 99 F0 96		        sta demo_row_bank,y
+   344 27F8 99 10 97		        sta demo_row_bank,y
    345
    346 27FB 18			        clc
    347 27FC AD 32 88		        lda demo_rowtab_ptr_lo
@@ -1580,14 +1580,14 @@ Source: text_io.asm
     13 2864 20 CF 28		        jsr copy_string_to_buffer
     14 2867 A0 00		        ldy #0
     15 2869			copy_room_find_end
-    16 2869 B9 60 88		        lda url_buffer,y
+    16 2869 B9 80 88		        lda url_buffer,y
     17 286C F0 03		        beq copy_room_append_name
     18 286E C8			        iny
     19 286F D0 F8		        bne copy_room_find_end
     20 2871			copy_room_append_name
     21 2871 20 E5 28		        jsr append_current_room_name
     22 2874 A9 00		        lda #0
-    23 2876 99 60 88		        sta url_buffer,y
+    23 2876 99 80 88		        sta url_buffer,y
     24 2879 60			        rts
     25
     26 287A			copy_click_url_to_buffer
@@ -1598,24 +1598,24 @@ Source: text_io.asm
     31 2882 20 CF 28		        jsr copy_string_to_buffer
     32 2885 A0 00		        ldy #0
     33 2887			copy_click_find_end
-    34 2887 B9 60 88		        lda url_buffer,y
+    34 2887 B9 80 88		        lda url_buffer,y
     35 288A F0 03		        beq copy_click_append_room
     36 288C C8			        iny
     37 288D D0 F8		        bne copy_click_find_end
     38 288F			copy_click_append_room
     39 288F 20 E5 28		        jsr append_current_room_name
     40 2892 A9 2F		        lda #'/'
-    41 2894 99 60 88		        sta url_buffer,y
+    41 2894 99 80 88		        sta url_buffer,y
     42 2897 C8			        iny
     43 2898 A5 B0		        lda zp_demo_cursor_x
     44 289A 20 F6 28		        jsr append_hex_byte_to_buffer
     45 289D A9 2F		        lda #'/'
-    46 289F 99 60 88		        sta url_buffer,y
+    46 289F 99 80 88		        sta url_buffer,y
     47 28A2 C8			        iny
     48 28A3 A5 B1		        lda zp_demo_cursor_y
     49 28A5 20 F6 28		        jsr append_hex_byte_to_buffer
     50 28A8 A9 00		        lda #0
-    51 28AA 99 60 88		        sta url_buffer,y
+    51 28AA 99 80 88		        sta url_buffer,y
     52 28AD 60			        rts
     53
     54 28AE			copy_slide_url_to_buffer
@@ -1641,14 +1641,14 @@ Source: text_io.asm
     74 28CF A9 00		        lda #0
     75 28D1 A8			        tay
     76 28D2			copy_url_clear_loop
-    77 28D2 99 60 88		        sta url_buffer,y
+    77 28D2 99 80 88		        sta url_buffer,y
     78 28D5 C8			        iny
     79 28D6 D0 FA		        bne copy_url_clear_loop
     80
     81 28D8 A0 00		        ldy #0
     82 28DA			copy_url_copy_loop
     83 28DA B1 87		        lda (zp_tmp_ptr),y
-    84 28DC 99 60 88		        sta url_buffer,y
+    84 28DC 99 80 88		        sta url_buffer,y
     85 28DF F0 03		        beq copy_url_done
     86 28E1 C8			        iny
     87 28E2 D0 F6		        bne copy_url_copy_loop
@@ -1660,10 +1660,10 @@ Source: text_io.asm
     93 28E7			append_room_name_loop
     94 28E7 BD 3E 88		        lda current_room_name,x
     95 28EA F0 09		        beq append_room_name_done
-    96 28EC 99 60 88		        sta url_buffer,y
+    96 28EC 99 80 88		        sta url_buffer,y
     97 28EF C8			        iny
     98 28F0 E8			        inx
-    99 28F1 E0 10		        cpx #ROOM_NAME_MAX
+    99 28F1 E0 20		        cpx #ROOM_NAME_MAX
    100 28F3 90 F2		        bcc append_room_name_loop
    101 28F5			append_room_name_done
    102 28F5 60			        rts
@@ -1675,11 +1675,11 @@ Source: text_io.asm
    108 28F9 4A			        lsr
    109 28FA 4A			        lsr
    110 28FB 20 77 31		        jsr nibble_to_hex
-   111 28FE 99 60 88		        sta url_buffer,y
+   111 28FE 99 80 88		        sta url_buffer,y
    112 2901 C8			        iny
    113 2902 68			        pla
    114 2903 20 77 31		        jsr nibble_to_hex
-   115 2906 99 60 88		        sta url_buffer,y
+   115 2906 99 80 88		        sta url_buffer,y
    116 2909 C8			        iny
    117 290A 60			        rts
    118
@@ -1789,7 +1789,7 @@ Source: text_io.asm
    222 29BD			sanitize_loop
    223 29BD E4 A3		        cpx zp_rx_len
    224 29BF F0 23		        beq sanitize_done
-   225 29C1 BD 60 89		        lda rx_buffer,x
+   225 29C1 BD 80 89		        lda rx_buffer,x
    226 29C4 C9 0D		        cmp #13
    227 29C6 F0 0F		        beq sanitize_nl
    228 29C8 C9 0A		        cmp #10
@@ -1808,7 +1808,7 @@ Source: text_io.asm
    241 29DB A9 2E		        lda #'.'
    242
    243 29DD			sanitize_store
-   244 29DD 9D 60 89		        sta rx_buffer,x
+   244 29DD 9D 80 89		        sta rx_buffer,x
    245
    246 29E0			sanitize_next
    247 29E0 E8			        inx
@@ -1817,7 +1817,7 @@ Source: text_io.asm
    250 29E4 E0 FF		        cpx #255
    251 29E6 F0 05		        beq sanitize_no_term
    252 29E8 A9 00		        lda #0
-   253 29EA 9D 60 89		        sta rx_buffer,x
+   253 29EA 9D 80 89		        sta rx_buffer,x
    254 29ED			sanitize_no_term
    255 29ED 60			        rts
     54 29EE			        icl 'client/room_actions.asm'
@@ -1829,66 +1829,66 @@ Source: room_actions.asm
      5 29F3 9D 3E 88		        sta current_room_name,x
      6 29F6 F0 0A		        beq init_room_name_done
      7 29F8 E8			        inx
-     8 29F9 E0 10		        cpx #ROOM_NAME_MAX
+     8 29F9 E0 20		        cpx #ROOM_NAME_MAX
      9 29FB 90 F3		        bcc init_room_name_loop
     10 29FD A9 00		        lda #0
-    11 29FF 8D 4E 88		        sta current_room_name+ROOM_NAME_MAX
+    11 29FF 8D 5E 88		        sta current_room_name+ROOM_NAME_MAX
     12 2A02			init_room_name_done
     13 2A02 60			        rts
     14
     15 2A03			room_process_click_response
     16 2A03 A9 00		        lda #0
     17 2A05 8D 35 88		        sta room_action_pending_reload
-    18 2A08 AD 60 89		        lda rx_buffer
+    18 2A08 AD 80 89		        lda rx_buffer
     19 2A0B F0 6A		        beq room_action_done
     20
     21 2A0D C9 52		        cmp #'R'
     22 2A0F D0 20		        bne room_check_text
-    23 2A11 AD 61 89		        lda rx_buffer+1
+    23 2A11 AD 81 89		        lda rx_buffer+1
     24 2A14 C9 4F		        cmp #'O'
     25 2A16 D0 19		        bne room_check_text
-    26 2A18 AD 62 89		        lda rx_buffer+2
+    26 2A18 AD 82 89		        lda rx_buffer+2
     27 2A1B C9 4F		        cmp #'O'
     28 2A1D D0 12		        bne room_check_text
-    29 2A1F AD 63 89		        lda rx_buffer+3
+    29 2A1F AD 83 89		        lda rx_buffer+3
     30 2A22 C9 4D		        cmp #'M'
     31 2A24 D0 0B		        bne room_check_text
-    32 2A26 AD 64 89		        lda rx_buffer+4
+    32 2A26 AD 84 89		        lda rx_buffer+4
     33 2A29 C9 3A		        cmp #':'
     34 2A2B D0 04		        bne room_check_text
     35 2A2D 20 78 2A		        jsr room_apply_change_action
     36 2A30 60			        rts
     37
     38 2A31			room_check_text
-    39 2A31 AD 60 89		        lda rx_buffer
+    39 2A31 AD 80 89		        lda rx_buffer
     40 2A34 C9 54		        cmp #'T'
     41 2A36 D0 20		        bne room_check_gfx
-    42 2A38 AD 61 89		        lda rx_buffer+1
+    42 2A38 AD 81 89		        lda rx_buffer+1
     43 2A3B C9 45		        cmp #'E'
     44 2A3D D0 19		        bne room_check_gfx
-    45 2A3F AD 62 89		        lda rx_buffer+2
+    45 2A3F AD 82 89		        lda rx_buffer+2
     46 2A42 C9 58		        cmp #'X'
     47 2A44 D0 12		        bne room_check_gfx
-    48 2A46 AD 63 89		        lda rx_buffer+3
+    48 2A46 AD 83 89		        lda rx_buffer+3
     49 2A49 C9 54		        cmp #'T'
     50 2A4B D0 0B		        bne room_check_gfx
-    51 2A4D AD 64 89		        lda rx_buffer+4
+    51 2A4D AD 84 89		        lda rx_buffer+4
     52 2A50 C9 3A		        cmp #':'
     53 2A52 D0 04		        bne room_check_gfx
     54 2A54 20 AA 2A		        jsr room_apply_text_action
     55 2A57 60			        rts
     56
     57 2A58			room_check_gfx
-    58 2A58 AD 60 89		        lda rx_buffer
+    58 2A58 AD 80 89		        lda rx_buffer
     59 2A5B C9 47		        cmp #'G'
     60 2A5D D0 18		        bne room_action_done
-    61 2A5F AD 61 89		        lda rx_buffer+1
+    61 2A5F AD 81 89		        lda rx_buffer+1
     62 2A62 C9 46		        cmp #'F'
     63 2A64 D0 11		        bne room_action_done
-    64 2A66 AD 62 89		        lda rx_buffer+2
+    64 2A66 AD 82 89		        lda rx_buffer+2
     65 2A69 C9 58		        cmp #'X'
     66 2A6B D0 0A		        bne room_action_done
-    67 2A6D AD 63 89		        lda rx_buffer+3
+    67 2A6D AD 83 89		        lda rx_buffer+3
     68 2A70 C9 3A		        cmp #':'
     69 2A72 D0 03		        bne room_action_done
     70 2A74 20 CF 2A		        jsr room_apply_graphics_action
@@ -1900,9 +1900,9 @@ Source: room_actions.asm
     76 2A78 A2 00		        ldx #0
     77 2A7A A0 05		        ldy #5
     78 2A7C			room_change_copy_loop
-    79 2A7C E0 10		        cpx #ROOM_NAME_MAX
+    79 2A7C E0 20		        cpx #ROOM_NAME_MAX
     80 2A7E B0 1F		        bcs room_change_finish_max
-    81 2A80 B9 60 89		        lda rx_buffer,y
+    81 2A80 B9 80 89		        lda rx_buffer,y
     82 2A83 F0 0B		        beq room_change_finish
     83 2A85 C9 9B		        cmp #ATASCII_RET
     84 2A87 F0 07		        beq room_change_finish
@@ -1923,7 +1923,7 @@ Source: room_actions.asm
     99
    100 2A9F			room_change_finish_max
    101 2A9F A9 00		        lda #0
-   102 2AA1 8D 4E 88		        sta current_room_name+ROOM_NAME_MAX
+   102 2AA1 8D 5E 88		        sta current_room_name+ROOM_NAME_MAX
    103 2AA4 A9 01		        lda #1
    104 2AA6 8D 35 88		        sta room_action_pending_reload
    105 2AA9 60			        rts
@@ -1934,7 +1934,7 @@ Source: room_actions.asm
    110 2AAE			room_text_copy_loop
    111 2AAE E0 13		        cpx #DEMO_POPUP_TEXT_MAX
    112 2AB0 B0 10		        bcs room_text_finish
-   113 2AB2 B9 60 89		        lda rx_buffer,y
+   113 2AB2 B9 80 89		        lda rx_buffer,y
    114 2AB5 F0 0B		        beq room_text_finish
    115 2AB7 C9 9B		        cmp #ATASCII_RET
    116 2AB9 F0 07		        beq room_text_finish
@@ -1956,22 +1956,22 @@ Source: room_actions.asm
    132 2ACF A2 00		        ldx #0
    133 2AD1 A0 04		        ldy #4
    134 2AD3			room_gfx_room_copy_loop
-   135 2AD3 E0 10		        cpx #ROOM_NAME_MAX
+   135 2AD3 E0 20		        cpx #ROOM_NAME_MAX
    136 2AD5 B0 6D		        bcs room_gfx_fail
-   137 2AD7 B9 60 89		        lda rx_buffer,y
+   137 2AD7 B9 80 89		        lda rx_buffer,y
    138 2ADA F0 68		        beq room_gfx_fail
    139 2ADC C9 2C		        cmp #','
    140 2ADE F0 0B		        beq room_gfx_room_done
    141 2AE0 C9 9B		        cmp #ATASCII_RET
    142 2AE2 F0 60		        beq room_gfx_fail
-   143 2AE4 9D 4F 88		        sta room_patch_source_room,x
+   143 2AE4 9D 5F 88		        sta room_patch_source_room,x
    144 2AE7 E8			        inx
    145 2AE8 C8			        iny
    146 2AE9 D0 E8		        bne room_gfx_room_copy_loop
    147
    148 2AEB			room_gfx_room_done
    149 2AEB A9 00		        lda #0
-   150 2AED 9D 4F 88		        sta room_patch_source_room,x
+   150 2AED 9D 5F 88		        sta room_patch_source_room,x
    151 2AF0 E0 00		        cpx #0
    152 2AF2 F0 50		        beq room_gfx_fail
    153 2AF4 C8			        iny
@@ -1979,7 +1979,7 @@ Source: room_actions.asm
    155 2AF8 B0 4A		        bcs room_gfx_fail
    156 2AFA 8D 37 88		        sta room_patch_x_hi
    157 2AFD C8			        iny
-   158 2AFE B9 60 89		        lda rx_buffer,y
+   158 2AFE B9 80 89		        lda rx_buffer,y
    159 2B01 C9 2C		        cmp #','
    160 2B03 D0 3F		        bne room_gfx_fail
    161 2B05 C8			        iny
@@ -1987,7 +1987,7 @@ Source: room_actions.asm
    163 2B09 B0 39		        bcs room_gfx_fail
    164 2B0B 8D 36 88		        sta room_patch_x_lo
    165 2B0E C8			        iny
-   166 2B0F B9 60 89		        lda rx_buffer,y
+   166 2B0F B9 80 89		        lda rx_buffer,y
    167 2B12 C9 2C		        cmp #','
    168 2B14 D0 2E		        bne room_gfx_fail
    169 2B16 C8			        iny
@@ -1995,7 +1995,7 @@ Source: room_actions.asm
    171 2B1A B0 28		        bcs room_gfx_fail
    172 2B1C 8D 38 88		        sta room_patch_y
    173 2B1F C8			        iny
-   174 2B20 B9 60 89		        lda rx_buffer,y
+   174 2B20 B9 80 89		        lda rx_buffer,y
    175 2B23 C9 2C		        cmp #','
    176 2B25 D0 1D		        bne room_gfx_fail
    177 2B27 C8			        iny
@@ -2003,7 +2003,7 @@ Source: room_actions.asm
    179 2B2B B0 17		        bcs room_gfx_fail
    180 2B2D 8D 39 88		        sta room_patch_width
    181 2B30 C8			        iny
-   182 2B31 B9 60 89		        lda rx_buffer,y
+   182 2B31 B9 80 89		        lda rx_buffer,y
    183 2B34 C9 2C		        cmp #','
    184 2B36 D0 0C		        bne room_gfx_fail
    185 2B38 C8			        iny
@@ -2015,7 +2015,7 @@ Source: room_actions.asm
    191 2B44 60			        rts
    192
    193 2B45			room_parse_hex_byte_field
-   194 2B45 B9 60 89		        lda rx_buffer,y
+   194 2B45 B9 80 89		        lda rx_buffer,y
    195 2B48 20 66 2B		        jsr room_ascii_hex_to_nibble
    196 2B4B C9 FF		        cmp #$FF
    197 2B4D F0 15		        beq room_parse_hex_byte_fail
@@ -2025,7 +2025,7 @@ Source: room_actions.asm
    201 2B52 0A			        asl
    202 2B53 85 8B		        sta zp_tmp1
    203 2B55 C8			        iny
-   204 2B56 B9 60 89		        lda rx_buffer,y
+   204 2B56 B9 80 89		        lda rx_buffer,y
    205 2B59 20 66 2B		        jsr room_ascii_hex_to_nibble
    206 2B5C C9 FF		        cmp #$FF
    207 2B5E F0 04		        beq room_parse_hex_byte_fail
@@ -2078,7 +2078,7 @@ Source: graphics_patch.asm
      6 2B95 20 CF 28		        jsr copy_string_to_buffer
      7 2B98 A0 00		        ldy #0
      8 2B9A			gfx_find_end
-     9 2B9A B9 60 88		        lda url_buffer,y
+     9 2B9A B9 80 88		        lda url_buffer,y
     10 2B9D F0 03		        beq gfx_append_source
     11 2B9F C8			        iny
     12 2BA0 D0 F8		        bne gfx_find_end
@@ -2086,31 +2086,31 @@ Source: graphics_patch.asm
     14 2BA2			gfx_append_source
     15 2BA2 A2 00		        ldx #0
     16 2BA4			gfx_append_source_loop
-    17 2BA4 BD 4F 88		        lda room_patch_source_room,x
+    17 2BA4 BD 5F 88		        lda room_patch_source_room,x
     18 2BA7 F0 09		        beq gfx_append_target_sep
-    19 2BA9 99 60 88		        sta url_buffer,y
+    19 2BA9 99 80 88		        sta url_buffer,y
     20 2BAC C8			        iny
     21 2BAD E8			        inx
-    22 2BAE E0 10		        cpx #ROOM_NAME_MAX
+    22 2BAE E0 20		        cpx #ROOM_NAME_MAX
     23 2BB0 90 F2		        bcc gfx_append_source_loop
     24
     25 2BB2			gfx_append_target_sep
     26 2BB2 A9 2F		        lda #'/'
-    27 2BB4 99 60 88		        sta url_buffer,y
+    27 2BB4 99 80 88		        sta url_buffer,y
     28 2BB7 C8			        iny
     29 2BB8 20 E5 28		        jsr append_current_room_name
     30 2BBB A9 2F		        lda #'/'
-    31 2BBD 99 60 88		        sta url_buffer,y
+    31 2BBD 99 80 88		        sta url_buffer,y
     32 2BC0 C8			        iny
     33 2BC1 AD 39 88		        lda room_patch_width
     34 2BC4 20 F6 28		        jsr append_hex_byte_to_buffer
     35 2BC7 A9 2F		        lda #'/'
-    36 2BC9 99 60 88		        sta url_buffer,y
+    36 2BC9 99 80 88		        sta url_buffer,y
     37 2BCC C8			        iny
     38 2BCD AD 3A 88		        lda room_patch_height
     39 2BD0 20 F6 28		        jsr append_hex_byte_to_buffer
     40 2BD3 A9 00		        lda #0
-    41 2BD5 99 60 88		        sta url_buffer,y
+    41 2BD5 99 80 88		        sta url_buffer,y
     42 2BD8 60			        rts
     43
     44 2BD9			room_fetch_graphics_patch
@@ -2216,7 +2216,7 @@ Source: graphics_patch.asm
    144 2C8D 20 1F 28		        jsr demo_mem_open
    145
    146 2C90			room_patch_row_opened
-   147 2C90 BD 60 89		        lda rx_buffer,x
+   147 2C90 BD 80 89		        lda rx_buffer,x
    148 2C93 20 2B 28		        jsr demo_mem_put
    149 2C96 CE 3C 88		        dec room_patch_row_remaining
    150 2C99 D0 16		        bne room_patch_next_byte
@@ -2243,11 +2243,11 @@ Source: graphics_patch.asm
    165 2CB6			room_patch_prepare_row
    166 2CB6 AD 3B 88		        lda room_patch_cur_y
    167 2CB9 A8			        tay
-   168 2CBA B9 60 95		        lda demo_row_ptr_lo,y
+   168 2CBA B9 80 95		        lda demo_row_ptr_lo,y
    169 2CBD 85 87		        sta zp_tmp_ptr
-   170 2CBF B9 28 96		        lda demo_row_ptr_hi,y
+   170 2CBF B9 48 96		        lda demo_row_ptr_hi,y
    171 2CC2 85 88		        sta zp_tmp_ptr+1
-   172 2CC4 B9 F0 96		        lda demo_row_bank,y
+   172 2CC4 B9 10 97		        lda demo_row_bank,y
    173 2CC7 8D 20 88		        sta demo_cursor_bank
    174 2CCA 18			        clc
    175 2CCB A5 87		        lda zp_tmp_ptr
@@ -2312,7 +2312,7 @@ Source: image_io.asm
     39
     40 2D3B			fetch_pixels_ok
     41 2D3B 20 A7 33		        jsr fn_close
-    42 2D3E A9 60		        lda #<img_pal_buf
+    42 2D3E A9 80		        lda #<img_pal_buf
     43 2D40 85 87		        sta zp_tmp_ptr
     44 2D42 A9 8A		        lda #>img_pal_buf
     45 2D44 85 88		        sta zp_tmp_ptr+1
@@ -2379,11 +2379,11 @@ Source: image_io.asm
    106 2DB2 4C F1 2D		        jmp hdr_err
    107
    108 2DB5			hdr_read_ok
-   109 2DB5 AD 60 89		        lda rx_buffer
+   109 2DB5 AD 80 89		        lda rx_buffer
    110 2DB8 8D 08 88		        sta img_width
-   111 2DBB AD 61 89		        lda rx_buffer+1
+   111 2DBB AD 81 89		        lda rx_buffer+1
    112 2DBE 8D 09 88		        sta img_width+1
-   113 2DC1 AD 62 89		        lda rx_buffer+2
+   113 2DC1 AD 82 89		        lda rx_buffer+2
    114 2DC4 8D 0D 88		        sta img_height
    115
    116 2DC7 AD 09 88		        lda img_width+1
@@ -2416,7 +2416,7 @@ Source: image_io.asm
    143 2DF2 60			        rts
    144
    145 2DF3			read_palette_stream
-   146 2DF3 A9 60		        lda #<img_pal_buf
+   146 2DF3 A9 80		        lda #<img_pal_buf
    147 2DF5 85 87		        sta zp_tmp_ptr
    148 2DF7 A9 8A		        lda #>img_pal_buf
    149 2DF9 85 88		        sta zp_tmp_ptr+1
@@ -2464,7 +2464,7 @@ Source: image_io.asm
    191 2E4A			pal_copy
    192 2E4A C4 A3		        cpy zp_rx_len
    193 2E4C F0 24		        beq pal_check_done
-   194 2E4E B9 60 89		        lda rx_buffer,y
+   194 2E4E B9 80 89		        lda rx_buffer,y
    195 2E51 84 8D		        sty zp_tmp3
    196 2E53 A0 00		        ldy #0
    197 2E55 91 87		        sta (zp_tmp_ptr),y
@@ -2492,8 +2492,8 @@ Source: image_io.asm
    219 2E78 B0 13		        bcs pal_no_left
    220 2E7A A2 00		        ldx #0
    221 2E7C			pal_shift
-   222 2E7C B9 60 89		        lda rx_buffer,y
-   223 2E7F 9D 60 89		        sta rx_buffer,x
+   222 2E7C B9 80 89		        lda rx_buffer,y
+   223 2E7F 9D 80 89		        sta rx_buffer,x
    224 2E82 C8			        iny
    225 2E83 E8			        inx
    226 2E84 C4 A3		        cpy zp_rx_len
@@ -2604,7 +2604,7 @@ Source: image_io.asm
    331 2F31 A2 00		        ldx #0
    332 2F33			write_loop
    333 2F33 A0 00		        ldy #0
-   334 2F35 BD 60 89		        lda rx_buffer,x
+   334 2F35 BD 80 89		        lda rx_buffer,x
    335 2F38 91 AB		        sta (zp_img_ptr),y
    336 2F3A E6 AB		        inc zp_img_ptr
    337 2F3C D0 1A		        bne write_next
@@ -2669,7 +2669,7 @@ Source: demo_image.asm
     30 2FA3 C9 C8		        cmp #DEMO_HEIGHT
     31 2FA5 D0 DC		        bne demo_row_loop
     32
-    33 2FA7 A9 60		        lda #<img_pal_buf
+    33 2FA7 A9 80		        lda #<img_pal_buf
     34 2FA9 85 87		        sta zp_tmp_ptr
     35 2FAB A9 8A		        lda #>img_pal_buf
     36 2FAD 85 88		        sta zp_tmp_ptr+1
@@ -2677,7 +2677,7 @@ Source: demo_image.asm
     38 2FB2 60			        rts
     39
     40 2FB3			build_demo_palette
-    41 2FB3 A9 60		        lda #<img_pal_buf
+    41 2FB3 A9 80		        lda #<img_pal_buf
     42 2FB5 85 87		        sta zp_tmp_ptr
     43 2FB7 A9 8A		        lda #>img_pal_buf
     44 2FB9 85 88		        sta zp_tmp_ptr+1
@@ -2715,7 +2715,7 @@ Source: demo_image.asm
     76 2FE8 18			        clc
     77 2FE9 6D 14 88		        adc demo_phase
     78 2FEC 09 08		        ora #8
-    79 2FEE 9D 60 89		        sta rx_buffer,x
+    79 2FEE 9D 80 89		        sta rx_buffer,x
     80 2FF1 E8			        inx
     81 2FF2 EC 17 88		        cpx demo_chunk_len
     82 2FF5 D0 E9		        bne demo_fill_loop
@@ -3093,7 +3093,7 @@ Source: display_debug.asm
    281 328B A2 35		        ldx #>msg_payload
    282 328D A0 09		        ldy #msg_payload_end-msg_payload
    283 328F 20 5F 31		        jsr print_record
-   284 3292 A9 60		        lda #<rx_buffer
+   284 3292 A9 80		        lda #<rx_buffer
    285 3294 A2 89		        ldx #>rx_buffer
    286 3296 AC 07 88		        ldy debug_rx_len
    287 3299 20 5F 31		        jsr print_record
@@ -3137,7 +3137,7 @@ Source: fujinet.asm
     31 32B4 8D 02 03		        sta DCOMND
     32 32B7 A9 80		        lda #SIO_WRITE
     33 32B9 8D 03 03		        sta DSTATS
-    34 32BC A9 60		        lda #<url_buffer
+    34 32BC A9 80		        lda #<url_buffer
     35 32BE 8D 04 03		        sta DBUFLO
     36 32C1 A9 88		        lda #>url_buffer
     37 32C3 8D 05 03		        sta DBUFHI
@@ -3249,7 +3249,7 @@ Source: fujinet.asm
    143 3378 8D 02 03		        sta DCOMND
    144 337B A9 40		        lda #SIO_READ
    145 337D 8D 03 03		        sta DSTATS
-   146 3380 A9 60		        lda #<rx_buffer
+   146 3380 A9 80		        lda #<rx_buffer
    147 3382 8D 04 03		        sta DBUFLO
    148 3385 A9 89		        lda #>rx_buffer
    149 3387 8D 05 03		        sta DBUFHI
@@ -3449,14 +3449,14 @@ Source: state.asm
     59 883D 00			room_patch_rows_left dta b(0)
     60
     61 = 883E			current_room_name  .ds ROOM_NAME_MAX+1
-    62 = 884F			room_patch_source_room .ds ROOM_NAME_MAX+1
-    63 = 8860			url_buffer        .ds 256
-    64 = 8960			rx_buffer         .ds 256
-    65 = 8A60			img_pal_buf       .ds 768
-    66 = 8D60			demo_cursor_saved .ds DEMO_CURSOR_WIDTH*(demo_arrow_data_end-demo_arrow_data)
-    67 = 8DE0			demo_popup_saved  .ds DEMO_POPUP_WIDTH*DEMO_POPUP_HEIGHT
-    68 = 9560			demo_row_ptr_lo   .ds DEMO_HEIGHT
-    69 = 9628			demo_row_ptr_hi   .ds DEMO_HEIGHT
-    70 = 96F0			demo_row_bank     .ds DEMO_HEIGHT
+    62 = 885F			room_patch_source_room .ds ROOM_NAME_MAX+1
+    63 = 8880			url_buffer        .ds 256
+    64 = 8980			rx_buffer         .ds 256
+    65 = 8A80			img_pal_buf       .ds 768
+    66 = 8D80			demo_cursor_saved .ds DEMO_CURSOR_WIDTH*(demo_arrow_data_end-demo_arrow_data)
+    67 = 8E00			demo_popup_saved  .ds DEMO_POPUP_WIDTH*DEMO_POPUP_HEIGHT
+    68 = 9580			demo_row_ptr_lo   .ds DEMO_HEIGHT
+    69 = 9648			demo_row_ptr_hi   .ds DEMO_HEIGHT
+    70 = 9710			demo_row_bank     .ds DEMO_HEIGHT
     62
     63 02E0-02E1> 00 20		        run main
