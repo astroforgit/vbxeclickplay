@@ -225,6 +225,7 @@ function buildDemoImagePayload() {
 
 const demoImagePayload = buildDemoImagePayload();
 const roomClickState = new Map();
+const ATARI_VISIBLE_MAX_CLICK_Y = 183;
 
 function validateVbxePayload(buffer, options = {}) {
   const minPixels = Math.max(1, clampInteger(options.minPixels, 64));
@@ -724,6 +725,14 @@ function buildRoomPreviewBuffer(buffer, width, height, lastClick) {
     }
   }
   return preview;
+}
+
+function calibrateAtariClickY(rawY) {
+  const y = Math.max(0, Math.min(IMAGE_HEIGHT - 1, clampInteger(rawY, 0)));
+  return Math.min(
+    IMAGE_HEIGHT - 1,
+    Math.round((y * (IMAGE_HEIGHT - 1)) / ATARI_VISIBLE_MAX_CLICK_Y)
+  );
 }
 
 function parseHexByte(value) {
@@ -1425,17 +1434,19 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && clickMatch) {
       const requestedRoom = decodeURIComponent(clickMatch[1]);
       const logicalX = parseHexByte(clickMatch[2]);
-      const y = parseHexByte(clickMatch[3]);
+      const rawY = parseHexByte(clickMatch[3]);
       const slide = getRoomSlidePayload(requestedRoom, 0);
 
       if (!slide) {
         sendText(res, 404, `Room not found: ${requestedRoom}\n`);
         return;
       }
-      if (logicalX === null || y === null || logicalX >= 160 || y >= IMAGE_HEIGHT) {
+      if (logicalX === null || rawY === null || logicalX >= 160 || rawY >= IMAGE_HEIGHT) {
         sendText(res, 400, 'Invalid click coordinates\n');
         return;
       }
+
+      const y = calibrateAtariClickY(rawY);
 
       const resolvedRoom = getRoom(requestedRoom);
       const clickRoomName = (resolvedRoom && resolvedRoom.name) || sanitizeRoomName(requestedRoom);
@@ -1444,12 +1455,13 @@ const server = http.createServer(async (req, res) => {
         logicalX,
         x: logicalX * 2,
         y,
+        rawY,
         updatedAt: new Date().toISOString()
       });
 
       sendText(res, 200, encodeClickActionText(clickAction));
       console.log(
-        `[EVENT] click ${clickRoomName} logical=(${logicalX},${y}) pixel=(${logicalX * 2},${y})` +
+        `[EVENT] click ${clickRoomName} logical=(${logicalX},${rawY}) calibratedY=${y} pixel=(${logicalX * 2},${y})` +
         (clickAction ? ` action=${clickAction.type}` : '')
       );
       return;

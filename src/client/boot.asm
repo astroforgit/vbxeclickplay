@@ -87,6 +87,10 @@ room_handle_click
         sta zp_demo_prev_x
         sta zp_demo_prev_y
 room_click_send
+	        lda demo_popup_active
+	        beq room_click_send_fetch
+	        jsr demo_restore_popup_under
+room_click_send_fetch
         jsr demo_suspend_input_irq
         jsr copy_click_url_to_buffer
         jsr fetch_text_payload

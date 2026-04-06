@@ -1,0 +1,50 @@
+{
+  "rooms": [
+    {
+      "id": "mnktipkniu8b7r",
+      "name": "first",
+      "slides": [
+        {
+          "id": "mnktjhjsfnv14i",
+          "title": "image(15)",
+          "fileName": "mnktjhjsfnv14i.vbxe",
+          "width": 320,
+          "height": 200,
+          "createdAt": "2026-04-04T21:02:25.433Z"
+        }
+      ],
+      "selections": [
+        {
+          "id": "mnky7iin40nt6a",
+          "type": "image",
+          "name": "closeeyes",
+          "x": 109,
+          "y": 85,
+          "width": 103,
+          "height": 46,
+          "visible": false,
+          "locked": true,
+          "imageFileName": "selection-mnky7iin40nt6a.png",
+          "patchFileName": "selection-mnky7iin40nt6a.vbxe",
+          "createdAt": "2026-04-04T23:13:04.895Z"
+        },
+        {
+          "id": "mnl2c3a6j01cvl",
+          "type": "rect",
+          "name": "lips",
+          "x": 136,
+          "y": 145,
+          "width": 48,
+          "height": 32,
+          "visible": false,
+          "locked": false,
+          "imageFileName": null,
+          "patchFileName": null,
+          "createdAt": "2026-04-05T01:08:36.894Z"
+        }
+      ],
+      "createdAt": "2026-04-04T21:01:49.176Z"
+    }
+  ],
+  "clickScript": "// Available values: roomName, requestedRoomName, logicalX, x, y,\n// roomSelections, selections, rooms\n// Available helpers: changeRoom(name), displayText(text), replaceGraphics(payload)\n\nconst hit = roomSelections.find((selection) => {\n  return x >= selection.x && x < selection.x + selection.width && y >= selection.y && y < selection.y + selection.height;\n});\ndebugger;\nif (hit && hit.name=='closeeyes') {\n  return replaceGraphics('closeeyes');\n}\n\n\nif (hit) {\n  return displayText(hit.name);\n}\n\nreturn null;\n"
+}
