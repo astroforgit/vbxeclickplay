@@ -153,6 +153,7 @@ clear_debug
         sta img_pal_leftover
         sta demo_mode
         sta demo_input_active
+        sta room_patch_restore_mode
         rts
 
 show_banner

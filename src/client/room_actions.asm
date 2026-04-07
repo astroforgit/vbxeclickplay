@@ -16,7 +16,10 @@ room_process_click_response
         lda #0
         sta room_action_pending_reload
         lda rx_buffer
-        beq room_action_done
+        bne room_action_has_data
+        jmp room_action_done
+
+room_action_has_data
 
         cmp #'R'
         bne room_check_text
@@ -57,17 +60,33 @@ room_check_text
 room_check_gfx
         lda rx_buffer
         cmp #'G'
-        bne room_action_done
+        bne room_check_orig
         lda rx_buffer+1
         cmp #'F'
-        bne room_action_done
+        bne room_check_orig
         lda rx_buffer+2
         cmp #'X'
-        bne room_action_done
+        bne room_check_orig
         lda rx_buffer+3
         cmp #':'
-        bne room_action_done
+        bne room_check_orig
         jsr room_apply_graphics_action
+        rts
+
+room_check_orig
+        lda rx_buffer
+        cmp #'O'
+        bne room_action_done
+        lda rx_buffer+1
+        cmp #'R'
+        bne room_action_done
+        lda rx_buffer+2
+        cmp #'I'
+        bne room_action_done
+        lda rx_buffer+3
+        cmp #'G'
+        bne room_action_done
+        jsr room_apply_original_graphics_action
 
 room_action_done
         rts
@@ -186,8 +205,85 @@ room_gfx_room_done
         jsr room_parse_hex_byte_field
         bcs room_gfx_fail
         sta room_patch_height
+        jsr room_cache_prepare_replace
         jsr room_fetch_graphics_patch
 room_gfx_fail
+        rts
+
+room_apply_original_graphics_action
+        ldy #4
+        lda rx_buffer,y
+        cmp #':'
+        beq room_orig_parse_payload
+        jsr room_restore_original_graphics
+        rts
+
+room_orig_parse_payload
+        iny
+        jsr room_parse_hex_byte_field
+        bcs room_orig_fail
+        sta room_patch_x_hi
+        iny
+        lda rx_buffer,y
+        cmp #','
+        bne room_orig_fail
+        iny
+        jsr room_parse_hex_byte_field
+        bcs room_orig_fail
+        sta room_patch_x_lo
+        iny
+        lda rx_buffer,y
+        cmp #','
+        bne room_orig_fail
+        iny
+        jsr room_parse_hex_byte_field
+        bcs room_orig_fail
+        sta room_patch_y
+        iny
+        lda rx_buffer,y
+        cmp #','
+        bne room_orig_fail
+        iny
+        jsr room_parse_hex_byte_field
+        bcs room_orig_fail
+        sta room_patch_width
+        iny
+        lda rx_buffer,y
+        cmp #','
+        bne room_orig_fail
+        iny
+        jsr room_parse_hex_byte_field
+        bcs room_orig_fail
+        sta room_patch_height
+        jsr room_original_graphics_matches_cache
+        bcc room_orig_fail
+        jsr room_restore_original_graphics
+room_orig_fail
+        rts
+
+room_original_graphics_matches_cache
+        lda room_patch_restore_mode
+        beq room_orig_match_fail
+        lda room_patch_x_lo
+        cmp room_patch_restore_x_lo
+        bne room_orig_match_fail
+        lda room_patch_x_hi
+        cmp room_patch_restore_x_hi
+        bne room_orig_match_fail
+        lda room_patch_y
+        cmp room_patch_restore_y
+        bne room_orig_match_fail
+        lda room_patch_width
+        cmp room_patch_restore_width
+        bne room_orig_match_fail
+        lda room_patch_height
+        cmp room_patch_restore_height
+        bne room_orig_match_fail
+        sec
+        rts
+
+room_orig_match_fail
+        clc
         rts
 
 room_parse_hex_byte_field

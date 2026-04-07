@@ -19,8 +19,13 @@ const LEGACY_STORE_FILE = path.join(LEGACY_DATA_DIR, 'rooms.json');
 const WEB_INDEX_FILE = path.join(__dirname, 'web', 'index.html');
 const WEB_APP_FILE = path.join(__dirname, 'web', 'app.js');
 const DEFAULT_CLICK_SCRIPT = `// Available values: roomName, requestedRoomName, logicalX, x, y,
-// roomSelections, selections, rooms
-// Available helpers: changeRoom(name), displayText(text), replaceGraphics(payload)
+// roomSelections, selections, rooms, state, gameState
+// Available helpers: changeRoom(name), displayText(text), replaceGraphics(payload), originalGraphics(payload)
+// Examples:
+//   replaceGraphics('closeeyes')
+//   replaceGraphics({ selection: 'closeeyes', x: 120, y: 40 })
+//   originalGraphics('closeeyes')
+// Persist small JSON-safe values in state/gameState between clicks.
 
 const hit = roomSelections.find((selection) => {
   return x >= selection.x && x < selection.x + selection.width && y >= selection.y && y < selection.y + selection.height;
@@ -72,17 +77,18 @@ function loadStore() {
   try {
     const parsed = JSON.parse(fs.readFileSync(STORE_FILE, 'utf8'));
     if (!Array.isArray(parsed.rooms)) {
-      return { rooms: [], clickScript: DEFAULT_CLICK_SCRIPT };
+      return { rooms: [], clickScript: DEFAULT_CLICK_SCRIPT, scriptState: {} };
     }
     return {
       rooms: parsed.rooms
         .filter((room) => room && typeof room.id === 'string' && typeof room.name === 'string')
         .map((room) => normalizeRoomRecord(room)),
-      clickScript: typeof parsed.clickScript === 'string' ? parsed.clickScript : DEFAULT_CLICK_SCRIPT
+      clickScript: typeof parsed.clickScript === 'string' ? parsed.clickScript : DEFAULT_CLICK_SCRIPT,
+      scriptState: normalizeScriptState(parsed.scriptState)
     };
   } catch (error) {
     console.warn(`[WARN] Failed to load store: ${error.message}`);
-    return { rooms: [], clickScript: DEFAULT_CLICK_SCRIPT };
+    return { rooms: [], clickScript: DEFAULT_CLICK_SCRIPT, scriptState: {} };
   }
 }
 
@@ -90,8 +96,24 @@ function saveStore(store) {
   ensureStore();
   fs.writeFileSync(STORE_FILE, JSON.stringify({
     rooms: Array.isArray(store.rooms) ? store.rooms : [],
-    clickScript: typeof store.clickScript === 'string' ? store.clickScript : DEFAULT_CLICK_SCRIPT
+    clickScript: typeof store.clickScript === 'string' ? store.clickScript : DEFAULT_CLICK_SCRIPT,
+    scriptState: normalizeScriptState(store.scriptState)
   }, null, 2));
+}
+
+function normalizeScriptState(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  try {
+    const serialized = JSON.stringify(value);
+    const parsed = JSON.parse(serialized);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (error) {
+    console.warn(`[WARN] Failed to normalize click-script state: ${error.message}`);
+    return {};
+  }
 }
 
 function sanitizeTitle(title) {
@@ -586,8 +608,21 @@ function normalizeReplaceGraphicsPayload(rawPayload) {
   return {};
 }
 
-function resolveReplaceGraphicsAction(payloadInput, currentRoomName) {
+function resolveGraphicsRect(payloadInput, currentRoomName, options = {}) {
   const payload = normalizeReplaceGraphicsPayload(payloadInput);
+  const hasExplicitPayload =
+    typeof payload.selection === 'string' ||
+    payload.room !== undefined ||
+    payload.sourceRoom !== undefined ||
+    payload.x !== undefined ||
+    payload.y !== undefined ||
+    payload.width !== undefined ||
+    payload.height !== undefined;
+
+  if (!hasExplicitPayload) {
+    return options.allowEmpty ? { empty: true } : null;
+  }
+
   const store = loadStore();
 
   if (typeof payload.selection === 'string' && payload.selection.trim()) {
@@ -599,7 +634,7 @@ function resolveReplaceGraphicsAction(payloadInput, currentRoomName) {
       console.warn(`[SCRIPT] image selection not found or ambiguous: ${payload.selection}`);
       return null;
     }
-    if (!match.selection.patchFileName) {
+    if (options.requirePatch && !match.selection.patchFileName) {
       console.warn(`[SCRIPT] image selection ${match.selection.name} is missing a stored graphics patch`);
       return null;
     }
@@ -609,12 +644,11 @@ function resolveReplaceGraphicsAction(payloadInput, currentRoomName) {
     const width = Math.max(1, Math.min(255, match.selection.width, IMAGE_WIDTH - x, clampInteger(payload.width, match.selection.width)));
     const height = Math.max(1, Math.min(255, match.selection.height, IMAGE_HEIGHT - y, clampInteger(payload.height, match.selection.height)));
     return {
-      type: 'replaceGraphics',
-      sourceKey: `imgsel-${match.selection.id}`,
       x,
       y,
       width,
-      height
+      height,
+      sourceKey: `imgsel-${match.selection.id}`
     };
   }
 
@@ -624,7 +658,26 @@ function resolveReplaceGraphicsAction(payloadInput, currentRoomName) {
   const y = Math.max(0, Math.min(IMAGE_HEIGHT - 1, clampInteger(payload.y, 0)));
   const width = Math.max(1, Math.min(255, sourceSlide.width, IMAGE_WIDTH - x, clampInteger(payload.width, sourceSlide.width)));
   const height = Math.max(1, Math.min(255, sourceSlide.height, IMAGE_HEIGHT - y, clampInteger(payload.height, sourceSlide.height)));
-  return { type: 'replaceGraphics', sourceKey: sourceRoom, x, y, width, height };
+  return { x, y, width, height, sourceKey: sourceRoom };
+}
+
+function resolveReplaceGraphicsAction(payloadInput, currentRoomName) {
+  const rect = resolveGraphicsRect(payloadInput, currentRoomName, { requirePatch: true });
+  if (!rect) {
+    return null;
+  }
+  return { type: 'replaceGraphics', sourceKey: rect.sourceKey, x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+}
+
+function resolveOriginalGraphicsAction(payloadInput, currentRoomName) {
+  const rect = resolveGraphicsRect(payloadInput, currentRoomName, { allowEmpty: true });
+  if (!rect) {
+    return null;
+  }
+  if (rect.empty) {
+    return { type: 'originalGraphics' };
+  }
+  return { type: 'originalGraphics', x: rect.x, y: rect.y, width: rect.width, height: rect.height };
 }
 
 function normalizeClickActionResult(result, currentRoomName) {
@@ -645,6 +698,8 @@ function normalizeClickActionResult(result, currentRoomName) {
     }
     case 'replaceGraphics':
       return resolveReplaceGraphicsAction(candidate.payload, currentRoomName);
+    case 'originalGraphics':
+      return resolveOriginalGraphicsAction(candidate.payload, currentRoomName);
     default:
       return null;
   }
@@ -659,6 +714,10 @@ function encodeClickActionText(action) {
       return `TEXT:${sanitizeActionText(action.text)}\n`;
     case 'replaceGraphics':
       return `GFX:${action.sourceKey},${formatHexByte(action.x >> 8)},${formatHexByte(action.x)},${formatHexByte(action.y)},${formatHexByte(action.width)},${formatHexByte(action.height)}\n`;
+    case 'originalGraphics':
+      return action.x === undefined
+        ? 'ORIG\n'
+        : `ORIG:${formatHexByte(action.x >> 8)},${formatHexByte(action.x)},${formatHexByte(action.y)},${formatHexByte(action.width)},${formatHexByte(action.height)}\n`;
     default:
       return 'OK\n';
   }
@@ -667,6 +726,8 @@ function encodeClickActionText(action) {
 function executeClickScript(requestedRoomName, room, logicalX, y) {
   const store = loadStore();
   const x = logicalX * 2;
+  const persistedState = normalizeScriptState(store.scriptState);
+  const persistedStateJson = JSON.stringify(persistedState);
   const roomSelections = (room.selections || []).map((selection) => ({
     id: selection.id,
     type: selection.type || 'rect',
@@ -685,18 +746,36 @@ function executeClickScript(requestedRoomName, room, logicalX, y) {
     logicalX,
     x,
     y,
+    state: persistedState,
+    gameState: persistedState,
     roomSelections,
     selections: buildSelectionsForScript(store),
     rooms: buildRoomsForScript(store),
     changeRoom: (roomName) => ({ type: 'changeRoom', room: roomName }),
     displayText: (text) => ({ type: 'displayText', text }),
-    replaceGraphics: (payload = {}) => ({ type: 'replaceGraphics', payload })
+    replaceGraphics: (payload = {}) => ({ type: 'replaceGraphics', payload }),
+    replaceGraphisc: (payload = {}) => ({ type: 'replaceGraphics', payload }),
+    originalGraphics: (payload = {}) => ({ type: 'originalGraphics', payload }),
+    originalGraphisc: (payload = {}) => ({ type: 'originalGraphics', payload }),
+    orginalGraphics: (payload = {}) => ({ type: 'originalGraphics', payload }),
+    orginalGraphisc: (payload = {}) => ({ type: 'originalGraphics', payload })
   };
+  const context = vm.createContext(sandbox);
 
   const wrappedSource = `(function () {\n${store.clickScript || DEFAULT_CLICK_SCRIPT}\n})()`;
   try {
     const script = new vm.Script(wrappedSource, { filename: 'click-script.vm.js' });
-    const result = script.runInNewContext(sandbox, { timeout: 50 });
+    const result = script.runInContext(context, { timeout: 50 });
+    const serializedState = vm.runInContext(
+      '(typeof state === "object" && state && !Array.isArray(state)) ? JSON.stringify(state) : "{}"',
+      context,
+      { timeout: 10 }
+    );
+    const nextState = normalizeScriptState(JSON.parse(serializedState));
+    if (JSON.stringify(nextState) !== persistedStateJson) {
+      store.scriptState = nextState;
+      saveStore(store);
+    }
     return normalizeClickActionResult(result, room.name);
   } catch (error) {
     console.error(`[SCRIPT] click handler failed: ${error.stack || error.message}`);

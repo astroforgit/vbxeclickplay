@@ -130,6 +130,195 @@ room_patch_fail_close
         sec
         rts
 
+room_cache_prepare_replace
+        lda #0
+        sta room_patch_restore_mode
+        sta zp_tmp1
+        sta zp_tmp2
+        ldx room_patch_height
+
+room_cache_size_loop
+        cpx #0
+        beq room_cache_size_ready
+        clc
+        lda zp_tmp1
+        adc room_patch_width
+        sta zp_tmp1
+        lda zp_tmp2
+        adc #0
+        sta zp_tmp2
+        dex
+        bne room_cache_size_loop
+
+room_cache_size_ready
+        lda zp_tmp2
+        cmp #>ROOM_PATCH_CACHE_MAX
+        bcc room_cache_size_fit
+        bne room_cache_size_reload
+        lda zp_tmp1
+        cmp #<ROOM_PATCH_CACHE_MAX
+        bcc room_cache_size_fit
+        bne room_cache_size_reload
+
+room_cache_size_fit
+        lda room_patch_x_lo
+        sta room_patch_restore_x_lo
+        lda room_patch_x_hi
+        sta room_patch_restore_x_hi
+        lda room_patch_y
+        sta room_patch_restore_y
+        lda room_patch_width
+        sta room_patch_restore_width
+        lda room_patch_height
+        sta room_patch_restore_height
+        lda #1
+        sta room_patch_restore_mode
+        jmp room_cache_store_region
+
+room_cache_size_reload
+        lda #2
+        sta room_patch_restore_mode
+        rts
+
+room_restore_original_graphics
+        lda room_patch_restore_mode
+        beq room_restore_original_done
+        cmp #2
+        beq room_restore_original_reload
+
+        lda room_patch_restore_x_lo
+        sta room_patch_x_lo
+        lda room_patch_restore_x_hi
+        sta room_patch_x_hi
+        lda room_patch_restore_y
+        sta room_patch_y
+        lda room_patch_restore_width
+        sta room_patch_width
+        lda room_patch_restore_height
+        sta room_patch_height
+        jsr room_cache_restore_region
+        lda #0
+        sta room_patch_restore_mode
+room_restore_original_done
+        rts
+
+room_restore_original_reload
+        lda #0
+        sta room_patch_restore_mode
+        lda #1
+        sta room_action_pending_reload
+        rts
+
+room_patch_cache_init_ptr
+        lda #<ROOM_PATCH_CACHE_MEMB
+        sta zp_tmp_ptr2
+        lda #>ROOM_PATCH_CACHE_MEMB
+        sta zp_tmp_ptr2+1
+        lda #ROOM_PATCH_CACHE_BANK
+        sta room_patch_cache_cur_bank
+        rts
+
+room_patch_cache_open
+        lda room_patch_cache_cur_bank
+        ora #$80
+        sta zp_memb_shadow
+        ldy #VBXE_MEMAC_B
+        sta (zp_vbxe_base),y
+        rts
+
+room_patch_cache_advance
+        inc zp_tmp_ptr2
+        bne room_patch_cache_advance_check
+        inc zp_tmp_ptr2+1
+room_patch_cache_advance_check
+        lda zp_tmp_ptr2+1
+        cmp #$80
+        bne room_patch_cache_advance_done
+        lda #$40
+        sta zp_tmp_ptr2+1
+        inc room_patch_cache_cur_bank
+        lda room_patch_cache_cur_bank
+        ora #$80
+        sta zp_memb_shadow
+        ldy #VBXE_MEMAC_B
+        sta (zp_vbxe_base),y
+room_patch_cache_advance_done
+        rts
+
+room_cache_store_region
+        jsr room_patch_cache_init_ptr
+        lda room_patch_y
+        sta room_patch_cur_y
+        lda room_patch_height
+        sta room_patch_rows_left
+
+room_cache_store_row_loop
+        lda room_patch_rows_left
+        beq room_cache_store_done
+        jsr room_patch_prepare_row
+        jsr demo_mem_open
+        ldx #0
+
+room_cache_store_pix_loop
+        cpx room_patch_width
+        beq room_cache_store_row_done
+        ldy #0
+        lda (zp_tmp_ptr),y
+        sta zp_tmp3
+        jsr room_patch_cache_open
+        ldy #0
+        lda zp_tmp3
+        sta (zp_tmp_ptr2),y
+        jsr room_patch_cache_advance
+        jsr demo_mem_open
+        jsr demo_mem_advance
+        inx
+        bne room_cache_store_pix_loop
+
+room_cache_store_row_done
+        memb_off
+        inc room_patch_cur_y
+        dec room_patch_rows_left
+        bne room_cache_store_row_loop
+room_cache_store_done
+        rts
+
+room_cache_restore_region
+        jsr room_patch_cache_init_ptr
+        lda room_patch_y
+        sta room_patch_cur_y
+        lda room_patch_height
+        sta room_patch_rows_left
+
+room_cache_restore_row_loop
+        lda room_patch_rows_left
+        beq room_cache_restore_done
+        jsr room_patch_prepare_row
+        jsr demo_mem_open
+        ldx #0
+
+room_cache_restore_pix_loop
+        cpx room_patch_width
+        beq room_cache_restore_row_done
+        jsr room_patch_cache_open
+        ldy #0
+        lda (zp_tmp_ptr2),y
+        sta zp_tmp3
+        jsr room_patch_cache_advance
+        jsr demo_mem_open
+        lda zp_tmp3
+        jsr demo_mem_put
+        inx
+        bne room_cache_restore_pix_loop
+
+room_cache_restore_row_done
+        memb_off
+        inc room_patch_cur_y
+        dec room_patch_rows_left
+        bne room_cache_restore_row_loop
+room_cache_restore_done
+        rts
+
 room_patch_write_chunk
         ldx #0
 room_patch_chunk_loop

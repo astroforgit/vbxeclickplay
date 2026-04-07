@@ -31,20 +31,54 @@
         {
           "id": "mnl2c3a6j01cvl",
           "type": "rect",
-          "name": "lips",
-          "x": 136,
-          "y": 145,
-          "width": 48,
-          "height": 32,
-          "visible": false,
+          "name": "talk",
+          "x": 216,
+          "y": 90,
+          "width": 104,
+          "height": 73,
+          "visible": true,
           "locked": false,
           "imageFileName": null,
           "patchFileName": null,
           "createdAt": "2026-04-05T01:08:36.894Z"
+        },
+        {
+          "id": "mnnuctotd0cudn",
+          "type": "image",
+          "name": "smile",
+          "x": 137,
+          "y": 154,
+          "width": 51,
+          "height": 23,
+          "visible": false,
+          "locked": true,
+          "imageFileName": "selection-mnnuctotd0cudn.png",
+          "patchFileName": "selection-mnnuctotd0cudn.vbxe",
+          "createdAt": "2026-04-06T23:48:32.717Z"
+        },
+        {
+          "id": "mnnvt2vcfpougj",
+          "type": "image",
+          "name": "wine",
+          "x": 0,
+          "y": 107,
+          "width": 139,
+          "height": 93,
+          "visible": true,
+          "locked": true,
+          "imageFileName": "selection-mnnvt2vcfpougj.png",
+          "patchFileName": "selection-mnnvt2vcfpougj.vbxe",
+          "createdAt": "2026-04-07T00:29:10.728Z"
         }
       ],
       "createdAt": "2026-04-04T21:01:49.176Z"
     }
   ],
-  "clickScript": "// Available values: roomName, requestedRoomName, logicalX, x, y,\n// roomSelections, selections, rooms\n// Available helpers: changeRoom(name), displayText(text), replaceGraphics(payload)\n\nconst hit = roomSelections.find((selection) => {\n  return x >= selection.x && x < selection.x + selection.width && y >= selection.y && y < selection.y + selection.height;\n});\ndebugger;\nif (hit && hit.name=='closeeyes') {\n  return replaceGraphics('closeeyes');\n}\n\n\nif (hit) {\n  return displayText(hit.name);\n}\n\nreturn null;\n"
+  "clickScript": "const hit = roomSelections.find((selection) => {\n  return x >= selection.x && x < selection.x + selection.width && y >= selection.y && y < selection.y + selection.height;\n});\n\nstate.talkCount = typeof state.talkCount === 'number' ? state.talkCount : 0;\nstate.wineCount = typeof state.wineCount === 'number' ? state.wineCount : 0;\nstate.hasSmile = state.hasSmile === true;\nstate.eyesClosed = state.eyesClosed === true;\n\nif (!hit) {\n  return null;\n}\n\nif (hit.name === 'talk') {\n  if (state.eyesClosed) {\n    state.eyesClosed = false;\n    return originalGraphics('closeeyes');\n  }\n\n  state.talkCount += 1;\n  if (state.talkCount === 1) {\n    return displayText('You say hello.');\n  }\n  if (state.talkCount === 2) {\n    return displayText('She listens.');\n  }\n  if (state.wineCount === 0) {\n    return displayText('She eyes wine.');\n  }\n  if (!state.hasSmile) {\n    state.hasSmile = true;\n    return replaceGraphics('smile');\n  }\n  return displayText('She seems warm.');\n}\n\nif (hit.name === 'wine') {\n  if (state.talkCount === 0) {\n    return displayText('Say hello first.');\n  }\n\n  state.wineCount += 1;\n  if (state.wineCount === 1) {\n    return displayText('She takes a sip.');\n  }\n  if (!state.hasSmile) {\n    state.hasSmile = true;\n    return replaceGraphics('smile');\n  }\n  return displayText('Wine helps.');\n}\n\nif (hit.name === 'smile') {\n  if (!state.hasSmile) {\n    if (state.talkCount === 0 && state.wineCount === 0) {\n      return displayText('Not yet.');\n    }\n    state.hasSmile = true;\n    return replaceGraphics('smile');\n  }\n  return displayText('Already smiling.');\n}\n\nif (hit.name === 'closeeyes') {\n  if (!state.hasSmile) {\n    return displayText('Make her smile.');\n  }\n  state.eyesClosed = !state.eyesClosed;\n  if (state.eyesClosed) {\n    return replaceGraphics('closeeyes');\n  }\n  return originalGraphics('closeeyes');\n}\n\nreturn displayText('Talk wine smile.');\n",
+  "scriptState": {
+    "talkCount": 9,
+    "wineCount": 18,
+    "hasSmile": true,
+    "eyesClosed": true
+  }
 }
