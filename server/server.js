@@ -22,6 +22,8 @@ const LEGACY_ROOMS_DIR = path.join(LEGACY_DATA_DIR, 'rooms');
 const LEGACY_STORE_FILE = path.join(LEGACY_DATA_DIR, 'rooms.json');
 const WEB_INDEX_FILE = path.join(__dirname, 'web', 'index.html');
 const WEB_APP_FILE = path.join(__dirname, 'web', 'app.js');
+const CLICK_SCRIPT_REFERENCE_MD_FILE = path.join(ROOT_DIR, 'docs', 'click-script-reference.md');
+const CLICK_SCRIPT_REFERENCE_JSON_FILE = path.join(ROOT_DIR, 'docs', 'click-script-reference.json');
 const DEFAULT_CLICK_SCRIPT = `// Available values: roomName, requestedRoomName, logicalX, x, y,
 // roomSelections, selections, rooms, state, gameState, scriptState
 // Available helpers: changeRoom(name), displayText(text), replaceGraphics(payload), originalGraphics(payload)
@@ -1764,6 +1766,16 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && pathname === '/web/app.js') {
       sendFile(res, WEB_APP_FILE, 'text/javascript; charset=utf-8');
+      return;
+    }
+
+    if (req.method === 'GET' && pathname === '/docs/click-script-reference.md') {
+      sendFile(res, CLICK_SCRIPT_REFERENCE_MD_FILE, 'text/markdown; charset=utf-8');
+      return;
+    }
+
+    if (req.method === 'GET' && pathname === '/docs/click-script-reference.json') {
+      sendFile(res, CLICK_SCRIPT_REFERENCE_JSON_FILE, 'application/json; charset=utf-8');
       return;
     }
 

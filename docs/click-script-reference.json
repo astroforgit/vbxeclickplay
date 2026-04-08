@@ -1,0 +1,71 @@
+{
+  "title": "Click Script Reference",
+  "summary": "The click script runs in the server sandbox on every Atari room click and popup click. Return null for no action, a string as a displayText shortcut, or an action built with the helpers below.",
+  "values": [
+    { "name": "roomName", "type": "string", "description": "Resolved current room name used by the server." },
+    { "name": "requestedRoomName", "type": "string", "description": "Original room token from the request before fallback resolution." },
+    { "name": "logicalX", "type": "number", "description": "Atari logical X coordinate in 0..159." },
+    { "name": "x", "type": "number", "description": "Pixel X coordinate in 0..319. Equal to logicalX * 2." },
+    { "name": "y", "type": "number", "description": "Calibrated pixel Y coordinate in 0..199." },
+    { "name": "clickType", "type": "'room' | 'popup'", "description": "Whether the current event came from the room image or a popup click." },
+    { "name": "popupClick", "type": "object | null", "description": "Popup click context with lineNumber, columnNumber, word, choiceId, choiceText, value, and meta when clickType === 'popup'." },
+    { "name": "clickedLine / clickedColumn", "type": "number | null", "description": "Popup line and column shortcuts extracted from popupClick." },
+    { "name": "clickedWord", "type": "string", "description": "Word under the popup cursor, or empty string when none." },
+    { "name": "clickedChoice / clickedChoiceText", "type": "string", "description": "Choice id and rendered text for clickable popup choices." },
+    { "name": "state / gameState / scriptState", "type": "object", "description": "The same persistent JSON-safe state object saved to data/scriptState.json after the script finishes." },
+    { "name": "roomSelections", "type": "Selection[]", "description": "Selections for the current room only." },
+    { "name": "selections", "type": "Selection[]", "description": "Flattened selections from all rooms. Each item includes roomName." },
+    { "name": "rooms", "type": "Room[]", "description": "All rooms with their selections, slides, and script-friendly metadata." }
+  ],
+  "helpers": [
+    { "name": "changeRoom(roomName)", "returns": "changeRoom action", "description": "Reload the Atari client into another room by name." },
+    { "name": "displayText(text)", "returns": "displayText action", "description": "Show popup text. Long text is wrapped and clipped to 3 lines of 19 characters." },
+    { "name": "displayText({ text | message | lines, clickable, selectable, choices })", "returns": "displayText action", "description": "Advanced popup form. Set clickable/selectable true for popup click handling, or pass choices directly." },
+    { "name": "choice(id, text, options)", "returns": "popup choice object", "description": "Build one clickable choice line for use with displayChoices(). Options may include value or meta." },
+    { "name": "displayChoices(choices, options)", "returns": "displayText action", "description": "Show up to 3 clickable popup lines. Each line becomes a popup choice." },
+    { "name": "replaceGraphics(selectionName)", "returns": "replaceGraphics action", "description": "Use a saved image selection by name from the current room when the name is unique." },
+    { "name": "replaceGraphics({ selection, room, x, y, width, height })", "returns": "replaceGraphics action", "description": "Draw an image selection patch. selection can come from the current room or an explicit room. x/y/width/height can override placement within the stored patch bounds." },
+    { "name": "replaceGraphics({ room, sourceRoom, x, y, width, height })", "returns": "replaceGraphics action", "description": "Copy a rectangular patch from a room image instead of an image selection." },
+    { "name": "originalGraphics()", "returns": "originalGraphics action", "description": "Restore the full original room image." },
+    { "name": "originalGraphics(selectionName | payload)", "returns": "originalGraphics action", "description": "Restore just the affected rectangle. The payload format matches replaceGraphics()." },
+    { "name": "replaceGraphisc / originalGraphisc / orginalGraphics / orginalGraphisc", "returns": "same as the correct helper", "description": "Compatibility typo aliases kept for older scripts." }
+  ],
+  "returnValues": [
+    { "name": "null or undefined", "description": "Do nothing and leave the current room unchanged." },
+    { "name": "'some text'", "description": "Shortcut for displayText('some text')." },
+    { "name": "action object", "description": "A helper result from changeRoom, displayText, replaceGraphics, or originalGraphics." },
+    { "name": "array", "description": "If you return an array, the first truthy item is used." }
+  ],
+  "structures": [
+    { "name": "Selection", "description": "id, roomName (only in global selections), type, name, description, x, y, width, height, visible, showOnClient, visibleInPage, locked." },
+    { "name": "Room", "description": "id, name, title, slides, and selections. Each selection uses the same fields as above." }
+  ],
+  "limits": [
+    { "name": "Popup lines", "description": "Maximum 3 visible lines." },
+    { "name": "Popup line width", "description": "Each line is sanitized and clipped to 19 characters." },
+    { "name": "Popup choices", "description": "Maximum 3 clickable choices." },
+    { "name": "State persistence", "description": "Only plain JSON-safe object data should be stored in state/gameState/scriptState." },
+    { "name": "Script runtime", "description": "The sandbox is short-lived and timed; keep scripts fast and side-effect free beyond state updates." }
+  ],
+  "serverSpecials": [
+    { "name": "resetgame selection", "description": "A clicked topmost selection named resetgame is intercepted by the server. It deletes data/scriptState.json, clears transient popup/click state, and reloads the first room without running the click script." }
+  ],
+  "examples": [
+    {
+      "title": "Show the clicked selection name",
+      "code": "const hit = roomSelections.find((selection) => x >= selection.x && x < selection.x + selection.width && y >= selection.y && y < selection.y + selection.height);\nif (hit) return displayText(hit.name);\nreturn null;"
+    },
+    {
+      "title": "Clickable popup choices",
+      "code": "if (clickType === 'popup') {\n  if (clickedChoice === 'flower') return replaceGraphics('flower');\n  if (clickedChoice === 'wine') return replaceGraphics('wine');\n}\nreturn displayChoices([choice('flower', 'GIVE FLOWER'), choice('wine', 'GIVE WINE')]);"
+    },
+    {
+      "title": "Move to another room",
+      "code": "if (roomName === 'first' && x < 20 && y < 20) {\n  return changeRoom('room2');\n}\nreturn null;"
+    },
+    {
+      "title": "Draw and later restore an image selection",
+      "code": "if (!state.lampOn) {\n  state.lampOn = true;\n  return replaceGraphics('lamp_on');\n}\nstate.lampOn = false;\nreturn originalGraphics('lamp_on');"
+    }
+  ]
+}

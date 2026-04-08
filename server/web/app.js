@@ -45,6 +45,7 @@ const saveImageSelectionBtn = document.getElementById('save-image-selection-btn'
 const deleteSelectionBtn = document.getElementById('delete-selection-btn');
 const clickScriptEditor = document.getElementById('click-script-editor');
 const saveClickScriptBtn = document.getElementById('save-click-script-btn');
+const openClickScriptDocsBtn = document.getElementById('open-click-script-docs-btn');
 
 // Crop elements
 const cropContainer = document.getElementById('crop-container');
@@ -61,6 +62,10 @@ const cropSourceMeta = document.getElementById('crop-source-meta');
 // Modal elements
 const addRoomModal = document.getElementById('add-room-modal');
 const roomNameInput = document.getElementById('room-name-input');
+const clickScriptDocsModal = document.getElementById('click-script-docs-modal');
+const closeClickScriptDocsBtn = document.getElementById('close-click-script-docs-btn');
+const clickScriptDocsStatus = document.getElementById('click-script-docs-status');
+const clickScriptDocsContent = document.getElementById('click-script-docs-content');
 
 // State
 let currentRoom = null;
@@ -71,6 +76,7 @@ let rooms = [];
 let selectionInteraction = null;
 let imageSelectionDraft = null;
 let clickScriptLoaded = false;
+let clickScriptDocs = null;
 let imageSelectionPatchRepairInFlight = false;
 let cropState = {
   image: null,
@@ -101,6 +107,8 @@ selectionForm.addEventListener('input', onSelectionFormInput);
 saveImageSelectionBtn.addEventListener('click', saveImageSelectionDraft);
 deleteSelectionBtn.addEventListener('click', deleteSelection);
 saveClickScriptBtn.addEventListener('click', saveClickScript);
+openClickScriptDocsBtn.addEventListener('click', openClickScriptDocsModal);
+closeClickScriptDocsBtn.addEventListener('click', closeClickScriptDocsModal);
 
 // Crop event listeners
 scaleSlider.addEventListener('input', onScaleChange);
@@ -116,6 +124,9 @@ cropCanvas.addEventListener('mouseleave', onCropMouseUp);
 window.onclick = function(event) {
   if (event.target === addRoomModal) {
     closeAddRoomModal();
+  }
+  if (event.target === clickScriptDocsModal) {
+    closeClickScriptDocsModal();
   }
 };
 
@@ -1048,6 +1059,82 @@ async function saveClickScript() {
     body: JSON.stringify({ script: clickScriptEditor.value })
   });
   setStatus('Click script saved. Future Atari clicks will use the updated JavaScript.');
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderDocsSection(title, items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return '';
+  }
+
+  return `
+    <section class="docs-section">
+      <h3>${escapeHtml(title)}</h3>
+      ${items.map((item) => {
+        const label = item.name || item.title || '';
+        const secondary = item.type || item.returns || '';
+        return `
+          <div class="docs-item">
+            <div class="docs-item-header">
+              <code>${escapeHtml(label)}</code>
+              ${secondary ? `<span class="meta">${escapeHtml(secondary)}</span>` : ''}
+            </div>
+            ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
+            ${item.code ? `<pre class="docs-code">${escapeHtml(item.code)}</pre>` : ''}
+          </div>
+        `;
+      }).join('')}
+    </section>
+  `;
+}
+
+function renderClickScriptDocs(data) {
+  return `
+    <section class="docs-section">
+      <p>${escapeHtml(data.summary || '')}</p>
+    </section>
+    ${renderDocsSection('Context values', data.values)}
+    ${renderDocsSection('Helpers', data.helpers)}
+    ${renderDocsSection('Return values', data.returnValues)}
+    ${renderDocsSection('Data structures', data.structures)}
+    ${renderDocsSection('Limits', data.limits)}
+    ${renderDocsSection('Server-side specials', data.serverSpecials)}
+    ${renderDocsSection('Examples', data.examples)}
+  `;
+}
+
+async function openClickScriptDocsModal() {
+  clickScriptDocsModal.style.display = 'block';
+
+  if (clickScriptDocs) {
+    clickScriptDocsStatus.textContent = 'Reference loaded from /docs/click-script-reference.json';
+    clickScriptDocsContent.innerHTML = renderClickScriptDocs(clickScriptDocs);
+    return;
+  }
+
+  clickScriptDocsStatus.textContent = 'Loading reference…';
+  clickScriptDocsContent.innerHTML = '';
+
+  try {
+    clickScriptDocs = await fetchJson('/docs/click-script-reference.json');
+    clickScriptDocsStatus.textContent = 'Reference loaded from /docs/click-script-reference.json';
+    clickScriptDocsContent.innerHTML = renderClickScriptDocs(clickScriptDocs);
+  } catch (error) {
+    clickScriptDocsStatus.textContent = `Failed to load reference: ${error.message}`;
+    clickScriptDocsContent.innerHTML = '';
+  }
+}
+
+function closeClickScriptDocsModal() {
+  clickScriptDocsModal.style.display = 'none';
 }
 
 async function createSelection() {

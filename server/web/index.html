@@ -650,6 +650,61 @@
       justify-content: flex-end;
     }
 
+    .docs-modal-content {
+      width: min(960px, 92vw);
+      margin: 5vh auto;
+      max-height: 90vh;
+      overflow: auto;
+    }
+
+    .docs-content {
+      display: grid;
+      gap: 16px;
+    }
+
+    .docs-section {
+      display: grid;
+      gap: 10px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .docs-section:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .docs-item {
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(17, 24, 39, 0.35);
+    }
+
+    .docs-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .docs-item-header code {
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .docs-code {
+      margin: 8px 0 0;
+      padding: 12px;
+      border-radius: 8px;
+      overflow: auto;
+      background: rgba(2, 6, 23, 0.7);
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+    }
+
     .empty-panel {
       padding: 18px;
       color: var(--text-secondary);
@@ -915,10 +970,13 @@
           <section class="card">
             <div class="card-title-row">
               <h2>Click JavaScript</h2>
-              <button id="save-click-script-btn" type="button" class="primary">Save script</button>
+              <div class="row">
+                <button id="open-click-script-docs-btn" type="button">Script help</button>
+                <button id="save-click-script-btn" type="button" class="primary">Save script</button>
+              </div>
             </div>
             <div class="script-editor">
-              <p class="script-help">This global script runs on every Atari click after the server stores the red marker. Available values include <code>roomName</code>, <code>requestedRoomName</code>, <code>logicalX</code>, <code>x</code>, <code>y</code>, <code>roomSelections</code>, <code>selections</code>, and <code>rooms</code>. Return <code>changeRoom('room2')</code>, <code>displayText('hello')</code>, <code>replaceGraphics('lamp_on')</code> for a saved image selection, or <code>replaceGraphics({ room: 'patchroom', x: 120, y: 40, width: 32, height: 24 })</code>.</p>
+              <p class="script-help">This global script runs on every Atari click after the server stores the red marker. Use <strong>Script help</strong> for the full reference. Raw docs: <a href="/docs/click-script-reference.md" target="_blank" rel="noopener">MD</a> · <a href="/docs/click-script-reference.json" target="_blank" rel="noopener">JSON</a>.</p>
               <textarea id="click-script-editor" class="mono-textarea" spellcheck="false"></textarea>
             </div>
           </section>
@@ -938,6 +996,24 @@
         <button onclick="closeAddRoomModal()">Cancel</button>
         <button onclick="createRoom()" class="primary">Create</button>
       </div>
+    </div>
+  </div>
+
+  <div id="click-script-docs-modal" class="modal">
+    <div class="modal-content docs-modal-content">
+      <div class="card-title-row">
+        <div>
+          <div class="modal-header" style="margin-bottom: 4px;">Click script reference</div>
+          <div class="meta">Available sandbox values, helpers, limits, and examples.</div>
+        </div>
+        <div class="row">
+          <a href="/docs/click-script-reference.md" target="_blank" rel="noopener">Open MD</a>
+          <a href="/docs/click-script-reference.json" target="_blank" rel="noopener">Open JSON</a>
+          <button id="close-click-script-docs-btn" type="button">Close</button>
+        </div>
+      </div>
+      <div id="click-script-docs-status" class="meta" style="margin-bottom: 12px;">Loading reference…</div>
+      <div id="click-script-docs-content" class="docs-content"></div>
     </div>
   </div>
 
