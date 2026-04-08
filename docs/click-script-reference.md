@@ -100,6 +100,38 @@ These still work:
 - It deletes `data/scriptState.json`, clears transient popup/click state, and reloads the first room.
 - It does **not** need to be handled in the click script.
 
+## Related files and locations
+
+- `data/clickscript.js`
+  - The live click script executed by the server sandbox for room clicks and popup clicks.
+
+- `data/scriptState.json`
+  - Persistent JSON state automatically exposed as `state`, `gameState`, and `scriptState`.
+
+- `data/rooms.json`
+  - Canonical room database containing rooms, slides, selections, descriptions, visibility flags, and image-selection file references.
+
+- `data/rooms/<roomId>/slide-*.vbxe`
+  - Per-room VBXE background image files used by the Atari client.
+
+- `data/rooms/<roomId>/selection-*.png`
+  - Stored PNG fragment for an image selection, mainly used by the web editor preview.
+
+- `data/rooms/<roomId>/selection-*.vbxe`
+  - Stored VBXE patch for an image selection, used by in-game `replaceGraphics(...)`.
+
+- `data/selections.json`
+  - Legacy export file that has been removed. It is no longer used by the server or client.
+
+- `server/server.js`
+  - Main server implementation containing the click-script sandbox helpers, popup behavior, special server-side actions, and HTTP routes.
+
+- `docs/click-script-reference.md`
+  - Human-readable Markdown reference.
+
+- `docs/click-script-reference.json`
+  - Structured JSON reference used by the built-in Script help popup in the web editor.
+
 ## Examples
 
 ### Show the clicked selection name

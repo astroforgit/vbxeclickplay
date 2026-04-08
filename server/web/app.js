@@ -1107,6 +1107,7 @@ function renderClickScriptDocs(data) {
     ${renderDocsSection('Data structures', data.structures)}
     ${renderDocsSection('Limits', data.limits)}
     ${renderDocsSection('Server-side specials', data.serverSpecials)}
+    ${renderDocsSection('Related files and locations', data.relatedFiles)}
     ${renderDocsSection('Examples', data.examples)}
   `;
 }

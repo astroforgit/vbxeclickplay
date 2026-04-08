@@ -50,6 +50,18 @@
   "serverSpecials": [
     { "name": "resetgame selection", "description": "A clicked topmost selection named resetgame is intercepted by the server. It deletes data/scriptState.json, clears transient popup/click state, and reloads the first room without running the click script." }
   ],
+  "relatedFiles": [
+    { "name": "data/clickscript.js", "type": "main script", "description": "The live click script executed by the server sandbox for room clicks and popup clicks." },
+    { "name": "data/scriptState.json", "type": "persistent state", "description": "JSON object automatically loaded into state/gameState/scriptState and saved back after each click when the script changes it." },
+    { "name": "data/rooms.json", "type": "canonical content store", "description": "Main room database. Stores room names, slide metadata, selections, descriptions, visibility flags, and image-selection file references." },
+    { "name": "data/rooms/<roomId>/slide-*.vbxe", "type": "room image", "description": "Per-room VBXE background image files used by the Atari client and by room-based graphics patch actions." },
+    { "name": "data/rooms/<roomId>/selection-*.png", "type": "editor image selection preview", "description": "Stored PNG fragment for an image selection. Used by the web editor preview and management UI." },
+    { "name": "data/rooms/<roomId>/selection-*.vbxe", "type": "in-game image selection patch", "description": "Stored VBXE patch for an image selection. Used by replaceGraphics('selectionName') and related payload forms in-game." },
+    { "name": "data/selections.json", "type": "obsolete export", "description": "Removed legacy export file. It is no longer used by the server or client; data/rooms.json is the canonical source now." },
+    { "name": "server/server.js", "type": "server implementation", "description": "Defines the click-script sandbox values/helpers, popup limits, special server-side actions like resetgame, and the HTTP routes used by the game and web editor." },
+    { "name": "docs/click-script-reference.md", "type": "markdown docs", "description": "Human-readable reference for the click scripting API." },
+    { "name": "docs/click-script-reference.json", "type": "popup/help data", "description": "Structured reference consumed by the built-in Script help popup in the web editor." }
+  ],
   "examples": [
     {
       "title": "Show the clicked selection name",
