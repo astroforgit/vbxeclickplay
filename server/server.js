@@ -9,17 +9,21 @@ const IMAGE_WIDTH = 320;
 const IMAGE_HEIGHT = 200;
 const CLICK_MARKER_COLOR = 5;
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
+const POPUP_LINE_MAX = 19;
+const POPUP_MAX_LINES = 3;
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DATA_DIR = path.join(ROOT_DIR, 'data');
 const ROOMS_DIR = path.join(DATA_DIR, 'rooms');
 const STORE_FILE = path.join(DATA_DIR, 'rooms.json');
+const CLICK_SCRIPT_FILE = path.join(DATA_DIR, 'clickscript.js');
+const SCRIPT_STATE_FILE = path.join(DATA_DIR, 'scriptState.json');
 const LEGACY_DATA_DIR = path.resolve(__dirname, '../..', 'data');
 const LEGACY_ROOMS_DIR = path.join(LEGACY_DATA_DIR, 'rooms');
 const LEGACY_STORE_FILE = path.join(LEGACY_DATA_DIR, 'rooms.json');
 const WEB_INDEX_FILE = path.join(__dirname, 'web', 'index.html');
 const WEB_APP_FILE = path.join(__dirname, 'web', 'app.js');
 const DEFAULT_CLICK_SCRIPT = `// Available values: roomName, requestedRoomName, logicalX, x, y,
-// roomSelections, selections, rooms, state, gameState
+// roomSelections, selections, rooms, state, gameState, scriptState
 // Available helpers: changeRoom(name), displayText(text), replaceGraphics(payload), originalGraphics(payload)
 // Examples:
 //   replaceGraphics('closeeyes')
@@ -72,33 +76,81 @@ function ensureStore() {
   }
 }
 
+function readClickScript(fallback) {
+  try {
+    if (fs.existsSync(CLICK_SCRIPT_FILE)) {
+      return fs.readFileSync(CLICK_SCRIPT_FILE, 'utf8');
+    }
+  } catch (error) {
+    console.warn(`[WARN] Failed to read click script file: ${error.message}`);
+  }
+
+  const script = typeof fallback === 'string' && fallback.trim() ? fallback : DEFAULT_CLICK_SCRIPT;
+  try {
+    fs.writeFileSync(CLICK_SCRIPT_FILE, script.endsWith('\n') ? script : `${script}\n`);
+  } catch (error) {
+    console.warn(`[WARN] Failed to initialize click script file: ${error.message}`);
+  }
+  return script;
+}
+
+function writeClickScript(script) {
+  const content = typeof script === 'string' && script.trim() ? script : DEFAULT_CLICK_SCRIPT;
+  fs.writeFileSync(CLICK_SCRIPT_FILE, content.endsWith('\n') ? content : `${content}\n`);
+}
+
+function readScriptState(fallback) {
+  try {
+    if (fs.existsSync(SCRIPT_STATE_FILE)) {
+      return normalizeScriptState(JSON.parse(fs.readFileSync(SCRIPT_STATE_FILE, 'utf8')));
+    }
+  } catch (error) {
+    console.warn(`[WARN] Failed to read script state file: ${error.message}`);
+  }
+
+  const state = normalizeScriptState(fallback);
+  try {
+    fs.writeFileSync(SCRIPT_STATE_FILE, JSON.stringify(state, null, 2));
+  } catch (error) {
+    console.warn(`[WARN] Failed to initialize script state file: ${error.message}`);
+  }
+  return state;
+}
+
+function writeScriptState(state) {
+  fs.writeFileSync(SCRIPT_STATE_FILE, JSON.stringify(normalizeScriptState(state), null, 2));
+}
+
 function loadStore() {
   ensureStore();
   try {
     const parsed = JSON.parse(fs.readFileSync(STORE_FILE, 'utf8'));
     if (!Array.isArray(parsed.rooms)) {
-      return { rooms: [], clickScript: DEFAULT_CLICK_SCRIPT, scriptState: {} };
+      const store = { rooms: [], clickScript: readClickScript(parsed.clickScript), scriptState: readScriptState(parsed.scriptState) };
+      return store;
     }
-    return {
+    const store = {
       rooms: parsed.rooms
         .filter((room) => room && typeof room.id === 'string' && typeof room.name === 'string')
         .map((room) => normalizeRoomRecord(room)),
-      clickScript: typeof parsed.clickScript === 'string' ? parsed.clickScript : DEFAULT_CLICK_SCRIPT,
-      scriptState: normalizeScriptState(parsed.scriptState)
+      clickScript: readClickScript(parsed.clickScript),
+      scriptState: readScriptState(parsed.scriptState)
     };
+    return store;
   } catch (error) {
     console.warn(`[WARN] Failed to load store: ${error.message}`);
-    return { rooms: [], clickScript: DEFAULT_CLICK_SCRIPT, scriptState: {} };
+    const store = { rooms: [], clickScript: readClickScript(DEFAULT_CLICK_SCRIPT), scriptState: readScriptState({}) };
+    return store;
   }
 }
 
 function saveStore(store) {
   ensureStore();
   fs.writeFileSync(STORE_FILE, JSON.stringify({
-    rooms: Array.isArray(store.rooms) ? store.rooms : [],
-    clickScript: typeof store.clickScript === 'string' ? store.clickScript : DEFAULT_CLICK_SCRIPT,
-    scriptState: normalizeScriptState(store.scriptState)
+    rooms: Array.isArray(store.rooms) ? store.rooms : []
   }, null, 2));
+  writeClickScript(store.clickScript);
+  writeScriptState(store.scriptState);
 }
 
 function normalizeScriptState(value) {
@@ -127,6 +179,142 @@ function sanitizeActionText(text) {
     .replace(/[^\x20-\x7E]/g, ' ')
     .trim();
   return safe.slice(0, 19);
+}
+
+function sanitizePopupTextFragment(text) {
+  return String(text || '')
+    .replace(/[|\r\t]+/g, ' ')
+    .replace(/[^\x20-\x7E]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function wrapPopupLine(line, output) {
+  let remaining = sanitizePopupTextFragment(line);
+  if (!remaining) {
+    output.push('');
+    return;
+  }
+
+  while (remaining && output.length < POPUP_MAX_LINES) {
+    if (remaining.length <= POPUP_LINE_MAX) {
+      output.push(remaining);
+      return;
+    }
+
+    const candidate = remaining.slice(0, POPUP_LINE_MAX + 1);
+    let breakAt = candidate.lastIndexOf(' ');
+    if (breakAt <= 0) {
+      breakAt = POPUP_LINE_MAX;
+    }
+
+    output.push(remaining.slice(0, breakAt).trimEnd().slice(0, POPUP_LINE_MAX));
+    remaining = remaining.slice(breakAt).trimStart();
+  }
+}
+
+function normalizePopupLines(text) {
+  const rawLines = String(text || '').replace(/\r/g, '').split('\n');
+  const lines = [];
+
+  for (const rawLine of rawLines) {
+    if (lines.length >= POPUP_MAX_LINES) break;
+    wrapPopupLine(rawLine, lines);
+  }
+
+  const normalized = lines
+    .slice(0, POPUP_MAX_LINES)
+    .map((line) => sanitizePopupTextFragment(line).slice(0, POPUP_LINE_MAX));
+
+  if (normalized.length === 0) {
+    const fallback = sanitizeActionText(text);
+    return fallback ? [fallback] : [];
+  }
+
+  return normalized;
+}
+
+function slugifyChoiceId(value, fallback = 'choice') {
+  const safe = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return safe || fallback;
+}
+
+function normalizePopupChoice(candidate, index) {
+  if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
+    const text = sanitizePopupTextFragment(
+      candidate.text ?? candidate.label ?? candidate.title ?? candidate.name ?? candidate.message ?? ''
+    ).slice(0, POPUP_LINE_MAX);
+    if (!text) {
+      return null;
+    }
+    return {
+      id: slugifyChoiceId(candidate.id ?? candidate.key ?? candidate.value ?? text, `choice_${index + 1}`),
+      text,
+      value: candidate.value ?? candidate.id ?? text,
+      meta: candidate.meta && typeof candidate.meta === 'object' ? { ...candidate.meta } : null
+    };
+  }
+
+  const text = sanitizePopupTextFragment(candidate).slice(0, POPUP_LINE_MAX);
+  if (!text) {
+    return null;
+  }
+
+  return {
+    id: slugifyChoiceId(text, `choice_${index + 1}`),
+    text,
+    value: text,
+    meta: null
+  };
+}
+
+function normalizePopupChoices(candidates) {
+  if (!Array.isArray(candidates)) {
+    return [];
+  }
+
+  return candidates
+    .map((candidate, index) => normalizePopupChoice(candidate, index))
+    .filter(Boolean)
+    .slice(0, POPUP_MAX_LINES);
+}
+
+function normalizeDisplayTextAction(candidate) {
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+
+  const choices = normalizePopupChoices(candidate.choices);
+  if (choices.length > 0) {
+    return {
+      type: 'displayText',
+      lines: choices.map((choice) => choice.text),
+      clickable: candidate.clickable !== false,
+      choices
+    };
+  }
+
+  let text = '';
+  let clickable = false;
+
+  if (Array.isArray(candidate.lines)) {
+    text = candidate.lines.join('\n');
+  } else if (candidate.text !== undefined) {
+    text = String(candidate.text || '');
+  } else if (candidate.message !== undefined) {
+    text = String(candidate.message || '');
+  }
+
+  if (candidate.clickable === true || candidate.selectable === true) {
+    clickable = true;
+  }
+
+  const lines = normalizePopupLines(text);
+  return lines.length ? { type: 'displayText', lines, clickable } : null;
 }
 
 function isPngBuffer(buffer) {
@@ -162,16 +350,22 @@ function sanitizeSelectionRecord(selection, defaults = {}) {
   const y = Math.max(0, Math.min(maxHeight - 1, baseY));
   const width = Math.max(1, Math.min(maxWidth - x, clampInteger(selection?.width, defaults.width ?? 48)));
   const height = Math.max(1, Math.min(maxHeight - y, clampInteger(selection?.height, defaults.height ?? 32)));
+  const showOnClient = selection?.showOnClient === undefined
+    ? selection?.visibleInPage !== false
+    : selection?.showOnClient !== false;
 
   return {
     id: String(selection?.id || defaults.id || `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`),
     type,
     name: sanitizeTitle(selection?.name || defaults.name || 'Selection'),
+    description: String(selection?.description || defaults.description || ''),
     x,
     y,
     width,
     height,
     visible: selection?.visible !== false,
+    showOnClient,
+    visibleInPage: showOnClient,
     locked: type === 'image' ? selection?.locked !== false : false,
     imageFileName: type === 'image' && typeof selection?.imageFileName === 'string' ? selection.imageFileName : null,
     patchFileName: type === 'image' && typeof selection?.patchFileName === 'string' ? selection.patchFileName : null,
@@ -247,6 +441,7 @@ function buildDemoImagePayload() {
 
 const demoImagePayload = buildDemoImagePayload();
 const roomClickState = new Map();
+const roomPopupState = new Map();
 const ATARI_VISIBLE_MAX_CLICK_Y = 183;
 
 function validateVbxePayload(buffer, options = {}) {
@@ -410,11 +605,14 @@ function buildSelectionsForScript(store) {
     id: selection.id,
     type: selection.type || 'rect',
     name: selection.name,
+    description: String(selection.description || ''),
     x: selection.x,
     y: selection.y,
     width: selection.width,
     height: selection.height,
     visible: selection.visible !== false,
+    showOnClient: selection.showOnClient !== false,
+    visibleInPage: selection.visibleInPage !== false,
     locked: selection.locked === true
   })));
 }
@@ -427,14 +625,160 @@ function buildRoomsForScript(store) {
       id: selection.id,
       type: selection.type || 'rect',
       name: selection.name,
+      description: String(selection.description || ''),
       x: selection.x,
       y: selection.y,
       width: selection.width,
       height: selection.height,
       visible: selection.visible !== false,
+      showOnClient: selection.showOnClient !== false,
+      visibleInPage: selection.visibleInPage !== false,
       locked: selection.locked === true
     }))
   }));
+}
+
+function sanitizeHoverLabel(text) {
+  return sanitizeActionText(String(text || '').replace(/[|,:]/g, ' ').replace(/\s+/g, ' '));
+}
+
+function selectionShowsOnClient(selection) {
+  if (!selection || typeof selection !== 'object') return false;
+  if (selection.showOnClient !== undefined) {
+    return selection.showOnClient !== false;
+  }
+  return selection.visibleInPage !== false;
+}
+
+function findTopmostSelectionAt(room, x, y) {
+  const selections = Array.isArray(room?.selections) ? room.selections : [];
+  for (let index = selections.length - 1; index >= 0; index -= 1) {
+    const selection = selections[index];
+    if (x >= selection.x && x < selection.x + selection.width && y >= selection.y && y < selection.y + selection.height) {
+      return selection;
+    }
+  }
+  return null;
+}
+
+function buildRoomHoverPayload(roomName) {
+  const room = getRoom(roomName);
+  if (!room) return null;
+
+  const parts = [];
+  for (const selection of room.selections || []) {
+    if (!selectionShowsOnClient(selection)) continue;
+    const label = sanitizeHoverLabel(selection.name);
+    if (!label) continue;
+
+    const logicalX = Math.max(0, Math.min(159, Math.floor(selection.x / 2)));
+    const logicalRight = Math.max(logicalX + 1, Math.min(160, Math.ceil((selection.x + selection.width) / 2)));
+    const logicalWidth = Math.max(1, Math.min(160 - logicalX, logicalRight - logicalX));
+    const part = [
+      formatHexByte(logicalX),
+      formatHexByte(selection.y),
+      formatHexByte(logicalWidth),
+      formatHexByte(selection.height),
+      label
+    ].join(',');
+
+    const candidate = `SEL:${parts.concat(part).join('|')}\n`;
+    if (Buffer.byteLength(candidate, 'ascii') > 190) {
+      break;
+    }
+    parts.push(part);
+  }
+
+  return `SEL:${parts.join('|')}\n`;
+}
+
+function updateRoomPopupState(roomName, action) {
+  if (!roomName) return;
+  if (action && action.type === 'displayText' && Array.isArray(action.lines) && action.lines.length > 0) {
+    roomPopupState.set(roomName, {
+      lines: action.lines.slice(0, POPUP_MAX_LINES),
+      clickable: action.clickable === true,
+      choices: Array.isArray(action.choices)
+        ? action.choices.slice(0, POPUP_MAX_LINES).map((choice) => ({ ...choice }))
+        : [],
+      updatedAt: new Date().toISOString()
+    });
+    return;
+  }
+  roomPopupState.delete(roomName);
+}
+
+function resetGameAndBuildReloadAction(preferredRoomName = 'first') {
+  let reloadRoomName = sanitizeRoomName(preferredRoomName) || 'first';
+  try {
+    const store = loadStore();
+    if (Array.isArray(store.rooms) && store.rooms.length > 0 && typeof store.rooms[0]?.name === 'string') {
+      reloadRoomName = sanitizeRoomName(store.rooms[0].name) || reloadRoomName;
+    }
+  } catch (error) {
+    console.warn(`[WARN] Failed to resolve reset room: ${error.message}`);
+  }
+
+  try {
+    if (fs.existsSync(SCRIPT_STATE_FILE)) {
+      fs.unlinkSync(SCRIPT_STATE_FILE);
+    }
+  } catch (error) {
+    console.warn(`[WARN] Failed to delete script state file: ${error.message}`);
+  }
+
+  roomPopupState.clear();
+  roomClickState.clear();
+  return { type: 'changeRoom', room: reloadRoomName };
+}
+
+function resolvePopupWord(lineText, column) {
+  const safeLine = String(lineText || '');
+  const safeColumn = Math.max(0, clampInteger(column, 0));
+  const words = Array.from(safeLine.matchAll(/[^ ]+/g));
+  for (let index = 0; index < words.length; index += 1) {
+    const match = words[index];
+    const start = match.index ?? 0;
+    const word = match[0] || '';
+    const end = start + word.length;
+    if (safeColumn >= start && safeColumn < end) {
+      return { word, wordIndex: index, start, end: end - 1 };
+    }
+  }
+  return { word: '', wordIndex: -1, start: -1, end: -1 };
+}
+
+function buildPopupClickContext(roomName, line, column) {
+  const popup = roomPopupState.get(roomName);
+  if (!popup || popup.clickable !== true || !Array.isArray(popup.lines) || popup.lines.length === 0) {
+    return null;
+  }
+
+  const lineIndex = Math.max(0, Math.min(popup.lines.length - 1, clampInteger(line, 0)));
+  const columnIndex = Math.max(0, Math.min(POPUP_LINE_MAX - 1, clampInteger(column, 0)));
+  const lineText = String(popup.lines[lineIndex] || '');
+  const resolvedWord = resolvePopupWord(lineText, columnIndex);
+  const choice = Array.isArray(popup.choices) ? popup.choices[lineIndex] : null;
+
+  return {
+    line: lineIndex,
+    lineNumber: lineIndex + 1,
+    column: columnIndex,
+    columnNumber: columnIndex + 1,
+    lineText,
+    lines: popup.lines.slice(),
+    choiceId: choice ? String(choice.id || '') : '',
+    choiceText: choice ? String(choice.text || '') : '',
+    choiceValue: choice ? choice.value ?? '' : '',
+    choiceIndex: choice ? lineIndex : -1,
+    choiceNumber: choice ? lineIndex + 1 : 0,
+    choiceMeta: choice && choice.meta ? { ...choice.meta } : null,
+    word: resolvedWord.word,
+    wordIndex: resolvedWord.wordIndex,
+    wordNumber: resolvedWord.wordIndex >= 0 ? resolvedWord.wordIndex + 1 : 0,
+    wordStart: resolvedWord.start,
+    wordEnd: resolvedWord.end
+  };
 }
 
 function formatHexByte(value) {
@@ -683,6 +1027,10 @@ function resolveOriginalGraphicsAction(payloadInput, currentRoomName) {
 function normalizeClickActionResult(result, currentRoomName) {
   if (!result) return null;
   const candidate = Array.isArray(result) ? result.find(Boolean) : result;
+  if (typeof candidate === 'string') {
+    const text = normalizeDisplayTextAction({ text: candidate });
+    return text || null;
+  }
   if (!candidate || typeof candidate !== 'object') {
     return null;
   }
@@ -692,10 +1040,8 @@ function normalizeClickActionResult(result, currentRoomName) {
       const room = sanitizeRoomName(candidate.room);
       return room ? { type: 'changeRoom', room } : null;
     }
-    case 'displayText': {
-      const text = sanitizeActionText(candidate.text);
-      return text ? { type: 'displayText', text } : null;
-    }
+    case 'displayText':
+      return normalizeDisplayTextAction(candidate);
     case 'replaceGraphics':
       return resolveReplaceGraphicsAction(candidate.payload, currentRoomName);
     case 'originalGraphics':
@@ -711,7 +1057,7 @@ function encodeClickActionText(action) {
     case 'changeRoom':
       return `ROOM:${action.room}\n`;
     case 'displayText':
-      return `TEXT:${sanitizeActionText(action.text)}\n`;
+      return `POP:${action.clickable === true ? '1' : '0'}|${(action.lines || []).join('|')}\n`;
     case 'replaceGraphics':
       return `GFX:${action.sourceKey},${formatHexByte(action.x >> 8)},${formatHexByte(action.x)},${formatHexByte(action.y)},${formatHexByte(action.width)},${formatHexByte(action.height)}\n`;
     case 'originalGraphics':
@@ -723,20 +1069,24 @@ function encodeClickActionText(action) {
   }
 }
 
-function executeClickScript(requestedRoomName, room, logicalX, y) {
+function executeClickScript(requestedRoomName, room, logicalX, y, extraContext = {}) {
   const store = loadStore();
   const x = logicalX * 2;
   const persistedState = normalizeScriptState(store.scriptState);
   const persistedStateJson = JSON.stringify(persistedState);
+  const popupClick = extraContext.popupClick || null;
   const roomSelections = (room.selections || []).map((selection) => ({
     id: selection.id,
     type: selection.type || 'rect',
     name: selection.name,
+    description: String(selection.description || ''),
     x: selection.x,
     y: selection.y,
     width: selection.width,
     height: selection.height,
     visible: selection.visible !== false,
+    showOnClient: selection.showOnClient !== false,
+    visibleInPage: selection.visibleInPage !== false,
     locked: selection.locked === true
   }));
 
@@ -746,13 +1096,35 @@ function executeClickScript(requestedRoomName, room, logicalX, y) {
     logicalX,
     x,
     y,
+    clickType: extraContext.clickType || 'room',
+    popupClick,
+    clickedLine: popupClick ? popupClick.lineNumber : null,
+    clickedColumn: popupClick ? popupClick.columnNumber : null,
+    clickedWord: popupClick ? popupClick.word : '',
+    clickedChoice: popupClick ? popupClick.choiceId : '',
+    clickedChoiceText: popupClick ? popupClick.choiceText : '',
     state: persistedState,
     gameState: persistedState,
+    scriptState: persistedState,
     roomSelections,
     selections: buildSelectionsForScript(store),
     rooms: buildRoomsForScript(store),
     changeRoom: (roomName) => ({ type: 'changeRoom', room: roomName }),
-    displayText: (text) => ({ type: 'displayText', text }),
+    displayText: (textOrOptions, maybeOptions = {}) => {
+      if (textOrOptions && typeof textOrOptions === 'object' && !Array.isArray(textOrOptions)) {
+        return { type: 'displayText', ...textOrOptions };
+      }
+      return { type: 'displayText', text: textOrOptions, ...maybeOptions };
+    },
+    choice: (id, text, options = {}) => ({ id, text, ...options }),
+    displayChoices: (choices = [], options = {}) => {
+      return {
+        type: 'displayText',
+        choices: Array.isArray(choices) ? choices : [choices],
+        clickable: options.clickable !== false,
+        ...options
+      };
+    },
     replaceGraphics: (payload = {}) => ({ type: 'replaceGraphics', payload }),
     replaceGraphisc: (payload = {}) => ({ type: 'replaceGraphics', payload }),
     originalGraphics: (payload = {}) => ({ type: 'originalGraphics', payload }),
@@ -779,7 +1151,7 @@ function executeClickScript(requestedRoomName, room, logicalX, y) {
     return normalizeClickActionResult(result, room.name);
   } catch (error) {
     console.error(`[SCRIPT] click handler failed: ${error.stack || error.message}`);
-    return { type: 'displayText', text: 'SCRIPT ERROR' };
+    return { type: 'displayText', lines: ['SCRIPT ERROR'], clickable: false };
   }
 }
 
@@ -1529,6 +1901,19 @@ const server = http.createServer(async (req, res) => {
 
       const resolvedRoom = getRoom(requestedRoom);
       const clickRoomName = (resolvedRoom && resolvedRoom.name) || sanitizeRoomName(requestedRoom);
+      const hitSelection = findTopmostSelectionAt(resolvedRoom || { selections: [] }, logicalX * 2, y);
+
+      if (hitSelection && String(hitSelection.name || '').toLowerCase() === 'resetgame') {
+        const clickAction = resetGameAndBuildReloadAction('first');
+        sendText(res, 200, encodeClickActionText(clickAction));
+        console.log(
+          `[EVENT] click ${clickRoomName} logical=(${logicalX},${rawY}) calibratedY=${y} pixel=(${logicalX * 2},${y})` +
+          ` selection=${hitSelection.name} action=resetgame reload=${clickAction.room}`
+        );
+        return;
+      }
+
+      roomPopupState.delete(clickRoomName);
       const clickAction = executeClickScript(requestedRoom, resolvedRoom || { name: clickRoomName, selections: [] }, logicalX, y);
       roomClickState.set(clickRoomName, {
         logicalX,
@@ -1537,10 +1922,49 @@ const server = http.createServer(async (req, res) => {
         rawY,
         updatedAt: new Date().toISOString()
       });
+      updateRoomPopupState(clickRoomName, clickAction);
 
       sendText(res, 200, encodeClickActionText(clickAction));
       console.log(
         `[EVENT] click ${clickRoomName} logical=(${logicalX},${rawY}) calibratedY=${y} pixel=(${logicalX * 2},${y})` +
+        (hitSelection ? ` selection=${hitSelection.name}` : '') +
+        (clickAction ? ` action=${clickAction.type}` : '')
+      );
+      return;
+    }
+
+    const popupClickMatch = pathname.match(/^\/popupclick\/([^/]+)\/([0-9A-Fa-f]{2})\/([0-9A-Fa-f]{2})$/);
+    if (req.method === 'GET' && popupClickMatch) {
+      const requestedRoom = decodeURIComponent(popupClickMatch[1]);
+      const line = parseHexByte(popupClickMatch[2]);
+      const column = parseHexByte(popupClickMatch[3]);
+      if (line === null || column === null || line >= POPUP_MAX_LINES || column >= POPUP_LINE_MAX) {
+        sendText(res, 400, 'Invalid popup click coordinates\n');
+        return;
+      }
+
+      const resolvedRoom = getRoom(requestedRoom);
+      const clickRoomName = (resolvedRoom && resolvedRoom.name) || sanitizeRoomName(requestedRoom);
+      const popupClick = buildPopupClickContext(clickRoomName, line, column);
+      if (!popupClick) {
+        roomPopupState.delete(clickRoomName);
+        sendText(res, 200, 'OK\n');
+        return;
+      }
+
+      const clickAction = executeClickScript(
+        requestedRoom,
+        resolvedRoom || { name: clickRoomName, selections: [] },
+        0,
+        0,
+        { clickType: 'popup', popupClick }
+      );
+      updateRoomPopupState(clickRoomName, clickAction);
+      sendText(res, 200, encodeClickActionText(clickAction));
+      console.log(
+        `[EVENT] popupclick ${clickRoomName} line=${popupClick.lineNumber} column=${popupClick.columnNumber}` +
+        (popupClick.choiceId ? ` choice=${popupClick.choiceId}` : '') +
+        (popupClick.word ? ` word=${popupClick.word}` : '') +
         (clickAction ? ` action=${clickAction.type}` : '')
       );
       return;
@@ -1573,6 +1997,19 @@ const server = http.createServer(async (req, res) => {
         `[RES] room ${requestedRoom} -> ${slide.position} ` +
         `"${slide.title}" ${slide.width}x${slide.height} ${slide.buffer.length} bytes`
       );
+      return;
+    }
+
+    const roomMetaMatch = pathname.match(/^\/roommeta\/([^/]+)$/);
+    if (req.method === 'GET' && roomMetaMatch) {
+      const requestedRoom = decodeURIComponent(roomMetaMatch[1]);
+      const payload = buildRoomHoverPayload(requestedRoom);
+      if (payload === null) {
+        sendText(res, 404, `Room not found: ${requestedRoom}\n`);
+        return;
+      }
+      sendText(res, 200, payload);
+      console.log(`[RES] roommeta ${requestedRoom} ${Buffer.byteLength(payload, 'ascii')} bytes`);
       return;
     }
 

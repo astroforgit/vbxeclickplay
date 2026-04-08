@@ -23,6 +23,24 @@ copy_room_append_name
         sta url_buffer,y
         rts
 
+copy_room_meta_url_to_buffer
+        lda #<room_meta_url_prefix
+        sta zp_tmp_ptr
+        lda #>room_meta_url_prefix
+        sta zp_tmp_ptr+1
+        jsr copy_string_to_buffer
+        ldy #0
+copy_room_meta_find_end
+        lda url_buffer,y
+        beq copy_room_meta_append_name
+        iny
+        bne copy_room_meta_find_end
+copy_room_meta_append_name
+        jsr append_current_room_name
+        lda #0
+        sta url_buffer,y
+        rts
+
 copy_click_url_to_buffer
         lda #<click_url_prefix
         sta zp_tmp_ptr
@@ -46,6 +64,34 @@ copy_click_append_room
         sta url_buffer,y
         iny
         lda zp_demo_cursor_y
+        jsr append_hex_byte_to_buffer
+        lda #0
+        sta url_buffer,y
+        rts
+
+copy_popup_click_url_to_buffer
+        lda #<popup_click_url_prefix
+        sta zp_tmp_ptr
+        lda #>popup_click_url_prefix
+        sta zp_tmp_ptr+1
+        jsr copy_string_to_buffer
+        ldy #0
+copy_popup_click_find_end
+        lda url_buffer,y
+        beq copy_popup_click_append_room
+        iny
+        bne copy_popup_click_find_end
+copy_popup_click_append_room
+        jsr append_current_room_name
+        lda #'/'
+        sta url_buffer,y
+        iny
+        lda demo_popup_click_line
+        jsr append_hex_byte_to_buffer
+        lda #'/'
+        sta url_buffer,y
+        iny
+        lda demo_popup_click_col
         jsr append_hex_byte_to_buffer
         lda #0
         sta url_buffer,y

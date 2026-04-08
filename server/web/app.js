@@ -35,10 +35,12 @@ const selectionForm = document.getElementById('selection-form');
 const selectionFormPlaceholder = document.getElementById('selection-form-placeholder');
 const selectionFormMeta = document.getElementById('selection-form-meta');
 const selectionNameInput = document.getElementById('selection-name-input');
+const selectionDescriptionInput = document.getElementById('selection-description-input');
 const selectionXInput = document.getElementById('selection-x-input');
 const selectionYInput = document.getElementById('selection-y-input');
 const selectionWidthInput = document.getElementById('selection-width-input');
 const selectionHeightInput = document.getElementById('selection-height-input');
+const selectionShowOnClientInput = document.getElementById('selection-show-on-client-input');
 const saveImageSelectionBtn = document.getElementById('save-image-selection-btn');
 const deleteSelectionBtn = document.getElementById('delete-selection-btn');
 const clickScriptEditor = document.getElementById('click-script-editor');
@@ -293,6 +295,7 @@ function clampSelection(selection) {
     ...selection,
     type: selection.type === 'image' ? 'image' : 'rect',
     name: String(selection.name || 'Selection').slice(0, 80) || 'Selection',
+    description: String(selection.description || '').slice(0, 255),
     x,
     y,
     width,
@@ -467,10 +470,12 @@ function renderSelectionForm() {
       ? `Image selection • ${selection.locked ? 'Locked' : 'Unlocked'} • ${selection.visible === false ? 'Hidden' : 'Visible'}`
       : `Selection • ${selection.visible === false ? 'Hidden' : 'Visible'}`;
   selectionNameInput.value = selection.name;
+  selectionDescriptionInput.value = selection.description || '';
   selectionXInput.value = selection.x;
   selectionYInput.value = selection.y;
   selectionWidthInput.value = selection.width;
   selectionHeightInput.value = selection.height;
+  selectionShowOnClientInput.checked = selection.showOnClient !== false;
   const geometryLocked = isImageSelection(selection) && selection.locked;
   selectionXInput.disabled = geometryLocked;
   selectionYInput.disabled = geometryLocked;
@@ -491,10 +496,12 @@ function onSelectionFormInput() {
   const updated = updateSelectionInState(selectedSelectionId, (current) => ({
     ...current,
     name: selectionNameInput.value,
+    description: selectionDescriptionInput.value,
     x: selectionXInput.value,
     y: selectionYInput.value,
     width: selectionWidthInput.value,
-    height: selectionHeightInput.value
+    height: selectionHeightInput.value,
+    showOnClient: selectionShowOnClientInput.checked
   }));
 
   if (!updated) return;
@@ -607,6 +614,7 @@ async function onImageSelectionFileSelected(event) {
         width: 64,
         height: 48,
         visible: true,
+        showOnClient: true,
         locked: false
       }
     };
@@ -637,6 +645,7 @@ async function saveImageSelectionDraft() {
         width: draft.width,
         height: draft.height,
         visible: draft.visible !== false,
+        showOnClient: draft.showOnClient !== false,
         locked: true,
         imagePngBase64,
         imageVbxeBase64
@@ -1054,6 +1063,7 @@ async function createSelection() {
       width: 48,
       height: 32,
       visible: true,
+      showOnClient: true,
       locked: false
     })
   });
@@ -1069,7 +1079,9 @@ async function saveSelection(selection) {
     method: 'PUT',
     body: JSON.stringify({
       name: selection.name,
+      description: selection.description,
       visible: selection.visible !== false,
+      showOnClient: selection.showOnClient !== false,
       locked: selection.locked === true,
       x: selection.x,
       y: selection.y,

@@ -97,11 +97,72 @@ show_fullscreen
         sta MEMB_XDL,x
         inx
 
+        lda #240-24
+        sec
+        sbc img_height
+        beq show_fullscreen_no_text
+        bmi show_fullscreen_no_text
+        cmp #9
+        bcc show_fullscreen_status_only
+
+        sec
+        sbc #8
+        sec
+        sbc #1
+        pha
+        lda #<(XDLC_OVOFF|XDLC_MAPOFF|XDLC_RPTL)
+        sta MEMB_XDL,x
+        inx
+        lda #>(XDLC_OVOFF|XDLC_MAPOFF|XDLC_RPTL)
+        sta MEMB_XDL,x
+        inx
+        pla
+        sta MEMB_XDL,x
+        inx
+
+show_fullscreen_status_only
+        lda #<(XDLC_TMON|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT|XDLC_END)
+        sta MEMB_XDL,x
+        inx
+        lda #>(XDLC_TMON|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT|XDLC_END)
+        sta MEMB_XDL,x
+        inx
+        lda #8-1
+        sta MEMB_XDL,x
+        inx
+        lda #<(STATUS_ROW * SCR_STRIDE)
+        sta MEMB_XDL,x
+        inx
+        lda #>(STATUS_ROW * SCR_STRIDE)
+        sta MEMB_XDL,x
+        inx
+        lda #0
+        sta MEMB_XDL,x
+        inx
+        lda #<SCR_STRIDE
+        sta MEMB_XDL,x
+        inx
+        lda #>SCR_STRIDE
+        sta MEMB_XDL,x
+        inx
+        lda #CHBASE_VAL
+        sta MEMB_XDL,x
+        inx
+        lda #$11
+        sta MEMB_XDL,x
+        inx
+        lda #$FF
+        sta MEMB_XDL,x
+        jmp show_fullscreen_xdl_done
+
+show_fullscreen_no_text
         lda #<(XDLC_OVOFF|XDLC_END)
         sta MEMB_XDL,x
         inx
         lda #>(XDLC_OVOFF|XDLC_END)
         sta MEMB_XDL,x
+
+show_fullscreen_xdl_done
 
         memb_off
 

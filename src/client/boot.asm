@@ -6,6 +6,8 @@ main
 
         jsr detect_vbxe
         bcc no_vbxe
+        jsr status_copy_font
+        jsr room_selection_cache_clear_all
 
         lda #<msg_loading_room
         ldx #>msg_loading_room
@@ -31,6 +33,7 @@ image_ok
         lda #0
         sta SDMCTL
         jsr show_fullscreen
+        jsr room_load_hover_metadata
         lda demo_mode
         beq room_image_loop
         jmp demo_image_loop
@@ -40,9 +43,11 @@ room_image_loop
         sta demo_input_active
         jsr demo_init_input
         jsr demo_draw_cursor
+        jsr room_update_hover_label
 room_wait
         jsr wait_one_frame
         jsr demo_update_input
+        jsr room_update_hover_label
         jsr demo_draw_cursor
         jsr demo_poll_click
         bcc room_key_check
@@ -89,6 +94,21 @@ room_handle_click
 room_click_send
 	        lda demo_popup_active
 	        beq room_click_send_fetch
+	        jsr demo_popup_hit_test
+	        bcc room_click_popup_outside
+	        jsr demo_popup_text_hit_test
+	        bcc room_click_popup_consume
+	        jsr demo_restore_popup_under
+	        jsr demo_suspend_input_irq
+	        jsr copy_popup_click_url_to_buffer
+	        jsr fetch_text_payload
+	        bcs room_click_resume
+	        jsr room_process_click_response
+	        jmp room_click_resume
+room_click_popup_consume
+	        jsr demo_restore_popup_under
+	        jmp room_click_done
+room_click_popup_outside
 	        jsr demo_restore_popup_under
 room_click_send_fetch
         jsr demo_suspend_input_irq
@@ -102,6 +122,7 @@ room_click_resume
         jsr demo_resume_input_irq
 room_click_done
         jsr demo_draw_cursor
+        jsr room_update_hover_label
 room_click_done_reload
         rts
 
@@ -153,7 +174,15 @@ clear_debug
         sta img_pal_leftover
         sta demo_mode
         sta demo_input_active
+        sta demo_popup_active
         sta room_patch_restore_mode
+        sta room_sel_cache_active
+        sta room_hover_count
+        lda #$FF
+        sta room_sel_cache_pending_slot
+        sta room_sel_cache_hit_slot
+        sta room_hover_match
+        jsr demo_clear_popup_text
         rts
 
 show_banner

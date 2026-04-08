@@ -550,14 +550,16 @@
       color: var(--text-secondary);
     }
 
-    .selection-form input {
-      width: 100%;
-      padding: 10px 12px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: var(--bg-tertiary);
-      color: var(--text-primary);
-    }
+     .selection-form input,
+     .selection-form textarea {
+       width: 100%;
+       padding: 10px 12px;
+       border-radius: 10px;
+       border: 1px solid var(--border);
+       background: var(--bg-tertiary);
+       color: var(--text-primary);
+       font: inherit;
+     }
 
     .selection-grid {
       display: grid;
@@ -867,12 +869,17 @@
 
                 <form id="selection-form" class="selection-form" style="display: none;">
                   <p id="selection-form-meta" class="meta" style="margin: 0;"></p>
-                  <label>
-                    Name
-                    <input id="selection-name-input" type="text" maxlength="80">
-                  </label>
+                   <label>
+                     Name
+                     <input id="selection-name-input" type="text" maxlength="80">
+                   </label>
+                   
+                   <label>
+                     Description
+                     <textarea id="selection-description-input" maxlength="255" rows="2" style="resize: vertical; min-height: 42px; max-height: 120px;"></textarea>
+                   </label>
 
-                  <div class="selection-grid">
+                   <div class="selection-grid">
                     <label>
                       X
                       <input id="selection-x-input" type="number" min="0" max="319">
@@ -890,6 +897,11 @@
                       <input id="selection-height-input" type="number" min="1" max="200">
                     </label>
                   </div>
+
+                  <label style="display: flex; align-items: center; gap: 10px; color: var(--text-primary);">
+                    <input id="selection-show-on-client-input" type="checkbox" checked style="width: auto;">
+                    Show on client
+                  </label>
 
                   <div class="row">
                     <button id="save-image-selection-btn" type="button" class="primary" style="display: none;">Save image selection</button>

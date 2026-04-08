@@ -11,6 +11,30 @@ demo_click_stamp_patch
         jsr demo_draw_cursor
         rts
 
+demo_clear_popup_text
+        lda #0
+        sta demo_popup_clickable
+        sta demo_popup_line_ix
+        sta demo_popup_click_line
+        sta demo_popup_click_col
+        ldx #0
+demo_clear_popup_lengths_loop
+        lda #0
+        sta demo_popup_line_lengths,x
+        inx
+        cpx #DEMO_POPUP_LINES_MAX
+        bcc demo_clear_popup_lengths_loop
+        ldx #0
+demo_clear_popup_buffer_loop
+        lda #0
+        sta demo_popup_lines,x
+        inx
+        cpx #(DEMO_POPUP_LINE_STRIDE*DEMO_POPUP_LINES_MAX)
+        bcc demo_clear_popup_buffer_loop
+        lda #0
+        sta demo_popup_line_count
+        rts
+
 demo_show_popup
         lda zp_demo_prev_y
         cmp #$FF
@@ -67,6 +91,78 @@ demo_popup_hit_test
         rts
 demo_popup_hit_miss
         clc
+        rts
+
+demo_popup_text_hit_test
+        lda demo_popup_clickable
+        bne demo_popup_text_check_x
+        clc
+        rts
+
+demo_popup_text_check_x
+        lda zp_demo_cursor_x
+        sec
+        sbc demo_popup_x
+        bcs demo_popup_text_x_delta_ok
+        clc
+        rts
+demo_popup_text_x_delta_ok
+        sec
+        sbc #DEMO_POPUP_TEXT_X
+        bcs demo_popup_text_x_text_ok
+        clc
+        rts
+demo_popup_text_x_text_ok
+        cmp #(DEMO_POPUP_TEXT_MAX*DEMO_POPUP_CHAR_WIDTH_LOGICAL)
+        bcc demo_popup_text_store_col
+        clc
+        rts
+demo_popup_text_store_col
+        lsr
+        lsr
+        sta demo_popup_click_col
+
+        lda zp_demo_cursor_y
+        sec
+        sbc demo_popup_y
+        bcs demo_popup_text_y_delta_ok
+        clc
+        rts
+demo_popup_text_y_delta_ok
+        sec
+        sbc #DEMO_POPUP_TEXT_Y
+        bcs demo_popup_text_y_text_ok
+        clc
+        rts
+demo_popup_text_y_text_ok
+        sta zp_tmp1
+        lda demo_popup_line_count
+        beq demo_popup_text_miss
+        asl
+        asl
+        asl
+        sta zp_tmp2
+        lda zp_tmp1
+        cmp zp_tmp2
+        bcc demo_popup_text_store_line
+demo_popup_text_miss
+        clc
+        rts
+
+demo_popup_text_store_line
+        lda zp_tmp1
+        lsr
+        lsr
+        lsr
+        sta demo_popup_click_line
+        tax
+        lda demo_popup_click_col
+        cmp demo_popup_line_lengths,x
+        bcc demo_popup_text_hit
+        clc
+        rts
+demo_popup_text_hit
+        sec
         rts
 
 demo_save_popup_under
@@ -137,6 +233,8 @@ demo_popup_restore_ptr_ok
         bne demo_popup_restore_row_loop
         lda #0
         sta demo_popup_active
+        sta demo_popup_clickable
+        sta demo_popup_line_count
         rts
 
 demo_draw_popup_box
@@ -186,12 +284,25 @@ demo_popup_box_row_done
 
 demo_draw_popup_text
         lda #0
+        sta demo_popup_line_ix
+demo_popup_draw_line_loop
+        lda demo_popup_line_ix
+        cmp demo_popup_line_count
+        bcs demo_popup_text_done
+
+        lda #0
         sta demo_popup_text_row
 demo_popup_text_row_loop
+        lda demo_popup_line_ix
+        asl
+        asl
+        asl
+        sta zp_tmp1
         lda demo_popup_y
         clc
+        adc zp_tmp1
         adc demo_popup_text_row
-        adc #2
+        adc #DEMO_POPUP_TEXT_Y
         ldx demo_popup_x
         inx
         inx
@@ -201,8 +312,12 @@ demo_popup_text_row_loop
         lda #0
         sta demo_popup_char_ix
 demo_popup_char_loop
-        ldy demo_popup_char_ix
-        lda demo_popup_text,y
+        ldy demo_popup_line_ix
+        lda demo_popup_line_offsets,y
+        clc
+        adc demo_popup_char_ix
+        tay
+        lda demo_popup_lines,y
         beq demo_popup_text_row_done
         jsr demo_get_popup_font_bits
         sta demo_popup_font_bits
@@ -222,7 +337,9 @@ demo_popup_font_next
         cpx #8
         bne demo_popup_font_bit_loop
         inc demo_popup_char_ix
-        jmp demo_popup_char_loop
+        lda demo_popup_char_ix
+        cmp #DEMO_POPUP_TEXT_MAX
+        bcc demo_popup_char_loop
 
 demo_popup_text_row_done
         memb_off
@@ -230,6 +347,10 @@ demo_popup_text_row_done
         lda demo_popup_text_row
         cmp #8
         bne demo_popup_text_row_loop
+        inc demo_popup_line_ix
+        jmp demo_popup_draw_line_loop
+
+demo_popup_text_done
         rts
 
 demo_get_popup_font_bits

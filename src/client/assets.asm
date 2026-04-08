@@ -29,9 +29,13 @@ demo_arrow_data
         dta $80,$C0,$E0,$F0,$F8,$E0,$A0,$00
 demo_arrow_data_end
 
-demo_popup_text
+demo_popup_line_offsets
+        dta 0,DEMO_POPUP_LINE_STRIDE,DEMO_POPUP_LINE_STRIDE*2
+
+demo_popup_lines
         dta c'hello world',0
-        .ds DEMO_POPUP_TEXT_MAX+1-(12)
+        .ds DEMO_POPUP_LINE_STRIDE-(12)
+        .ds DEMO_POPUP_LINE_STRIDE*(DEMO_POPUP_LINES_MAX-1)
 
 default_room_name
         dta c'room1',0
@@ -40,8 +44,12 @@ text_url_string  dta c'N:http://127.0.0.1:3000/',0
 text_url_string_end
 room_url_prefix  dta c'N:http://127.0.0.1:3000/room/',0
 room_url_prefix_end
+room_meta_url_prefix dta c'N:http://127.0.0.1:3000/roommeta/',0
+room_meta_url_prefix_end
 click_url_prefix dta c'N:http://127.0.0.1:3000/click/',0
 click_url_prefix_end
+popup_click_url_prefix dta c'N:http://127.0.0.1:3000/popupclick/',0
+popup_click_url_prefix_end
 gfx_url_prefix   dta c'N:http://127.0.0.1:3000/gfx/',0
 gfx_url_prefix_end
 slide_url_string dta c'N:http://127.0.0.1:3000/slide/'
@@ -89,3 +97,18 @@ msg_stage_pix        dta c'Stage: READ PIXELS', ATASCII_RET
 msg_stage_pix_end
 dbg_line             dta c'ST=00 DS=00 FE=00 CN=00 BL=00 BH=00 RX=00', ATASCII_RET
 dbg_line_end
+
+room_hover_x       .ds ROOM_HOVER_MAX_SELECTIONS
+room_hover_y       .ds ROOM_HOVER_MAX_SELECTIONS
+room_hover_w       .ds ROOM_HOVER_MAX_SELECTIONS
+room_hover_h       .ds ROOM_HOVER_MAX_SELECTIONS
+room_hover_names   .ds ROOM_HOVER_MAX_SELECTIONS*(ROOM_HOVER_NAME_MAX+1)
+
+demo_popup_line_lengths .ds DEMO_POPUP_LINES_MAX
+
+current_room_name  .ds ROOM_NAME_MAX+1
+room_patch_source_room .ds ROOM_NAME_MAX+1
+
+demo_row_ptr_lo   .ds DEMO_HEIGHT
+demo_row_ptr_hi   .ds DEMO_HEIGHT
+demo_row_bank     .ds DEMO_HEIGHT

@@ -49,9 +49,12 @@ XDLC_END      = $8000
 ; VBXE VRAM Layout
 ; ----------------------------------------------------------------------------
 VRAM_IMG_BASE  = $8000  ; Image viewer: pixel data start (fits 320x240 @8bpp within 128KB VRAM)
-ROOM_PATCH_CACHE_MEMB = $7A00 ; MEMAC B address for cached pre-patch pixels (VRAM $17A00)
-ROOM_PATCH_CACHE_BANK = 5     ; VBXE bank containing ROOM_PATCH_CACHE_MEMB
-ROOM_PATCH_CACHE_MAX  = $8600 ; 34304 bytes free after 320x200 image within 128KB VRAM
+ROOM_SELECTION_CACHE_MEMB = $7A00 ; MEMAC B address for cached selection patches (VRAM $17A00)
+ROOM_SELECTION_CACHE_BANK = 5     ; VBXE bank containing ROOM_SELECTION_CACHE_MEMB
+ROOM_SELECTION_CACHE_MAX  = $4C00 ; 19456 bytes reserved for selection-patch cache
+ROOM_PATCH_CACHE_MEMB = $4600     ; MEMAC B address for cached pre-patch pixels (VRAM $1C600)
+ROOM_PATCH_CACHE_BANK = 7         ; VBXE bank containing ROOM_PATCH_CACHE_MEMB
+ROOM_PATCH_CACHE_MAX  = $3A00     ; 14848 bytes reserved for original-background undo cache
 VRAM_SCREEN    = $0000  ; Screen: SCR_ROWS*160 bytes (4800 for 30 rows)
 VRAM_BCB       = $1300  ; BCB blocks (after screen)
 VRAM_PATTERN   = $1380  ; Fill pattern (2 bytes)
