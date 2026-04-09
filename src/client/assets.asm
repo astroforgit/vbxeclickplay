@@ -30,7 +30,7 @@ demo_arrow_data
 demo_arrow_data_end
 
 demo_popup_line_offsets
-        dta 0,DEMO_POPUP_LINE_STRIDE,DEMO_POPUP_LINE_STRIDE*2
+        dta 0,DEMO_POPUP_LINE_STRIDE,DEMO_POPUP_LINE_STRIDE*2,DEMO_POPUP_LINE_STRIDE*3,DEMO_POPUP_LINE_STRIDE*4,DEMO_POPUP_LINE_STRIDE*5
 
 demo_popup_lines
         dta c'hello world',0

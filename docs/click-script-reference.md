@@ -44,7 +44,7 @@ Selections expose:
   - Reload the Atari client into another room.
 
 - `displayText(text)`
-  - Show popup text.
+  - Show popup text near the click/cursor.
 
 - `displayText({ text | message | lines, clickable, selectable, choices })`
   - Advanced popup form.
@@ -53,7 +53,7 @@ Selections expose:
   - Build one clickable popup choice for `displayChoices()`.
 
 - `displayChoices(choices, options)`
-  - Show up to 3 clickable popup lines.
+  - Show up to 6 popup lines total. If `options.text` is present, it is shown above the clickable choices when there is room.
 
 - `replaceGraphics(selectionName)`
   - Draw a saved image selection patch from the current room.
@@ -88,9 +88,9 @@ These still work:
 
 ## Limits
 
-- Popup maximum: **3** lines
-- Popup line width: **19** characters after sanitizing/wrapping
-- Popup choices maximum: **3**
+- Popup maximum: **6** lines
+- Popup line width: **37** characters after sanitizing/wrapping
+- Popup choices maximum: **6** clickable lines
 - Persist only plain JSON-safe data in `state`
 - Keep scripts fast; the sandbox is timed
 

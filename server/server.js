@@ -9,8 +9,8 @@ const IMAGE_WIDTH = 320;
 const IMAGE_HEIGHT = 200;
 const CLICK_MARKER_COLOR = 5;
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
-const POPUP_LINE_MAX = 19;
-const POPUP_MAX_LINES = 3;
+const POPUP_LINE_MAX = 37;
+const POPUP_MAX_LINES = 6;
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DATA_DIR = path.join(ROOT_DIR, 'data');
 const ROOMS_DIR = path.join(DATA_DIR, 'rooms');
@@ -292,11 +292,21 @@ function normalizeDisplayTextAction(candidate) {
 
   const choices = normalizePopupChoices(candidate.choices);
   if (choices.length > 0) {
+    const promptText = Array.isArray(candidate.lines)
+      ? candidate.lines.join('\n')
+      : candidate.text !== undefined
+        ? String(candidate.text || '')
+        : candidate.message !== undefined
+          ? String(candidate.message || '')
+          : '';
+    const promptLines = normalizePopupLines(promptText).slice(0, Math.max(0, POPUP_MAX_LINES - choices.length));
+    const lines = promptLines.concat(choices.map((choice) => choice.text)).slice(0, POPUP_MAX_LINES);
+    const alignedChoices = promptLines.map(() => null).concat(choices).slice(0, POPUP_MAX_LINES);
     return {
       type: 'displayText',
-      lines: choices.map((choice) => choice.text),
+      lines,
       clickable: candidate.clickable !== false,
-      choices
+      choices: alignedChoices
     };
   }
 
@@ -701,7 +711,7 @@ function updateRoomPopupState(roomName, action) {
       lines: action.lines.slice(0, POPUP_MAX_LINES),
       clickable: action.clickable === true,
       choices: Array.isArray(action.choices)
-        ? action.choices.slice(0, POPUP_MAX_LINES).map((choice) => ({ ...choice }))
+        ? action.choices.slice(0, POPUP_MAX_LINES).map((choice) => (choice ? { ...choice } : null))
         : [],
       updatedAt: new Date().toISOString()
     });
@@ -761,6 +771,9 @@ function buildPopupClickContext(roomName, line, column) {
   const lineText = String(popup.lines[lineIndex] || '');
   const resolvedWord = resolvePopupWord(lineText, columnIndex);
   const choice = Array.isArray(popup.choices) ? popup.choices[lineIndex] : null;
+  const choiceIndex = choice && Array.isArray(popup.choices)
+    ? popup.choices.slice(0, lineIndex + 1).filter(Boolean).length - 1
+    : -1;
 
   return {
     line: lineIndex,
@@ -772,8 +785,8 @@ function buildPopupClickContext(roomName, line, column) {
     choiceId: choice ? String(choice.id || '') : '',
     choiceText: choice ? String(choice.text || '') : '',
     choiceValue: choice ? choice.value ?? '' : '',
-    choiceIndex: choice ? lineIndex : -1,
-    choiceNumber: choice ? lineIndex + 1 : 0,
+    choiceIndex,
+    choiceNumber: choiceIndex >= 0 ? choiceIndex + 1 : 0,
     choiceMeta: choice && choice.meta ? { ...choice.meta } : null,
     word: resolvedWord.word,
     wordIndex: resolvedWord.wordIndex,

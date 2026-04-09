@@ -17,6 +17,12 @@ demo_clear_popup_text
         sta demo_popup_line_ix
         sta demo_popup_click_line
         sta demo_popup_click_col
+        sta demo_popup_box_width_logical
+        sta demo_popup_box_width_lo
+        sta demo_popup_box_width_hi
+        sta demo_popup_box_inner_width_lo
+        sta demo_popup_box_inner_width_hi
+        sta demo_popup_box_height
         ldx #0
 demo_clear_popup_lengths_loop
         lda #0
@@ -50,6 +56,7 @@ demo_show_popup_check
         bcs demo_show_popup_done
         jsr demo_restore_popup_under
 demo_show_popup_draw
+        jsr demo_prepare_popup_metrics
         jsr demo_calc_popup_position
         jsr demo_save_popup_under
         jsr demo_draw_popup_box
@@ -60,17 +67,71 @@ demo_show_popup_done
         jsr demo_draw_cursor
         rts
 
+demo_prepare_popup_metrics
+        ldx #0
+        lda #10
+        sta zp_tmp1
+demo_popup_metrics_scan_loop
+        cpx demo_popup_line_count
+        bcs demo_popup_metrics_scan_done
+        lda demo_popup_line_lengths,x
+        cmp zp_tmp1
+        bcc demo_popup_metrics_scan_next
+        sta zp_tmp1
+demo_popup_metrics_scan_next
+        inx
+        jmp demo_popup_metrics_scan_loop
+
+demo_popup_metrics_scan_done
+        lda zp_tmp1
+        asl
+        asl
+        clc
+        adc #1
+        sta demo_popup_box_width_logical
+        asl
+        sta demo_popup_box_width_lo
+        lda #0
+        rol
+        sta demo_popup_box_width_hi
+
+        sec
+        lda demo_popup_box_width_lo
+        sbc #2
+        sta demo_popup_box_inner_width_lo
+        lda demo_popup_box_width_hi
+        sbc #0
+        sta demo_popup_box_inner_width_hi
+
+        lda demo_popup_line_count
+        asl
+        asl
+        asl
+        clc
+        adc #4
+        sta demo_popup_box_height
+        rts
+
 demo_calc_popup_position
+        lda #160
+        sec
+        sbc demo_popup_box_width_logical
+        sta zp_tmp1
         lda zp_demo_cursor_x
-        cmp #DEMO_POPUP_MAX_X
+        cmp zp_tmp1
         bcc demo_popup_x_ok
-        lda #DEMO_POPUP_MAX_X
+        lda zp_tmp1
 demo_popup_x_ok
         sta demo_popup_x
+
+        lda #DEMO_HEIGHT
+        sec
+        sbc demo_popup_box_height
+        sta zp_tmp1
         lda zp_demo_cursor_y
-        cmp #DEMO_POPUP_MAX_Y
+        cmp zp_tmp1
         bcc demo_popup_y_ok
-        lda #DEMO_POPUP_MAX_Y
+        lda zp_tmp1
 demo_popup_y_ok
         sta demo_popup_y
         rts
@@ -79,12 +140,12 @@ demo_popup_hit_test
         lda zp_demo_cursor_x
         sec
         sbc demo_popup_x
-        cmp #DEMO_POPUP_WIDTH_LOGICAL
+        cmp demo_popup_box_width_logical
         bcs demo_popup_hit_miss
         lda zp_demo_cursor_y
         sec
         sbc demo_popup_y
-        cmp #DEMO_POPUP_HEIGHT
+        cmp demo_popup_box_height
         bcs demo_popup_hit_miss
         sec
         rts
@@ -164,72 +225,148 @@ demo_popup_text_hit
         sec
         rts
 
-demo_save_popup_under
-        lda #<demo_popup_saved
+demo_popup_cache_init_ptr
+        lda #<ROOM_POPUP_CACHE_MEMB
+        sta demo_popup_cache_ptr_lo
+        lda #>ROOM_POPUP_CACHE_MEMB
+        sta demo_popup_cache_ptr_hi
+        lda #ROOM_POPUP_CACHE_BANK
+        sta demo_popup_cache_bank
+        rts
+
+demo_popup_cache_open
+        lda demo_popup_cache_ptr_lo
         sta zp_tmp_ptr2
-        lda #>demo_popup_saved
+        lda demo_popup_cache_ptr_hi
         sta zp_tmp_ptr2+1
+        lda demo_popup_cache_bank
+        ora #$80
+        sta zp_memb_shadow
+        ldy #VBXE_MEMAC_B
+        sta (zp_vbxe_base),y
+        rts
+
+demo_popup_cache_advance
+        inc demo_popup_cache_ptr_lo
+        bne demo_popup_cache_advance_check
+        inc demo_popup_cache_ptr_hi
+demo_popup_cache_advance_check
+        lda demo_popup_cache_ptr_hi
+        cmp #$80
+        bne demo_popup_cache_advance_done
+        lda #$40
+        sta demo_popup_cache_ptr_hi
+        inc demo_popup_cache_bank
+demo_popup_cache_advance_done
+        rts
+
+demo_popup_set_width_counter
+        lda demo_popup_box_width_lo
+        sta zp_tmp1
+        lda demo_popup_box_width_hi
+        sta zp_tmp2
+        rts
+
+demo_popup_set_inner_counter
+        lda demo_popup_box_inner_width_lo
+        sta zp_tmp1
+        lda demo_popup_box_inner_width_hi
+        sta zp_tmp2
+        rts
+
+demo_popup_decrement_counter
+        lda zp_tmp1
+        bne demo_popup_decrement_low
+        dec zp_tmp2
+demo_popup_decrement_low
+        dec zp_tmp1
+        rts
+
+demo_popup_write_run
+        sta zp_tmp3
+demo_popup_write_run_loop
+        lda zp_tmp1
+        ora zp_tmp2
+        beq demo_popup_write_run_done
+        lda zp_tmp3
+        jsr demo_mem_put
+        jsr demo_popup_decrement_counter
+        jmp demo_popup_write_run_loop
+demo_popup_write_run_done
+        rts
+
+demo_save_popup_under
+        jsr demo_popup_cache_init_ptr
         lda #0
         sta demo_popup_row
 demo_popup_save_row_loop
+        lda demo_popup_row
+        cmp demo_popup_box_height
+        bcs demo_popup_save_done
         lda demo_popup_y
         clc
         adc demo_popup_row
         ldx demo_popup_x
         jsr demo_prepare_cursor_row_table
         jsr demo_mem_open
-        ldx #0
+        jsr demo_popup_set_width_counter
 demo_popup_save_pix_loop
+        lda zp_tmp1
+        ora zp_tmp2
+        beq demo_popup_save_row_done
         ldy #0
         lda (zp_tmp_ptr),y
+        sta zp_tmp3
+        jsr demo_popup_cache_open
         ldy #0
+        lda zp_tmp3
         sta (zp_tmp_ptr2),y
-        inc zp_tmp_ptr2
-        bne demo_popup_save_ptr_ok
-        inc zp_tmp_ptr2+1
-demo_popup_save_ptr_ok
+        jsr demo_popup_cache_advance
+        jsr demo_mem_open
         jsr demo_mem_advance
-        inx
-        cpx #DEMO_POPUP_WIDTH
-        bne demo_popup_save_pix_loop
+        jsr demo_popup_decrement_counter
+        jmp demo_popup_save_pix_loop
+demo_popup_save_row_done
         memb_off
         inc demo_popup_row
-        lda demo_popup_row
-        cmp #DEMO_POPUP_HEIGHT
-        bne demo_popup_save_row_loop
+        jmp demo_popup_save_row_loop
+demo_popup_save_done
         rts
 
 demo_restore_popup_under
-        lda #<demo_popup_saved
-        sta zp_tmp_ptr2
-        lda #>demo_popup_saved
-        sta zp_tmp_ptr2+1
+        jsr demo_popup_cache_init_ptr
         lda #0
         sta demo_popup_row
 demo_popup_restore_row_loop
+        lda demo_popup_row
+        cmp demo_popup_box_height
+        bcs demo_popup_restore_done
         lda demo_popup_y
         clc
         adc demo_popup_row
         ldx demo_popup_x
         jsr demo_prepare_cursor_row_table
         jsr demo_mem_open
-        ldx #0
+        jsr demo_popup_set_width_counter
 demo_popup_restore_pix_loop
+        lda zp_tmp1
+        ora zp_tmp2
+        beq demo_popup_restore_row_done
+        jsr demo_popup_cache_open
         ldy #0
         lda (zp_tmp_ptr2),y
-        inc zp_tmp_ptr2
-        bne demo_popup_restore_ptr_ok
-        inc zp_tmp_ptr2+1
-demo_popup_restore_ptr_ok
+        sta zp_tmp3
+        jsr demo_popup_cache_advance
+        jsr demo_mem_open
+        lda zp_tmp3
         jsr demo_mem_put
-        inx
-        cpx #DEMO_POPUP_WIDTH
-        bne demo_popup_restore_pix_loop
+        jsr demo_popup_decrement_counter
+        jmp demo_popup_restore_pix_loop
+demo_popup_restore_row_done
         memb_off
         inc demo_popup_row
-        lda demo_popup_row
-        cmp #DEMO_POPUP_HEIGHT
-        bne demo_popup_restore_row_loop
+        jmp demo_popup_restore_row_loop
+demo_popup_restore_done
         lda #0
         sta demo_popup_active
         sta demo_popup_clickable
@@ -240,6 +377,9 @@ demo_draw_popup_box
         lda #0
         sta demo_popup_row
 demo_popup_box_row_loop
+        lda demo_popup_row
+        cmp demo_popup_box_height
+        bcs demo_popup_box_done
         lda demo_popup_y
         clc
         adc demo_popup_row
@@ -248,37 +388,30 @@ demo_popup_box_row_loop
         jsr demo_mem_open
         lda demo_popup_row
         beq demo_popup_border_row
-        cmp #DEMO_POPUP_LAST_ROW
+        clc
+        adc #1
+        cmp demo_popup_box_height
         beq demo_popup_border_row
 
         lda #DEMO_POPUP_BORDER_COLOR
         jsr demo_mem_put
-        ldx #0
-demo_popup_fill_loop
+        jsr demo_popup_set_inner_counter
         lda #DEMO_POPUP_FILL_COLOR
-        jsr demo_mem_put
-        inx
-        cpx #DEMO_POPUP_INNER_WIDTH
-        bne demo_popup_fill_loop
+        jsr demo_popup_write_run
         lda #DEMO_POPUP_BORDER_COLOR
         jsr demo_mem_put
         jmp demo_popup_box_row_done
 
 demo_popup_border_row
-        ldx #0
-demo_popup_border_fill_loop
+        jsr demo_popup_set_width_counter
         lda #DEMO_POPUP_BORDER_COLOR
-        jsr demo_mem_put
-        inx
-        cpx #DEMO_POPUP_WIDTH
-        bne demo_popup_border_fill_loop
+        jsr demo_popup_write_run
 
 demo_popup_box_row_done
         memb_off
         inc demo_popup_row
-        lda demo_popup_row
-        cmp #DEMO_POPUP_HEIGHT
-        bne demo_popup_box_row_loop
+        jmp demo_popup_box_row_loop
+demo_popup_box_done
         rts
 
 demo_draw_popup_text

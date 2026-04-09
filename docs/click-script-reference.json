@@ -19,10 +19,10 @@
   ],
   "helpers": [
     { "name": "changeRoom(roomName)", "returns": "changeRoom action", "description": "Reload the Atari client into another room by name." },
-    { "name": "displayText(text)", "returns": "displayText action", "description": "Show popup text." },
+    { "name": "displayText(text)", "returns": "displayText action", "description": "Show popup text near the click/cursor." },
     { "name": "displayText({ text | message | lines, clickable, selectable, choices })", "returns": "displayText action", "description": "Advanced popup form. Set clickable/selectable true for popup click handling, or pass choices directly." },
     { "name": "choice(id, text, options)", "returns": "popup choice object", "description": "Build one clickable choice line for use with displayChoices(). Options may include value or meta." },
-    { "name": "displayChoices(choices, options)", "returns": "displayText action", "description": "Show up to 3 clickable popup lines. Each line becomes a popup choice." },
+    { "name": "displayChoices(choices, options)", "returns": "displayText action", "description": "Show up to 6 popup lines total. Each choice becomes a clickable line, and `options.text` is shown above the choices when there is room." },
     { "name": "replaceGraphics(selectionName)", "returns": "replaceGraphics action", "description": "Use a saved image selection by name from the current room when the name is unique." },
     { "name": "replaceGraphics({ selection, room, x, y, width, height })", "returns": "replaceGraphics action", "description": "Draw an image selection patch. selection can come from the current room or an explicit room. x/y/width/height can override placement within the stored patch bounds." },
     { "name": "replaceGraphics({ room, sourceRoom, x, y, width, height })", "returns": "replaceGraphics action", "description": "Copy a rectangular patch from a room image instead of an image selection." },
@@ -41,9 +41,9 @@
     { "name": "Room", "description": "id, name, title, slides, and selections. Each selection uses the same fields as above." }
   ],
   "limits": [
-    { "name": "Popup lines", "description": "Maximum 3 visible lines." },
-    { "name": "Popup line width", "description": "Each line is sanitized and clipped to 19 characters." },
-    { "name": "Popup choices", "description": "Maximum 3 clickable choices." },
+    { "name": "Popup lines", "description": "Maximum 6 visible lines." },
+    { "name": "Popup line width", "description": "Each line is sanitized and clipped to 37 characters." },
+    { "name": "Popup choices", "description": "Maximum 6 clickable choices." },
     { "name": "State persistence", "description": "Only plain JSON-safe object data should be stored in state/gameState/scriptState." },
     { "name": "Script runtime", "description": "The sandbox is short-lived and timed; keep scripts fast and side-effect free beyond state updates." }
   ],

@@ -46,6 +46,15 @@ demo_popup_click_line dta b(0)
 demo_popup_click_col dta b(0)
 demo_popup_x       dta b(0)
 demo_popup_y       dta b(0)
+demo_popup_box_width_logical dta b(0)
+demo_popup_box_width_lo dta b(0)
+demo_popup_box_width_hi dta b(0)
+demo_popup_box_inner_width_lo dta b(0)
+demo_popup_box_inner_width_hi dta b(0)
+demo_popup_box_height dta b(0)
+demo_popup_cache_bank dta b(0)
+demo_popup_cache_ptr_lo dta b(0)
+demo_popup_cache_ptr_hi dta b(0)
 demo_popup_row     dta b(0)
 demo_popup_char_ix dta b(0)
 demo_popup_text_row dta b(0)
@@ -92,4 +101,3 @@ url_buffer        .ds 256
 rx_buffer         .ds 256
 img_pal_buf       .ds 768
 demo_cursor_saved .ds DEMO_CURSOR_WIDTH*(demo_arrow_data_end-demo_arrow_data)
-demo_popup_saved  .ds DEMO_POPUP_WIDTH*DEMO_POPUP_HEIGHT
