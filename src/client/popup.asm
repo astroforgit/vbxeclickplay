@@ -67,7 +67,6 @@ demo_calc_popup_position
         lda #DEMO_POPUP_MAX_X
 demo_popup_x_ok
         sta demo_popup_x
-
         lda zp_demo_cursor_y
         cmp #DEMO_POPUP_MAX_Y
         bcc demo_popup_y_ok

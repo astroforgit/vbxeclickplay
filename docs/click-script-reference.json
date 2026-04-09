@@ -19,7 +19,7 @@
   ],
   "helpers": [
     { "name": "changeRoom(roomName)", "returns": "changeRoom action", "description": "Reload the Atari client into another room by name." },
-    { "name": "displayText(text)", "returns": "displayText action", "description": "Show popup text. Long text is wrapped and clipped to 3 lines of 19 characters." },
+    { "name": "displayText(text)", "returns": "displayText action", "description": "Show popup text." },
     { "name": "displayText({ text | message | lines, clickable, selectable, choices })", "returns": "displayText action", "description": "Advanced popup form. Set clickable/selectable true for popup click handling, or pass choices directly." },
     { "name": "choice(id, text, options)", "returns": "popup choice object", "description": "Build one clickable choice line for use with displayChoices(). Options may include value or meta." },
     { "name": "displayChoices(choices, options)", "returns": "displayText action", "description": "Show up to 3 clickable popup lines. Each line becomes a popup choice." },

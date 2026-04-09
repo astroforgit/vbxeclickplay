@@ -978,339 +978,338 @@ Source: popup.asm
     67 245F A9 50		        lda #DEMO_POPUP_MAX_X
     68 2461			demo_popup_x_ok
     69 2461 8D 31 88		        sta demo_popup_x
-    70
-    71 2464 A5 B1		        lda zp_demo_cursor_y
-    72 2466 C9 AC		        cmp #DEMO_POPUP_MAX_Y
-    73 2468 90 02		        bcc demo_popup_y_ok
-    74 246A A9 AC		        lda #DEMO_POPUP_MAX_Y
-    75 246C			demo_popup_y_ok
-    76 246C 8D 32 88		        sta demo_popup_y
-    77 246F 60			        rts
-    78
-    79 2470			demo_popup_hit_test
-    80 2470 A5 B0		        lda zp_demo_cursor_x
-    81 2472 38			        sec
-    82 2473 ED 31 88		        sbc demo_popup_x
-    83 2476 C9 50		        cmp #DEMO_POPUP_WIDTH_LOGICAL
-    84 2478 B0 0C		        bcs demo_popup_hit_miss
-    85 247A A5 B1		        lda zp_demo_cursor_y
-    86 247C 38			        sec
-    87 247D ED 32 88		        sbc demo_popup_y
-    88 2480 C9 1C		        cmp #DEMO_POPUP_HEIGHT
-    89 2482 B0 02		        bcs demo_popup_hit_miss
-    90 2484 38			        sec
-    91 2485 60			        rts
-    92 2486			demo_popup_hit_miss
-    93 2486 18			        clc
-    94 2487 60			        rts
-    95
-    96 2488			demo_popup_text_hit_test
-    97 2488 AD 2C 88		        lda demo_popup_clickable
-    98 248B D0 02		        bne demo_popup_text_check_x
-    99 248D 18			        clc
-   100 248E 60			        rts
-   101
-   102 248F			demo_popup_text_check_x
-   103 248F A5 B0		        lda zp_demo_cursor_x
-   104 2491 38			        sec
-   105 2492 ED 31 88		        sbc demo_popup_x
-   106 2495 B0 02		        bcs demo_popup_text_x_delta_ok
-   107 2497 18			        clc
-   108 2498 60			        rts
-   109 2499			demo_popup_text_x_delta_ok
-   110 2499 38			        sec
-   111 249A E9 02		        sbc #DEMO_POPUP_TEXT_X
-   112 249C B0 02		        bcs demo_popup_text_x_text_ok
-   113 249E 18			        clc
-   114 249F 60			        rts
-   115 24A0			demo_popup_text_x_text_ok
-   116 24A0 C9 4C		        cmp #(DEMO_POPUP_TEXT_MAX*DEMO_POPUP_CHAR_WIDTH_LOGICAL)
-   117 24A2 90 02		        bcc demo_popup_text_store_col
-   118 24A4 18			        clc
-   119 24A5 60			        rts
-   120 24A6			demo_popup_text_store_col
-   121 24A6 4A			        lsr
-   122 24A7 4A			        lsr
-   123 24A8 8D 30 88		        sta demo_popup_click_col
-   124
-   125 24AB A5 B1		        lda zp_demo_cursor_y
-   126 24AD 38			        sec
-   127 24AE ED 32 88		        sbc demo_popup_y
-   128 24B1 B0 02		        bcs demo_popup_text_y_delta_ok
-   129 24B3 18			        clc
-   130 24B4 60			        rts
-   131 24B5			demo_popup_text_y_delta_ok
-   132 24B5 38			        sec
-   133 24B6 E9 02		        sbc #DEMO_POPUP_TEXT_Y
-   134 24B8 B0 02		        bcs demo_popup_text_y_text_ok
-   135 24BA 18			        clc
-   136 24BB 60			        rts
-   137 24BC			demo_popup_text_y_text_ok
-   138 24BC 85 8B		        sta zp_tmp1
-   139 24BE AD 2D 88		        lda demo_popup_line_count
-   140 24C1 F0 0B		        beq demo_popup_text_miss
-   141 24C3 0A			        asl
-   142 24C4 0A			        asl
-   143 24C5 0A			        asl
-   144 24C6 85 8C		        sta zp_tmp2
-   145 24C8 A5 8B		        lda zp_tmp1
-   146 24CA C5 8C		        cmp zp_tmp2
-   147 24CC 90 02		        bcc demo_popup_text_store_line
-   148 24CE			demo_popup_text_miss
-   149 24CE 18			        clc
-   150 24CF 60			        rts
-   151
-   152 24D0			demo_popup_text_store_line
-   153 24D0 A5 8B		        lda zp_tmp1
-   154 24D2 4A			        lsr
-   155 24D3 4A			        lsr
-   156 24D4 4A			        lsr
-   157 24D5 8D 2F 88		        sta demo_popup_click_line
-   158 24D8 AA			        tax
-   159 24D9 AD 30 88		        lda demo_popup_click_col
-   160 24DC DD 75 41		        cmp demo_popup_line_lengths,x
-   161 24DF 90 02		        bcc demo_popup_text_hit
-   162 24E1 18			        clc
-   163 24E2 60			        rts
-   164 24E3			demo_popup_text_hit
-   165 24E3 38			        sec
-   166 24E4 60			        rts
-   167
-   168 24E5			demo_save_popup_under
-   169 24E5 A9 75		        lda #<demo_popup_saved
-   170 24E7 85 89		        sta zp_tmp_ptr2
-   171 24E9 A9 8E		        lda #>demo_popup_saved
-   172 24EB 85 8A		        sta zp_tmp_ptr2+1
-   173 24ED A9 00		        lda #0
-   174 24EF 8D 33 88		        sta demo_popup_row
-   175 24F2			demo_popup_save_row_loop
-   176 24F2 AD 32 88		        lda demo_popup_y
-   177 24F5 18			        clc
-   178 24F6 6D 33 88		        adc demo_popup_row
-   179 24F9 AE 31 88		        ldx demo_popup_x
-   180 24FC 20 A3 28		        jsr demo_prepare_cursor_row_table
-   181 24FF 20 2F 29		        jsr demo_mem_open
-   182 2502 A2 00		        ldx #0
-   183 2504			demo_popup_save_pix_loop
-   184 2504 A0 00		        ldy #0
-   185 2506 B1 87		        lda (zp_tmp_ptr),y
-   186 2508 A0 00		        ldy #0
-   187 250A 91 89		        sta (zp_tmp_ptr2),y
-   188 250C E6 89		        inc zp_tmp_ptr2
-   189 250E D0 02		        bne demo_popup_save_ptr_ok
-   190 2510 E6 8A		        inc zp_tmp_ptr2+1
-   191 2512			demo_popup_save_ptr_ok
-   192 2512 20 42 29		        jsr demo_mem_advance
-   193 2515 E8			        inx
-   194 2516 E0 A0		        cpx #DEMO_POPUP_WIDTH
-   195 2518 D0 EA		        bne demo_popup_save_pix_loop
-   196 251A			        memb_off
+    70 2464 A5 B1		        lda zp_demo_cursor_y
+    71 2466 C9 AC		        cmp #DEMO_POPUP_MAX_Y
+    72 2468 90 02		        bcc demo_popup_y_ok
+    73 246A A9 AC		        lda #DEMO_POPUP_MAX_Y
+    74 246C			demo_popup_y_ok
+    75 246C 8D 32 88		        sta demo_popup_y
+    76 246F 60			        rts
+    77
+    78 2470			demo_popup_hit_test
+    79 2470 A5 B0		        lda zp_demo_cursor_x
+    80 2472 38			        sec
+    81 2473 ED 31 88		        sbc demo_popup_x
+    82 2476 C9 50		        cmp #DEMO_POPUP_WIDTH_LOGICAL
+    83 2478 B0 0C		        bcs demo_popup_hit_miss
+    84 247A A5 B1		        lda zp_demo_cursor_y
+    85 247C 38			        sec
+    86 247D ED 32 88		        sbc demo_popup_y
+    87 2480 C9 1C		        cmp #DEMO_POPUP_HEIGHT
+    88 2482 B0 02		        bcs demo_popup_hit_miss
+    89 2484 38			        sec
+    90 2485 60			        rts
+    91 2486			demo_popup_hit_miss
+    92 2486 18			        clc
+    93 2487 60			        rts
+    94
+    95 2488			demo_popup_text_hit_test
+    96 2488 AD 2C 88		        lda demo_popup_clickable
+    97 248B D0 02		        bne demo_popup_text_check_x
+    98 248D 18			        clc
+    99 248E 60			        rts
+   100
+   101 248F			demo_popup_text_check_x
+   102 248F A5 B0		        lda zp_demo_cursor_x
+   103 2491 38			        sec
+   104 2492 ED 31 88		        sbc demo_popup_x
+   105 2495 B0 02		        bcs demo_popup_text_x_delta_ok
+   106 2497 18			        clc
+   107 2498 60			        rts
+   108 2499			demo_popup_text_x_delta_ok
+   109 2499 38			        sec
+   110 249A E9 02		        sbc #DEMO_POPUP_TEXT_X
+   111 249C B0 02		        bcs demo_popup_text_x_text_ok
+   112 249E 18			        clc
+   113 249F 60			        rts
+   114 24A0			demo_popup_text_x_text_ok
+   115 24A0 C9 4C		        cmp #(DEMO_POPUP_TEXT_MAX*DEMO_POPUP_CHAR_WIDTH_LOGICAL)
+   116 24A2 90 02		        bcc demo_popup_text_store_col
+   117 24A4 18			        clc
+   118 24A5 60			        rts
+   119 24A6			demo_popup_text_store_col
+   120 24A6 4A			        lsr
+   121 24A7 4A			        lsr
+   122 24A8 8D 30 88		        sta demo_popup_click_col
+   123
+   124 24AB A5 B1		        lda zp_demo_cursor_y
+   125 24AD 38			        sec
+   126 24AE ED 32 88		        sbc demo_popup_y
+   127 24B1 B0 02		        bcs demo_popup_text_y_delta_ok
+   128 24B3 18			        clc
+   129 24B4 60			        rts
+   130 24B5			demo_popup_text_y_delta_ok
+   131 24B5 38			        sec
+   132 24B6 E9 02		        sbc #DEMO_POPUP_TEXT_Y
+   133 24B8 B0 02		        bcs demo_popup_text_y_text_ok
+   134 24BA 18			        clc
+   135 24BB 60			        rts
+   136 24BC			demo_popup_text_y_text_ok
+   137 24BC 85 8B		        sta zp_tmp1
+   138 24BE AD 2D 88		        lda demo_popup_line_count
+   139 24C1 F0 0B		        beq demo_popup_text_miss
+   140 24C3 0A			        asl
+   141 24C4 0A			        asl
+   142 24C5 0A			        asl
+   143 24C6 85 8C		        sta zp_tmp2
+   144 24C8 A5 8B		        lda zp_tmp1
+   145 24CA C5 8C		        cmp zp_tmp2
+   146 24CC 90 02		        bcc demo_popup_text_store_line
+   147 24CE			demo_popup_text_miss
+   148 24CE 18			        clc
+   149 24CF 60			        rts
+   150
+   151 24D0			demo_popup_text_store_line
+   152 24D0 A5 8B		        lda zp_tmp1
+   153 24D2 4A			        lsr
+   154 24D3 4A			        lsr
+   155 24D4 4A			        lsr
+   156 24D5 8D 2F 88		        sta demo_popup_click_line
+   157 24D8 AA			        tax
+   158 24D9 AD 30 88		        lda demo_popup_click_col
+   159 24DC DD 75 41		        cmp demo_popup_line_lengths,x
+   160 24DF 90 02		        bcc demo_popup_text_hit
+   161 24E1 18			        clc
+   162 24E2 60			        rts
+   163 24E3			demo_popup_text_hit
+   164 24E3 38			        sec
+   165 24E4 60			        rts
+   166
+   167 24E5			demo_save_popup_under
+   168 24E5 A9 75		        lda #<demo_popup_saved
+   169 24E7 85 89		        sta zp_tmp_ptr2
+   170 24E9 A9 8E		        lda #>demo_popup_saved
+   171 24EB 85 8A		        sta zp_tmp_ptr2+1
+   172 24ED A9 00		        lda #0
+   173 24EF 8D 33 88		        sta demo_popup_row
+   174 24F2			demo_popup_save_row_loop
+   175 24F2 AD 32 88		        lda demo_popup_y
+   176 24F5 18			        clc
+   177 24F6 6D 33 88		        adc demo_popup_row
+   178 24F9 AE 31 88		        ldx demo_popup_x
+   179 24FC 20 A3 28		        jsr demo_prepare_cursor_row_table
+   180 24FF 20 2F 29		        jsr demo_mem_open
+   181 2502 A2 00		        ldx #0
+   182 2504			demo_popup_save_pix_loop
+   183 2504 A0 00		        ldy #0
+   184 2506 B1 87		        lda (zp_tmp_ptr),y
+   185 2508 A0 00		        ldy #0
+   186 250A 91 89		        sta (zp_tmp_ptr2),y
+   187 250C E6 89		        inc zp_tmp_ptr2
+   188 250E D0 02		        bne demo_popup_save_ptr_ok
+   189 2510 E6 8A		        inc zp_tmp_ptr2+1
+   190 2512			demo_popup_save_ptr_ok
+   191 2512 20 42 29		        jsr demo_mem_advance
+   192 2515 E8			        inx
+   193 2516 E0 A0		        cpx #DEMO_POPUP_WIDTH
+   194 2518 D0 EA		        bne demo_popup_save_pix_loop
+   195 251A			        memb_off
 Macro: MEMB_OFF [Source: vbxe_const.asm]
      1 251A A9 00		        lda #0
      2 251C 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
      3 251E A0 5D		        ldy #VBXE_MEMAC_B
      4 2520 91 80		        sta (zp_vbxe_base),y
 Source: popup.asm
-   197 2522 EE 33 88		        inc demo_popup_row
-   198 2525 AD 33 88		        lda demo_popup_row
-   199 2528 C9 1C		        cmp #DEMO_POPUP_HEIGHT
-   200 252A D0 C6		        bne demo_popup_save_row_loop
-   201 252C 60			        rts
-   202
-   203 252D			demo_restore_popup_under
-   204 252D A9 75		        lda #<demo_popup_saved
-   205 252F 85 89		        sta zp_tmp_ptr2
-   206 2531 A9 8E		        lda #>demo_popup_saved
-   207 2533 85 8A		        sta zp_tmp_ptr2+1
-   208 2535 A9 00		        lda #0
-   209 2537 8D 33 88		        sta demo_popup_row
-   210 253A			demo_popup_restore_row_loop
-   211 253A AD 32 88		        lda demo_popup_y
-   212 253D 18			        clc
-   213 253E 6D 33 88		        adc demo_popup_row
-   214 2541 AE 31 88		        ldx demo_popup_x
-   215 2544 20 A3 28		        jsr demo_prepare_cursor_row_table
-   216 2547 20 2F 29		        jsr demo_mem_open
-   217 254A A2 00		        ldx #0
-   218 254C			demo_popup_restore_pix_loop
-   219 254C A0 00		        ldy #0
-   220 254E B1 89		        lda (zp_tmp_ptr2),y
-   221 2550 E6 89		        inc zp_tmp_ptr2
-   222 2552 D0 02		        bne demo_popup_restore_ptr_ok
-   223 2554 E6 8A		        inc zp_tmp_ptr2+1
-   224 2556			demo_popup_restore_ptr_ok
-   225 2556 20 3B 29		        jsr demo_mem_put
-   226 2559 E8			        inx
-   227 255A E0 A0		        cpx #DEMO_POPUP_WIDTH
-   228 255C D0 EE		        bne demo_popup_restore_pix_loop
-   229 255E			        memb_off
+   196 2522 EE 33 88		        inc demo_popup_row
+   197 2525 AD 33 88		        lda demo_popup_row
+   198 2528 C9 1C		        cmp #DEMO_POPUP_HEIGHT
+   199 252A D0 C6		        bne demo_popup_save_row_loop
+   200 252C 60			        rts
+   201
+   202 252D			demo_restore_popup_under
+   203 252D A9 75		        lda #<demo_popup_saved
+   204 252F 85 89		        sta zp_tmp_ptr2
+   205 2531 A9 8E		        lda #>demo_popup_saved
+   206 2533 85 8A		        sta zp_tmp_ptr2+1
+   207 2535 A9 00		        lda #0
+   208 2537 8D 33 88		        sta demo_popup_row
+   209 253A			demo_popup_restore_row_loop
+   210 253A AD 32 88		        lda demo_popup_y
+   211 253D 18			        clc
+   212 253E 6D 33 88		        adc demo_popup_row
+   213 2541 AE 31 88		        ldx demo_popup_x
+   214 2544 20 A3 28		        jsr demo_prepare_cursor_row_table
+   215 2547 20 2F 29		        jsr demo_mem_open
+   216 254A A2 00		        ldx #0
+   217 254C			demo_popup_restore_pix_loop
+   218 254C A0 00		        ldy #0
+   219 254E B1 89		        lda (zp_tmp_ptr2),y
+   220 2550 E6 89		        inc zp_tmp_ptr2
+   221 2552 D0 02		        bne demo_popup_restore_ptr_ok
+   222 2554 E6 8A		        inc zp_tmp_ptr2+1
+   223 2556			demo_popup_restore_ptr_ok
+   224 2556 20 3B 29		        jsr demo_mem_put
+   225 2559 E8			        inx
+   226 255A E0 A0		        cpx #DEMO_POPUP_WIDTH
+   227 255C D0 EE		        bne demo_popup_restore_pix_loop
+   228 255E			        memb_off
 Macro: MEMB_OFF [Source: vbxe_const.asm]
      1 255E A9 00		        lda #0
      2 2560 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
      3 2562 A0 5D		        ldy #VBXE_MEMAC_B
      4 2564 91 80		        sta (zp_vbxe_base),y
 Source: popup.asm
-   230 2566 EE 33 88		        inc demo_popup_row
-   231 2569 AD 33 88		        lda demo_popup_row
-   232 256C C9 1C		        cmp #DEMO_POPUP_HEIGHT
-   233 256E D0 CA		        bne demo_popup_restore_row_loop
-   234 2570 A9 00		        lda #0
-   235 2572 8D 2B 88		        sta demo_popup_active
-   236 2575 8D 2C 88		        sta demo_popup_clickable
-   237 2578 8D 2D 88		        sta demo_popup_line_count
-   238 257B 60			        rts
-   239
-   240 257C			demo_draw_popup_box
-   241 257C A9 00		        lda #0
-   242 257E 8D 33 88		        sta demo_popup_row
-   243 2581			demo_popup_box_row_loop
-   244 2581 AD 32 88		        lda demo_popup_y
-   245 2584 18			        clc
-   246 2585 6D 33 88		        adc demo_popup_row
-   247 2588 AE 31 88		        ldx demo_popup_x
-   248 258B 20 A3 28		        jsr demo_prepare_cursor_row_table
-   249 258E 20 2F 29		        jsr demo_mem_open
-   250 2591 AD 33 88		        lda demo_popup_row
-   251 2594 F0 1D		        beq demo_popup_border_row
-   252 2596 C9 1B		        cmp #DEMO_POPUP_LAST_ROW
-   253 2598 F0 19		        beq demo_popup_border_row
-   254
-   255 259A A9 FA		        lda #DEMO_POPUP_BORDER_COLOR
-   256 259C 20 3B 29		        jsr demo_mem_put
-   257 259F A2 00		        ldx #0
-   258 25A1			demo_popup_fill_loop
-   259 25A1 A9 18		        lda #DEMO_POPUP_FILL_COLOR
-   260 25A3 20 3B 29		        jsr demo_mem_put
-   261 25A6 E8			        inx
-   262 25A7 E0 9E		        cpx #DEMO_POPUP_INNER_WIDTH
-   263 25A9 D0 F6		        bne demo_popup_fill_loop
-   264 25AB A9 FA		        lda #DEMO_POPUP_BORDER_COLOR
-   265 25AD 20 3B 29		        jsr demo_mem_put
-   266 25B0 4C BF 25		        jmp demo_popup_box_row_done
-   267
-   268 25B3			demo_popup_border_row
-   269 25B3 A2 00		        ldx #0
-   270 25B5			demo_popup_border_fill_loop
-   271 25B5 A9 FA		        lda #DEMO_POPUP_BORDER_COLOR
-   272 25B7 20 3B 29		        jsr demo_mem_put
-   273 25BA E8			        inx
-   274 25BB E0 A0		        cpx #DEMO_POPUP_WIDTH
-   275 25BD D0 F6		        bne demo_popup_border_fill_loop
-   276
-   277 25BF			demo_popup_box_row_done
-   278 25BF			        memb_off
+   229 2566 EE 33 88		        inc demo_popup_row
+   230 2569 AD 33 88		        lda demo_popup_row
+   231 256C C9 1C		        cmp #DEMO_POPUP_HEIGHT
+   232 256E D0 CA		        bne demo_popup_restore_row_loop
+   233 2570 A9 00		        lda #0
+   234 2572 8D 2B 88		        sta demo_popup_active
+   235 2575 8D 2C 88		        sta demo_popup_clickable
+   236 2578 8D 2D 88		        sta demo_popup_line_count
+   237 257B 60			        rts
+   238
+   239 257C			demo_draw_popup_box
+   240 257C A9 00		        lda #0
+   241 257E 8D 33 88		        sta demo_popup_row
+   242 2581			demo_popup_box_row_loop
+   243 2581 AD 32 88		        lda demo_popup_y
+   244 2584 18			        clc
+   245 2585 6D 33 88		        adc demo_popup_row
+   246 2588 AE 31 88		        ldx demo_popup_x
+   247 258B 20 A3 28		        jsr demo_prepare_cursor_row_table
+   248 258E 20 2F 29		        jsr demo_mem_open
+   249 2591 AD 33 88		        lda demo_popup_row
+   250 2594 F0 1D		        beq demo_popup_border_row
+   251 2596 C9 1B		        cmp #DEMO_POPUP_LAST_ROW
+   252 2598 F0 19		        beq demo_popup_border_row
+   253
+   254 259A A9 FA		        lda #DEMO_POPUP_BORDER_COLOR
+   255 259C 20 3B 29		        jsr demo_mem_put
+   256 259F A2 00		        ldx #0
+   257 25A1			demo_popup_fill_loop
+   258 25A1 A9 18		        lda #DEMO_POPUP_FILL_COLOR
+   259 25A3 20 3B 29		        jsr demo_mem_put
+   260 25A6 E8			        inx
+   261 25A7 E0 9E		        cpx #DEMO_POPUP_INNER_WIDTH
+   262 25A9 D0 F6		        bne demo_popup_fill_loop
+   263 25AB A9 FA		        lda #DEMO_POPUP_BORDER_COLOR
+   264 25AD 20 3B 29		        jsr demo_mem_put
+   265 25B0 4C BF 25		        jmp demo_popup_box_row_done
+   266
+   267 25B3			demo_popup_border_row
+   268 25B3 A2 00		        ldx #0
+   269 25B5			demo_popup_border_fill_loop
+   270 25B5 A9 FA		        lda #DEMO_POPUP_BORDER_COLOR
+   271 25B7 20 3B 29		        jsr demo_mem_put
+   272 25BA E8			        inx
+   273 25BB E0 A0		        cpx #DEMO_POPUP_WIDTH
+   274 25BD D0 F6		        bne demo_popup_border_fill_loop
+   275
+   276 25BF			demo_popup_box_row_done
+   277 25BF			        memb_off
 Macro: MEMB_OFF [Source: vbxe_const.asm]
      1 25BF A9 00		        lda #0
      2 25C1 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
      3 25C3 A0 5D		        ldy #VBXE_MEMAC_B
      4 25C5 91 80		        sta (zp_vbxe_base),y
 Source: popup.asm
-   279 25C7 EE 33 88		        inc demo_popup_row
-   280 25CA AD 33 88		        lda demo_popup_row
-   281 25CD C9 1C		        cmp #DEMO_POPUP_HEIGHT
-   282 25CF D0 B0		        bne demo_popup_box_row_loop
-   283 25D1 60			        rts
-   284
-   285 25D2			demo_draw_popup_text
-   286 25D2 A9 00		        lda #0
-   287 25D4 8D 2E 88		        sta demo_popup_line_ix
-   288 25D7			demo_popup_draw_line_loop
-   289 25D7 AD 2E 88		        lda demo_popup_line_ix
-   290 25DA CD 2D 88		        cmp demo_popup_line_count
-   291 25DD B0 7B		        bcs demo_popup_text_done
-   292
-   293 25DF A9 00		        lda #0
-   294 25E1 8D 35 88		        sta demo_popup_text_row
-   295 25E4			demo_popup_text_row_loop
-   296 25E4 AD 2E 88		        lda demo_popup_line_ix
-   297 25E7 0A			        asl
-   298 25E8 0A			        asl
-   299 25E9 0A			        asl
-   300 25EA 85 8B		        sta zp_tmp1
-   301 25EC AD 32 88		        lda demo_popup_y
-   302 25EF 18			        clc
-   303 25F0 65 8B		        adc zp_tmp1
-   304 25F2 6D 35 88		        adc demo_popup_text_row
-   305 25F5 69 02		        adc #DEMO_POPUP_TEXT_Y
-   306 25F7 AE 31 88		        ldx demo_popup_x
-   307 25FA E8			        inx
-   308 25FB E8			        inx
-   309 25FC 20 A3 28		        jsr demo_prepare_cursor_row_table
-   310 25FF 20 2F 29		        jsr demo_mem_open
-   311
-   312 2602 A9 00		        lda #0
-   313 2604 8D 34 88		        sta demo_popup_char_ix
-   314 2607			demo_popup_char_loop
-   315 2607 AC 2E 88		        ldy demo_popup_line_ix
-   316 260A B9 27 3E		        lda demo_popup_line_offsets,y
-   317 260D 18			        clc
-   318 260E 6D 34 88		        adc demo_popup_char_ix
-   319 2611 A8			        tay
-   320 2612 B9 2A 3E		        lda demo_popup_lines,y
-   321 2615 F0 2B		        beq demo_popup_text_row_done
-   322 2617 20 5B 26		        jsr demo_get_popup_font_bits
-   323 261A 8D 36 88		        sta demo_popup_font_bits
-   324 261D A2 00		        ldx #0
-   325 261F			demo_popup_font_bit_loop
-   326 261F AD 36 88		        lda demo_popup_font_bits
-   327 2622 0A			        asl
-   328 2623 8D 36 88		        sta demo_popup_font_bits
-   329 2626 90 08		        bcc demo_popup_font_skip
-   330 2628 A9 FC		        lda #DEMO_POPUP_TEXT_COLOR
-   331 262A 20 3B 29		        jsr demo_mem_put
-   332 262D 4C 33 26		        jmp demo_popup_font_next
-   333 2630			demo_popup_font_skip
-   334 2630 20 42 29		        jsr demo_mem_advance
-   335 2633			demo_popup_font_next
-   336 2633 E8			        inx
-   337 2634 E0 08		        cpx #8
-   338 2636 D0 E7		        bne demo_popup_font_bit_loop
-   339 2638 EE 34 88		        inc demo_popup_char_ix
-   340 263B AD 34 88		        lda demo_popup_char_ix
-   341 263E C9 13		        cmp #DEMO_POPUP_TEXT_MAX
-   342 2640 90 C5		        bcc demo_popup_char_loop
-   343
-   344 2642			demo_popup_text_row_done
-   345 2642			        memb_off
+   278 25C7 EE 33 88		        inc demo_popup_row
+   279 25CA AD 33 88		        lda demo_popup_row
+   280 25CD C9 1C		        cmp #DEMO_POPUP_HEIGHT
+   281 25CF D0 B0		        bne demo_popup_box_row_loop
+   282 25D1 60			        rts
+   283
+   284 25D2			demo_draw_popup_text
+   285 25D2 A9 00		        lda #0
+   286 25D4 8D 2E 88		        sta demo_popup_line_ix
+   287 25D7			demo_popup_draw_line_loop
+   288 25D7 AD 2E 88		        lda demo_popup_line_ix
+   289 25DA CD 2D 88		        cmp demo_popup_line_count
+   290 25DD B0 7B		        bcs demo_popup_text_done
+   291
+   292 25DF A9 00		        lda #0
+   293 25E1 8D 35 88		        sta demo_popup_text_row
+   294 25E4			demo_popup_text_row_loop
+   295 25E4 AD 2E 88		        lda demo_popup_line_ix
+   296 25E7 0A			        asl
+   297 25E8 0A			        asl
+   298 25E9 0A			        asl
+   299 25EA 85 8B		        sta zp_tmp1
+   300 25EC AD 32 88		        lda demo_popup_y
+   301 25EF 18			        clc
+   302 25F0 65 8B		        adc zp_tmp1
+   303 25F2 6D 35 88		        adc demo_popup_text_row
+   304 25F5 69 02		        adc #DEMO_POPUP_TEXT_Y
+   305 25F7 AE 31 88		        ldx demo_popup_x
+   306 25FA E8			        inx
+   307 25FB E8			        inx
+   308 25FC 20 A3 28		        jsr demo_prepare_cursor_row_table
+   309 25FF 20 2F 29		        jsr demo_mem_open
+   310
+   311 2602 A9 00		        lda #0
+   312 2604 8D 34 88		        sta demo_popup_char_ix
+   313 2607			demo_popup_char_loop
+   314 2607 AC 2E 88		        ldy demo_popup_line_ix
+   315 260A B9 27 3E		        lda demo_popup_line_offsets,y
+   316 260D 18			        clc
+   317 260E 6D 34 88		        adc demo_popup_char_ix
+   318 2611 A8			        tay
+   319 2612 B9 2A 3E		        lda demo_popup_lines,y
+   320 2615 F0 2B		        beq demo_popup_text_row_done
+   321 2617 20 5B 26		        jsr demo_get_popup_font_bits
+   322 261A 8D 36 88		        sta demo_popup_font_bits
+   323 261D A2 00		        ldx #0
+   324 261F			demo_popup_font_bit_loop
+   325 261F AD 36 88		        lda demo_popup_font_bits
+   326 2622 0A			        asl
+   327 2623 8D 36 88		        sta demo_popup_font_bits
+   328 2626 90 08		        bcc demo_popup_font_skip
+   329 2628 A9 FC		        lda #DEMO_POPUP_TEXT_COLOR
+   330 262A 20 3B 29		        jsr demo_mem_put
+   331 262D 4C 33 26		        jmp demo_popup_font_next
+   332 2630			demo_popup_font_skip
+   333 2630 20 42 29		        jsr demo_mem_advance
+   334 2633			demo_popup_font_next
+   335 2633 E8			        inx
+   336 2634 E0 08		        cpx #8
+   337 2636 D0 E7		        bne demo_popup_font_bit_loop
+   338 2638 EE 34 88		        inc demo_popup_char_ix
+   339 263B AD 34 88		        lda demo_popup_char_ix
+   340 263E C9 13		        cmp #DEMO_POPUP_TEXT_MAX
+   341 2640 90 C5		        bcc demo_popup_char_loop
+   342
+   343 2642			demo_popup_text_row_done
+   344 2642			        memb_off
 Macro: MEMB_OFF [Source: vbxe_const.asm]
      1 2642 A9 00		        lda #0
      2 2644 85 AD		        sta zp_memb_shadow     ; shadow FIRST (NMI-safe ordering)
      3 2646 A0 5D		        ldy #VBXE_MEMAC_B
      4 2648 91 80		        sta (zp_vbxe_base),y
 Source: popup.asm
-   346 264A EE 35 88		        inc demo_popup_text_row
-   347 264D AD 35 88		        lda demo_popup_text_row
-   348 2650 C9 08		        cmp #8
-   349 2652 D0 90		        bne demo_popup_text_row_loop
-   350 2654 EE 2E 88		        inc demo_popup_line_ix
-   351 2657 4C D7 25		        jmp demo_popup_draw_line_loop
-   352
-   353 265A			demo_popup_text_done
-   354 265A 60			        rts
-   355
-   356 265B			demo_get_popup_font_bits
-   357 265B 85 8B		        sta zp_tmp1
-   358 265D 29 1F		        and #$1F
-   359 265F 0A			        asl
-   360 2660 0A			        asl
-   361 2661 0A			        asl
-   362 2662 18			        clc
-   363 2663 6D 35 88		        adc demo_popup_text_row
-   364 2666 85 89		        sta zp_tmp_ptr2
-   365 2668 A5 8B		        lda zp_tmp1
-   366 266A 4A			        lsr
-   367 266B 4A			        lsr
-   368 266C 4A			        lsr
-   369 266D 4A			        lsr
-   370 266E 4A			        lsr
-   371 266F AA			        tax
-   372 2670 AD F4 02		        lda CHBAS
-   373 2673 18			        clc
-   374 2674 7D 1B 3E		        adc demo_font_page_map,x
-   375 2677 85 8A		        sta zp_tmp_ptr2+1
-   376 2679 A0 00		        ldy #0
-   377 267B B1 89		        lda (zp_tmp_ptr2),y
-   378 267D 60			        rts
+   345 264A EE 35 88		        inc demo_popup_text_row
+   346 264D AD 35 88		        lda demo_popup_text_row
+   347 2650 C9 08		        cmp #8
+   348 2652 D0 90		        bne demo_popup_text_row_loop
+   349 2654 EE 2E 88		        inc demo_popup_line_ix
+   350 2657 4C D7 25		        jmp demo_popup_draw_line_loop
+   351
+   352 265A			demo_popup_text_done
+   353 265A 60			        rts
+   354
+   355 265B			demo_get_popup_font_bits
+   356 265B 85 8B		        sta zp_tmp1
+   357 265D 29 1F		        and #$1F
+   358 265F 0A			        asl
+   359 2660 0A			        asl
+   360 2661 0A			        asl
+   361 2662 18			        clc
+   362 2663 6D 35 88		        adc demo_popup_text_row
+   363 2666 85 89		        sta zp_tmp_ptr2
+   364 2668 A5 8B		        lda zp_tmp1
+   365 266A 4A			        lsr
+   366 266B 4A			        lsr
+   367 266C 4A			        lsr
+   368 266D 4A			        lsr
+   369 266E 4A			        lsr
+   370 266F AA			        tax
+   371 2670 AD F4 02		        lda CHBAS
+   372 2673 18			        clc
+   373 2674 7D 1B 3E		        adc demo_font_page_map,x
+   374 2677 85 8A		        sta zp_tmp_ptr2+1
+   375 2679 A0 00		        ldy #0
+   376 267B B1 89		        lda (zp_tmp_ptr2),y
+   377 267D 60			        rts
     60 267E			        icl 'client/cursor.asm'
 Source: cursor.asm
      1 267E			demo_draw_cursor
