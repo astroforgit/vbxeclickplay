@@ -1,6 +1,6 @@
 {
-  "stage": "start",
+  "stage": "flower_shown",
   "leechShown": false,
-  "affection": 0,
-  "flirtCount": 0
+  "affection": 15,
+  "flirtCount": 2
 }

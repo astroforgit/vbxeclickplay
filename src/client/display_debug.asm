@@ -30,40 +30,6 @@ show_fullscreen
         memb_on 0
         ldx #0
 
-        lda #<(XDLC_OVOFF|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT)
-        sta MEMB_XDL,x
-        inx
-        lda #>(XDLC_OVOFF|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT)
-        sta MEMB_XDL,x
-        inx
-        lda #24-1
-        sta MEMB_XDL,x
-        inx
-        lda #<VRAM_SCREEN
-        sta MEMB_XDL,x
-        inx
-        lda #>VRAM_SCREEN
-        sta MEMB_XDL,x
-        inx
-        lda #0
-        sta MEMB_XDL,x
-        inx
-        lda #<SCR_STRIDE
-        sta MEMB_XDL,x
-        inx
-        lda #>SCR_STRIDE
-        sta MEMB_XDL,x
-        inx
-        lda #CHBASE_VAL
-        sta MEMB_XDL,x
-        inx
-        lda #$11
-        sta MEMB_XDL,x
-        inx
-        lda #$FF
-        sta MEMB_XDL,x
-        inx
-
         lda #<(XDLC_GMON|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_OVATT)
         sta MEMB_XDL,x
         inx
@@ -97,16 +63,19 @@ show_fullscreen
         sta MEMB_XDL,x
         inx
 
-        lda #240-24
+        lda #240
         sec
         sbc img_height
-        beq show_fullscreen_no_text
-        bmi show_fullscreen_no_text
-        cmp #9
-        bcc show_fullscreen_status_only
+        bmi show_fullscreen_need_no_text
+        cmp #(BOTTOM_TEXT_ROWS*8)
+        bcs show_fullscreen_have_bottom
+show_fullscreen_need_no_text
+        jmp show_fullscreen_no_text
 
+show_fullscreen_have_bottom
         sec
-        sbc #8
+        sbc #(BOTTOM_TEXT_ROWS*8)
+        beq show_fullscreen_bottom_rows
         sec
         sbc #1
         pha
@@ -118,22 +87,23 @@ show_fullscreen
         inx
         pla
         sta MEMB_XDL,x
+        sta MEMB_XDL,x
         inx
 
-show_fullscreen_status_only
+show_fullscreen_bottom_rows
         lda #<(XDLC_TMON|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT|XDLC_END)
         sta MEMB_XDL,x
         inx
         lda #>(XDLC_TMON|XDLC_MAPOFF|XDLC_RPTL|XDLC_OVADR|XDLC_CHBASE|XDLC_OVATT|XDLC_END)
         sta MEMB_XDL,x
         inx
-        lda #8-1
+        lda #(BOTTOM_TEXT_ROWS*8)-1
         sta MEMB_XDL,x
         inx
-        lda #<(STATUS_ROW * SCR_STRIDE)
+        lda #<(BOTTOM_TEXT_ROW * SCR_STRIDE)
         sta MEMB_XDL,x
         inx
-        lda #>(STATUS_ROW * SCR_STRIDE)
+        lda #>(BOTTOM_TEXT_ROW * SCR_STRIDE)
         sta MEMB_XDL,x
         inx
         lda #0

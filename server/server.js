@@ -11,6 +11,8 @@ const CLICK_MARKER_COLOR = 5;
 const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const POPUP_LINE_MAX = 37;
 const POPUP_MAX_LINES = 6;
+const BOTTOM_TEXT_LINE_MAX = 59;
+const BOTTOM_TEXT_MAX_LINES = 4;
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DATA_DIR = path.join(ROOT_DIR, 'data');
 const ROOMS_DIR = path.join(DATA_DIR, 'rooms');
@@ -236,6 +238,60 @@ function normalizePopupLines(text) {
   return normalized;
 }
 
+function sanitizeBottomTextFragment(text) {
+  return String(text || '')
+    .replace(/[|\r\t]+/g, ' ')
+    .replace(/[^\x20-\x7E]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function wrapBottomTextLine(line, output) {
+  let remaining = sanitizeBottomTextFragment(line);
+  if (!remaining) {
+    output.push('');
+    return;
+  }
+
+  while (remaining && output.length < BOTTOM_TEXT_MAX_LINES) {
+    if (remaining.length <= BOTTOM_TEXT_LINE_MAX) {
+      output.push(remaining);
+      return;
+    }
+
+    const candidate = remaining.slice(0, BOTTOM_TEXT_LINE_MAX + 1);
+    let breakAt = candidate.lastIndexOf(' ');
+    if (breakAt <= 0) {
+      breakAt = BOTTOM_TEXT_LINE_MAX;
+    }
+
+    output.push(remaining.slice(0, breakAt).trimEnd().slice(0, BOTTOM_TEXT_LINE_MAX));
+    remaining = remaining.slice(breakAt).trimStart();
+  }
+}
+
+function normalizeBottomTextLines(value) {
+  const rawLines = Array.isArray(value)
+    ? value.map((line) => String(line ?? ''))
+    : String(value || '').replace(/\r/g, '').split('\n');
+  const lines = [];
+
+  for (const rawLine of rawLines) {
+    if (lines.length >= BOTTOM_TEXT_MAX_LINES) break;
+    wrapBottomTextLine(rawLine, lines);
+  }
+
+  const normalized = lines
+    .slice(0, BOTTOM_TEXT_MAX_LINES)
+    .map((line) => sanitizeBottomTextFragment(line).slice(0, BOTTOM_TEXT_LINE_MAX));
+
+  while (normalized.length > 0 && normalized[normalized.length - 1] === '') {
+    normalized.pop();
+  }
+
+  return normalized;
+}
+
 function slugifyChoiceId(value, fallback = 'choice') {
   const safe = String(value || '')
     .trim()
@@ -389,6 +445,7 @@ function normalizeRoomRecord(room) {
   return {
     ...room,
     slides: Array.isArray(room.slides) ? room.slides : [],
+    bottomTextLines: normalizeBottomTextLines(room.bottomTextLines || room.bottomText || []),
     selections: Array.isArray(room.selections)
       ? room.selections.map((selection) => sanitizeSelectionRecord(selection))
       : []
@@ -589,6 +646,7 @@ function getRoomPreviewPayload(roomName) {
       vbxeBase64: demoImagePayload.toString('base64'),
       hasCustomImage: false,
       imageTitle: null,
+      bottomTextLines: room.bottomTextLines || [],
       selections: previewSelections,
       lastClick: roomClickState.get(room.name) || null
     };
@@ -606,9 +664,27 @@ function getRoomPreviewPayload(roomName) {
     vbxeBase64: buildRoomPreviewBuffer(slide.buffer, slide.width, slide.height, lastClick).toString('base64'),
     hasCustomImage: true,
     imageTitle: slide.title,
+    bottomTextLines: room.bottomTextLines || [],
     selections: previewSelections,
     lastClick
   };
+}
+
+function getRoomBottomTextPayload(roomName) {
+  const room = getRoom(roomName);
+  if (!room) return null;
+  const lines = normalizeBottomTextLines(room.bottomTextLines || []);
+  return {
+    roomName: room.name,
+    lines,
+    text: lines.join('\n')
+  };
+}
+
+function buildRoomBottomTextAtariPayload(roomName) {
+  const payload = getRoomBottomTextPayload(roomName);
+  if (!payload) return null;
+  return `BTM:${payload.lines.join('|')}\n`;
 }
 
 function buildSelectionsForScript(store) {
@@ -1306,6 +1382,7 @@ async function handleCreateRoom(req, res) {
     id,
     name,
     slides: [],
+    bottomTextLines: [],
     selections: [],
     createdAt: new Date().toISOString()
   };
@@ -1515,6 +1592,43 @@ async function handleGetCroppedImage(req, res, roomName) {
     'Connection': 'close'
   });
   res.end(buffer);
+}
+
+function handleGetRoomBottomText(res, roomName) {
+  const payload = getRoomBottomTextPayload(roomName);
+  if (!payload) {
+    sendJson(res, 404, { error: 'Room not found' });
+    return;
+  }
+  sendJson(res, 200, payload);
+}
+
+async function handleSaveRoomBottomText(req, res, roomName) {
+  const body = await readJsonBody(req);
+  const store = loadStore();
+  const room = getRoomFromStore(store, roomName);
+  if (!room) {
+    sendJson(res, 404, { error: 'Room not found' });
+    return;
+  }
+
+  const lines = normalizeBottomTextLines(
+    Array.isArray(body.lines)
+      ? body.lines
+      : body.text !== undefined
+        ? body.text
+        : body.message !== undefined
+          ? body.message
+          : ''
+  );
+  room.bottomTextLines = lines;
+  saveStore(store);
+  sendJson(res, 200, {
+    ok: true,
+    roomName: room.name,
+    lines,
+    text: lines.join('\n')
+  });
 }
 
 async function handleCreateSelection(req, res, roomName) {
@@ -1824,6 +1938,19 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    const roomBottomTextApiMatch = pathname.match(/^\/api\/rooms\/([^/]+)\/bottomtext$/);
+    if (req.method === 'GET' && roomBottomTextApiMatch) {
+      const requestedRoom = decodeURIComponent(roomBottomTextApiMatch[1]);
+      handleGetRoomBottomText(res, requestedRoom);
+      return;
+    }
+
+    if (req.method === 'PUT' && roomBottomTextApiMatch) {
+      const requestedRoom = decodeURIComponent(roomBottomTextApiMatch[1]);
+      await handleSaveRoomBottomText(req, res, requestedRoom);
+      return;
+    }
+
     const roomImageApiMatch = pathname.match(/^\/api\/rooms\/([^/]+)\/image$/);
     if (req.method === 'POST' && roomImageApiMatch) {
       const requestedRoom = decodeURIComponent(roomImageApiMatch[1]);
@@ -2035,6 +2162,19 @@ const server = http.createServer(async (req, res) => {
       }
       sendText(res, 200, payload);
       console.log(`[RES] roommeta ${requestedRoom} ${Buffer.byteLength(payload, 'ascii')} bytes`);
+      return;
+    }
+
+    const roomBottomMatch = pathname.match(/^\/roombottom\/([^/]+)$/);
+    if (req.method === 'GET' && roomBottomMatch) {
+      const requestedRoom = decodeURIComponent(roomBottomMatch[1]);
+      const payload = buildRoomBottomTextAtariPayload(requestedRoom);
+      if (payload === null) {
+        sendText(res, 404, `Room not found: ${requestedRoom}\n`);
+        return;
+      }
+      sendText(res, 200, payload);
+      console.log(`[RES] roombottom ${requestedRoom} ${Buffer.byteLength(payload, 'ascii')} bytes`);
       return;
     }
 

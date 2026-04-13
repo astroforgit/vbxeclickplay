@@ -85,6 +85,8 @@ CONTENT_BOT    = SCR_ROWS - 3
 CONTENT_ROWS   = SCR_ROWS - 4
 URL_ROW        = 0
 TITLE_ROW      = 1
+BOTTOM_TEXT_ROW = SCR_ROWS - 5
+BOTTOM_TEXT_ROWS = 4
 STATUS_ROW     = SCR_ROWS - 2
 
 ; ----------------------------------------------------------------------------

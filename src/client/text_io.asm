@@ -41,6 +41,24 @@ copy_room_meta_append_name
         sta url_buffer,y
         rts
 
+copy_room_bottom_url_to_buffer
+        lda #<room_bottom_url_prefix
+        sta zp_tmp_ptr
+        lda #>room_bottom_url_prefix
+        sta zp_tmp_ptr+1
+        jsr copy_string_to_buffer
+        ldy #0
+copy_room_bottom_find_end
+        lda url_buffer,y
+        beq copy_room_bottom_append_name
+        iny
+        bne copy_room_bottom_find_end
+copy_room_bottom_append_name
+        jsr append_current_room_name
+        lda #0
+        sta url_buffer,y
+        rts
+
 copy_click_url_to_buffer
         lda #<click_url_prefix
         sta zp_tmp_ptr

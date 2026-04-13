@@ -31,6 +31,99 @@ room_clear_hover_label
         ldx #COL_BLACK
         jmp vbxe_fill_row
 
+room_clear_bottom_text
+        lda #0
+        sta room_bottom_text_active
+        lda #BOTTOM_TEXT_ROW
+        ldx #COL_BLACK
+        jsr vbxe_fill_row
+        lda #(BOTTOM_TEXT_ROW+1)
+        ldx #COL_BLACK
+        jsr vbxe_fill_row
+        lda #(BOTTOM_TEXT_ROW+2)
+        ldx #COL_BLACK
+        jsr vbxe_fill_row
+        lda #STATUS_ROW
+        ldx #COL_BLACK
+        jmp vbxe_fill_row
+
+room_load_bottom_text
+        jsr room_clear_bottom_text
+        jsr copy_room_bottom_url_to_buffer
+        jsr fetch_text_payload
+        bcs room_load_bottom_done
+        jsr room_parse_bottom_text
+room_load_bottom_done
+        rts
+
+room_parse_bottom_text
+        lda rx_buffer
+        cmp #'B'
+        bne room_parse_bottom_done
+        lda rx_buffer+1
+        cmp #'T'
+        bne room_parse_bottom_done
+        lda rx_buffer+2
+        cmp #'M'
+        bne room_parse_bottom_done
+        lda rx_buffer+3
+        cmp #':'
+        bne room_parse_bottom_done
+
+        ldy #4
+        lda rx_buffer,y
+        beq room_parse_bottom_done
+        cmp #ATASCII_RET
+        beq room_parse_bottom_done
+        lda #1
+        sta room_bottom_text_active
+        lda #BOTTOM_TEXT_ROW
+        sta zp_tmp1
+
+room_parse_bottom_line
+        sty zp_tmp2
+room_parse_bottom_scan
+        lda rx_buffer,y
+        beq room_parse_bottom_terminate
+        cmp #ATASCII_RET
+        beq room_parse_bottom_terminate
+        cmp #'|'
+        beq room_parse_bottom_terminate
+        iny
+        bne room_parse_bottom_scan
+
+room_parse_bottom_terminate
+        sta zp_tmp3
+        lda #0
+        sta rx_buffer,y
+        lda zp_tmp1
+        ldx #0
+        jsr vbxe_setpos
+        lda #ATTR_NORMAL
+        jsr vbxe_setattr
+        lda #<rx_buffer
+        clc
+        adc zp_tmp2
+        ldx #>rx_buffer
+        bcc room_parse_bottom_print
+        inx
+room_parse_bottom_print
+        jsr vbxe_print
+        lda zp_tmp3
+        cmp #'|'
+        bne room_parse_bottom_done
+        iny
+        lda zp_tmp1
+        clc
+        adc #1
+        cmp #(STATUS_ROW+1)
+        bcs room_parse_bottom_done
+        sta zp_tmp1
+        jmp room_parse_bottom_line
+
+room_parse_bottom_done
+        rts
+
 room_load_hover_metadata
         jsr room_clear_hover_metadata
         jsr room_clear_hover_label
@@ -217,6 +310,13 @@ room_show_hover_label
         jmp vbxe_print
 
 room_update_hover_label
+        lda room_bottom_text_active
+        beq room_hover_check_active
+        lda #$FF
+        sta room_hover_match
+        rts
+
+room_hover_check_active
         lda room_hover_count
         bne room_hover_scan_start
         lda room_hover_match

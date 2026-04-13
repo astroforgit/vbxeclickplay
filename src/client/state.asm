@@ -97,6 +97,22 @@ room_sel_cache_ptrs_hi .ds ROOM_SELECTION_CACHE_SLOTS
 room_sel_cache_tokens .ds ROOM_SELECTION_CACHE_SLOTS*(ROOM_NAME_MAX+1)
 room_hover_count   dta b(0)
 room_hover_match   dta b($FF)
+room_bottom_text_active dta b(0)
+demo_popup_lines
+        dta c'hello world',0
+        .ds DEMO_POPUP_LINE_STRIDE-(12)
+        .ds DEMO_POPUP_LINE_STRIDE*(DEMO_POPUP_LINES_MAX-1)
+room_hover_x       .ds ROOM_HOVER_MAX_SELECTIONS
+room_hover_y       .ds ROOM_HOVER_MAX_SELECTIONS
+room_hover_w       .ds ROOM_HOVER_MAX_SELECTIONS
+room_hover_h       .ds ROOM_HOVER_MAX_SELECTIONS
+room_hover_names   .ds ROOM_HOVER_MAX_SELECTIONS*(ROOM_HOVER_NAME_MAX+1)
+demo_popup_line_lengths .ds DEMO_POPUP_LINES_MAX
+current_room_name  .ds ROOM_NAME_MAX+1
+room_patch_source_room .ds ROOM_NAME_MAX+1
+demo_row_ptr_lo   .ds DEMO_HEIGHT
+demo_row_ptr_hi   .ds DEMO_HEIGHT
+demo_row_bank     .ds DEMO_HEIGHT
 url_buffer        .ds 256
 rx_buffer         .ds 256
 img_pal_buf       .ds 768

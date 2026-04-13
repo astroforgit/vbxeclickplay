@@ -34,6 +34,7 @@ image_ok
         sta SDMCTL
         jsr show_fullscreen
         jsr room_load_hover_metadata
+        jsr room_load_bottom_text
         lda demo_mode
         beq room_image_loop
         jmp demo_image_loop
@@ -104,6 +105,9 @@ room_click_send
 	        jsr fetch_text_payload
 	        bcs room_click_resume
 	        jsr room_process_click_response
+	        lda room_action_pending_reload
+	        bne room_click_resume
+	        jsr room_load_bottom_text
 	        jmp room_click_resume
 room_click_popup_consume
 	        jsr demo_restore_popup_under
@@ -116,6 +120,9 @@ room_click_send_fetch
         jsr fetch_text_payload
         bcs room_click_resume
         jsr room_process_click_response
+	        lda room_action_pending_reload
+	        bne room_click_resume
+	        jsr room_load_bottom_text
 room_click_resume
         lda room_action_pending_reload
         bne room_click_done_reload
