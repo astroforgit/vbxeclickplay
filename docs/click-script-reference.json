@@ -21,6 +21,8 @@
     { "name": "changeRoom(roomName)", "returns": "changeRoom action", "description": "Reload the Atari client into another room by name." },
     { "name": "displayText(text)", "returns": "displayText action", "description": "Show popup text near the click/cursor." },
     { "name": "displayText({ text | message | lines, clickable, selectable, choices })", "returns": "displayText action", "description": "Advanced popup form. Set clickable/selectable true for popup click handling, or pass choices directly." },
+    { "name": "displayBottomText(text)", "returns": "displayBottomText action", "description": "Show transient text in the 4-line bottom panel. Long text is wrapped and paged automatically by the server." },
+    { "name": "displayBottomText({ text | message | lines })", "returns": "displayBottomText action", "description": "Advanced bottom-panel form. The server stores wrapped pages, the existing client bottom-text reload path shows one page at a time, each room click advances one page, and the click after the last page clears it." },
     { "name": "choice(id, text, options)", "returns": "popup choice object", "description": "Build one clickable choice line for use with displayChoices(). Options may include value or meta." },
     { "name": "displayChoices(choices, options)", "returns": "displayText action", "description": "Show up to 6 popup lines total. Each choice becomes a clickable line, and `options.text` is shown above the choices when there is room." },
     { "name": "replaceGraphics(selectionName)", "returns": "replaceGraphics action", "description": "Use a saved image selection by name from the current room when the name is unique." },
@@ -33,7 +35,7 @@
   "returnValues": [
     { "name": "null or undefined", "description": "Do nothing and leave the current room unchanged." },
     { "name": "'some text'", "description": "Shortcut for displayText('some text')." },
-    { "name": "action object", "description": "A helper result from changeRoom, displayText, replaceGraphics, or originalGraphics." },
+    { "name": "action object", "description": "A helper result from changeRoom, displayText, displayBottomText, replaceGraphics, or originalGraphics." },
     { "name": "array", "description": "If you return an array, the first truthy item is used." }
   ],
   "structures": [
@@ -44,6 +46,9 @@
     { "name": "Popup lines", "description": "Maximum 6 visible lines." },
     { "name": "Popup line width", "description": "Each line is sanitized and clipped to 37 characters." },
     { "name": "Popup choices", "description": "Maximum 6 clickable choices." },
+    { "name": "Bottom text page", "description": "4 visible lines, 59 characters per line, so 236 visible characters max per page after wrapping." },
+    { "name": "displayBottomText total", "description": "Up to 32 pages (128 wrapped lines, about 7552 visible characters). Extra text is truncated." },
+    { "name": "Bottom text paging behavior", "description": "The server stores wrapped pages, the existing client bottom-text reload path shows one page at a time, each room click advances one page, and the click after the last page clears it." },
     { "name": "State persistence", "description": "Only plain JSON-safe object data should be stored in state/gameState/scriptState." },
     { "name": "Script runtime", "description": "The sandbox is short-lived and timed; keep scripts fast and side-effect free beyond state updates." }
   ],
@@ -74,6 +79,10 @@
     {
       "title": "Move to another room",
       "code": "if (roomName === 'first' && x < 20 && y < 20) {\n  return changeRoom('room2');\n}\nreturn null;"
+    },
+    {
+      "title": "Paginated bottom text",
+      "code": "if (!state.readDiary) {\n  state.readDiary = true;\n  return displayBottomText('This can be much longer than one bottom screen. It wraps to 59 columns, shows 4 lines at a time, advances one page per click, and clears after the final page.');\n}\nreturn null;"
     },
     {
       "title": "Draw and later restore an image selection",

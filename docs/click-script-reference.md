@@ -49,6 +49,12 @@ Selections expose:
 - `displayText({ text | message | lines, clickable, selectable, choices })`
   - Advanced popup form.
 
+- `displayBottomText(text)`
+  - Show transient narrative text in the 4-line bottom panel. Long text is wrapped and paged automatically by the server.
+
+- `displayBottomText({ text | message | lines })`
+  - Advanced bottom-panel form. The server stores the wrapped pages, and the existing client bottom-text reload path shows one page at a time.
+
 - `choice(id, text, options)`
   - Build one clickable popup choice for `displayChoices()`.
 
@@ -91,6 +97,11 @@ These still work:
 - Popup maximum: **6** lines
 - Popup line width: **37** characters after sanitizing/wrapping
 - Popup choices maximum: **6** clickable lines
+- Bottom text page height: **4** lines
+- Bottom text line width: **59** characters after sanitizing/wrapping
+- Bottom text page size: **236** visible characters max per page (`4 * 59`)
+- `displayBottomText(...)` total size: **32 pages** max (up to **128** wrapped lines, about **7552** visible characters). Extra text is truncated.
+- Active `displayBottomText(...)` pages advance on each room click and clear on the click after the last page.
 - Persist only plain JSON-safe data in `state`
 - Keep scripts fast; the sandbox is timed
 
@@ -157,6 +168,14 @@ These still work:
 
     if (roomName === 'first' && x < 20 && y < 20) {
       return changeRoom('room2');
+    }
+    return null;
+
+### Paginated bottom text
+
+    if (!state.readDiary) {
+      state.readDiary = true;
+      return displayBottomText('This can be much longer than one bottom screen. It wraps to 59 columns, shows 4 lines at a time, advances one page per click, and clears after the final page.');
     }
     return null;
 

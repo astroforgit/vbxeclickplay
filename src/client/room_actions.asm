@@ -93,7 +93,9 @@ room_parse_bottom_scan
         bne room_parse_bottom_scan
 
 room_parse_bottom_terminate
-        sta zp_tmp3
+        pha
+        tya
+        pha
         lda #0
         sta rx_buffer,y
         lda zp_tmp1
@@ -109,7 +111,9 @@ room_parse_bottom_terminate
         inx
 room_parse_bottom_print
         jsr vbxe_print
-        lda zp_tmp3
+        pla
+        tay
+        pla
         cmp #'|'
         bne room_parse_bottom_done
         iny

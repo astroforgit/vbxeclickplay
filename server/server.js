@@ -13,6 +13,7 @@ const POPUP_LINE_MAX = 37;
 const POPUP_MAX_LINES = 6;
 const BOTTOM_TEXT_LINE_MAX = 59;
 const BOTTOM_TEXT_MAX_LINES = 4;
+const BOTTOM_TEXT_PAGE_MAX = 32;
 const ROOT_DIR = path.resolve(__dirname, '..');
 const DATA_DIR = path.join(ROOT_DIR, 'data');
 const ROOMS_DIR = path.join(DATA_DIR, 'rooms');
@@ -28,7 +29,7 @@ const CLICK_SCRIPT_REFERENCE_MD_FILE = path.join(ROOT_DIR, 'docs', 'click-script
 const CLICK_SCRIPT_REFERENCE_JSON_FILE = path.join(ROOT_DIR, 'docs', 'click-script-reference.json');
 const DEFAULT_CLICK_SCRIPT = `// Available values: roomName, requestedRoomName, logicalX, x, y,
 // roomSelections, selections, rooms, state, gameState, scriptState
-// Available helpers: changeRoom(name), displayText(text), replaceGraphics(payload), originalGraphics(payload)
+// Available helpers: changeRoom(name), displayText(text), displayBottomText(text), replaceGraphics(payload), originalGraphics(payload)
 // Examples:
 //   replaceGraphics('closeeyes')
 //   replaceGraphics({ selection: 'closeeyes', x: 120, y: 40 })
@@ -292,6 +293,53 @@ function normalizeBottomTextLines(value) {
   return normalized;
 }
 
+function paginateBottomTextLines(value, maxPagesInput = BOTTOM_TEXT_PAGE_MAX) {
+  const rawLines = Array.isArray(value)
+    ? value.map((line) => String(line ?? ''))
+    : String(value || '').replace(/\r/g, '').split('\n');
+  const maxPages = Math.max(1, clampInteger(maxPagesInput, BOTTOM_TEXT_PAGE_MAX));
+  const maxWrappedLines = BOTTOM_TEXT_MAX_LINES * maxPages;
+  const wrappedLines = [];
+
+  for (const rawLine of rawLines) {
+    if (wrappedLines.length >= maxWrappedLines) break;
+    let remaining = sanitizeBottomTextFragment(rawLine);
+    if (!remaining) {
+      wrappedLines.push('');
+      continue;
+    }
+    while (remaining && wrappedLines.length < maxWrappedLines) {
+      if (remaining.length <= BOTTOM_TEXT_LINE_MAX) {
+        wrappedLines.push(remaining);
+        remaining = '';
+        continue;
+      }
+      const candidate = remaining.slice(0, BOTTOM_TEXT_LINE_MAX + 1);
+      let breakAt = candidate.lastIndexOf(' ');
+      if (breakAt <= 0) {
+        breakAt = BOTTOM_TEXT_LINE_MAX;
+      }
+      wrappedLines.push(remaining.slice(0, breakAt).trimEnd().slice(0, BOTTOM_TEXT_LINE_MAX));
+      remaining = remaining.slice(breakAt).trimStart();
+    }
+  }
+
+  const sanitizedLines = wrappedLines
+    .slice(0, maxWrappedLines)
+    .map((line) => sanitizeBottomTextFragment(line).slice(0, BOTTOM_TEXT_LINE_MAX));
+  const pages = [];
+  for (let index = 0; index < sanitizedLines.length; index += BOTTOM_TEXT_MAX_LINES) {
+    const page = sanitizedLines.slice(index, index + BOTTOM_TEXT_MAX_LINES);
+    while (page.length > 0 && page[page.length - 1] === '') {
+      page.pop();
+    }
+    if (page.length > 0) {
+      pages.push(page);
+    }
+  }
+  return pages;
+}
+
 function slugifyChoiceId(value, fallback = 'choice') {
   const safe = String(value || '')
     .trim()
@@ -383,6 +431,24 @@ function normalizeDisplayTextAction(candidate) {
 
   const lines = normalizePopupLines(text);
   return lines.length ? { type: 'displayText', lines, clickable } : null;
+}
+
+function normalizeDisplayBottomTextAction(candidate) {
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+
+  let text = '';
+  if (Array.isArray(candidate.lines)) {
+    text = candidate.lines.join('\n');
+  } else if (candidate.text !== undefined) {
+    text = String(candidate.text || '');
+  } else if (candidate.message !== undefined) {
+    text = String(candidate.message || '');
+  }
+
+  const pages = paginateBottomTextLines(text, BOTTOM_TEXT_PAGE_MAX);
+  return pages.length ? { type: 'displayBottomText', lines: pages[0].slice(0, BOTTOM_TEXT_MAX_LINES), pages } : null;
 }
 
 function isPngBuffer(buffer) {
@@ -511,6 +577,7 @@ function buildDemoImagePayload() {
 const demoImagePayload = buildDemoImagePayload();
 const roomClickState = new Map();
 const roomPopupState = new Map();
+const roomTransientBottomTextState = new Map();
 const ATARI_VISIBLE_MAX_CLICK_Y = 183;
 
 function validateVbxePayload(buffer, options = {}) {
@@ -682,9 +749,13 @@ function getRoomBottomTextPayload(roomName) {
 }
 
 function buildRoomBottomTextAtariPayload(roomName) {
-  const payload = getRoomBottomTextPayload(roomName);
-  if (!payload) return null;
-  return `BTM:${payload.lines.join('|')}\n`;
+  const room = getRoom(roomName);
+  if (!room) return null;
+  const transient = roomTransientBottomTextState.get(room.name);
+  const lines = transient && Array.isArray(transient.pages?.[transient.pageIndex])
+    ? transient.pages[transient.pageIndex].slice(0, BOTTOM_TEXT_MAX_LINES)
+    : normalizeBottomTextLines(room.bottomTextLines || []);
+  return `BTM:${lines.join('|')}\n`;
 }
 
 function buildSelectionsForScript(store) {
@@ -796,6 +867,36 @@ function updateRoomPopupState(roomName, action) {
   roomPopupState.delete(roomName);
 }
 
+function updateRoomTransientBottomTextState(roomName, action) {
+  if (!roomName) return;
+  if (action && action.type === 'displayBottomText' && Array.isArray(action.pages) && action.pages.length > 0) {
+    roomTransientBottomTextState.set(roomName, {
+      pages: action.pages.slice(0, BOTTOM_TEXT_PAGE_MAX).map((page) => page.slice(0, BOTTOM_TEXT_MAX_LINES)),
+      pageIndex: 0,
+      updatedAt: new Date().toISOString()
+    });
+    return;
+  }
+  roomTransientBottomTextState.delete(roomName);
+}
+
+function advanceRoomTransientBottomTextAction(roomName) {
+  const state = roomTransientBottomTextState.get(roomName);
+  if (!state || !Array.isArray(state.pages) || state.pages.length === 0) {
+    return null;
+  }
+
+  const nextPageIndex = state.pageIndex + 1;
+  if (nextPageIndex < state.pages.length) {
+    state.pageIndex = nextPageIndex;
+    state.updatedAt = new Date().toISOString();
+    return { advanced: true, cleared: false, pageIndex: nextPageIndex };
+  }
+
+  roomTransientBottomTextState.delete(roomName);
+  return { advanced: false, cleared: true, pageIndex: -1 };
+}
+
 function resetGameAndBuildReloadAction(preferredRoomName = 'first') {
   let reloadRoomName = sanitizeRoomName(preferredRoomName) || 'first';
   try {
@@ -816,6 +917,7 @@ function resetGameAndBuildReloadAction(preferredRoomName = 'first') {
   }
 
   roomPopupState.clear();
+  roomTransientBottomTextState.clear();
   roomClickState.clear();
   return { type: 'changeRoom', room: reloadRoomName };
 }
@@ -1133,6 +1235,8 @@ function normalizeClickActionResult(result, currentRoomName) {
     }
     case 'displayText':
       return normalizeDisplayTextAction(candidate);
+    case 'displayBottomText':
+      return normalizeDisplayBottomTextAction(candidate);
     case 'replaceGraphics':
       return resolveReplaceGraphicsAction(candidate.payload, currentRoomName);
     case 'originalGraphics':
@@ -1149,6 +1253,8 @@ function encodeClickActionText(action) {
       return `ROOM:${action.room}\n`;
     case 'displayText':
       return `POP:${action.clickable === true ? '1' : '0'}|${(action.lines || []).join('|')}\n`;
+    case 'displayBottomText':
+      return 'OK\n';
     case 'replaceGraphics':
       return `GFX:${action.sourceKey},${formatHexByte(action.x >> 8)},${formatHexByte(action.x)},${formatHexByte(action.y)},${formatHexByte(action.width)},${formatHexByte(action.height)}\n`;
     case 'originalGraphics':
@@ -1206,6 +1312,12 @@ function executeClickScript(requestedRoomName, room, logicalX, y, extraContext =
         return { type: 'displayText', ...textOrOptions };
       }
       return { type: 'displayText', text: textOrOptions, ...maybeOptions };
+    },
+    displayBottomText: (textOrOptions, maybeOptions = {}) => {
+      if (textOrOptions && typeof textOrOptions === 'object' && !Array.isArray(textOrOptions)) {
+        return { type: 'displayBottomText', ...textOrOptions };
+      }
+      return { type: 'displayBottomText', text: textOrOptions, ...maybeOptions };
     },
     choice: (id, text, options = {}) => ({ id, text, ...options }),
     displayChoices: (choices = [], options = {}) => {
@@ -2055,6 +2167,17 @@ const server = http.createServer(async (req, res) => {
       const clickRoomName = (resolvedRoom && resolvedRoom.name) || sanitizeRoomName(requestedRoom);
       const hitSelection = findTopmostSelectionAt(resolvedRoom || { selections: [] }, logicalX * 2, y);
 
+      const transientBottomState = roomTransientBottomTextState.get(clickRoomName);
+      if (transientBottomState) {
+        const transientAdvance = advanceRoomTransientBottomTextAction(clickRoomName);
+        sendText(res, 200, 'OK\n');
+        console.log(
+          `[EVENT] click ${clickRoomName} logical=(${logicalX},${rawY}) calibratedY=${y} pixel=(${logicalX * 2},${y})` +
+          ` action=${transientAdvance?.cleared ? 'clearBottomText' : 'displayBottomTextPage'}`
+        );
+        return;
+      }
+
       if (hitSelection && String(hitSelection.name || '').toLowerCase() === 'resetgame') {
         const clickAction = resetGameAndBuildReloadAction('first');
         sendText(res, 200, encodeClickActionText(clickAction));
@@ -2075,6 +2198,7 @@ const server = http.createServer(async (req, res) => {
         updatedAt: new Date().toISOString()
       });
       updateRoomPopupState(clickRoomName, clickAction);
+      updateRoomTransientBottomTextState(clickRoomName, clickAction);
 
       sendText(res, 200, encodeClickActionText(clickAction));
       console.log(
@@ -2112,6 +2236,7 @@ const server = http.createServer(async (req, res) => {
         { clickType: 'popup', popupClick }
       );
       updateRoomPopupState(clickRoomName, clickAction);
+      updateRoomTransientBottomTextState(clickRoomName, clickAction);
       sendText(res, 200, encodeClickActionText(clickAction));
       console.log(
         `[EVENT] popupclick ${clickRoomName} line=${popupClick.lineNumber} column=${popupClick.columnNumber}` +

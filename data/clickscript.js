@@ -1,335 +1,407 @@
-// New Dialog-Based Game System
-// Native server choice dialog system - fully compatible
-
 const hit = roomSelections.find((selection) => {
     return x >= selection.x && x < selection.x + selection.width && y >= selection.y && y < selection.y + selection.height;
 });
 
-state.stage = typeof state.stage === 'string' ? state.stage : 'start';
+const LEGACY_STAGE_MAP = {
+    start: 'intro',
+    need_flower: 'await_flower',
+    flower_shown: 'flower_shown',
+    need_wine: 'await_wine',
+    wine_shown: 'wine_shown',
+    wine_hidden: 'wine_shown',
+    need_smile: 'await_smile',
+    smile_shown: 'smile_shown',
+    need_seducesmile: 'await_seduce',
+    seducesmile_shown: 'seduce_shown',
+    need_closeeyes: 'await_eyes',
+    eyes_closed: 'eyes_closed',
+    need_leech: 'need_leech',
+    done: 'ritual_done'
+};
+
+const STAGES = [
+    'intro', 'await_flower', 'flower_shown', 'await_wine', 'wine_shown',
+    'await_smile', 'smile_shown', 'await_seduce', 'seduce_shown',
+    'await_eyes', 'eyes_closed', 'need_leech', 'ritual_done'
+];
+
+state.stage = LEGACY_STAGE_MAP[state.stage] || state.stage || 'intro';
+if (STAGES.indexOf(state.stage) < 0) state.stage = 'intro';
+state.affection = typeof state.affection === 'number' ? state.affection : 0;
+state.flirtCount = typeof state.flirtCount === 'number' ? state.flirtCount : 0;
 state.leechShown = state.leechShown === true;
-state.affection = state.affection || 0;
-state.flirtCount = state.flirtCount || 0;
+state.epilogue = typeof state.epilogue === 'string' ? state.epilogue : '';
 
-// Handle dialog choice selections first
-if (clickedChoice) {
-    switch(clickedChoice) {
-        // Start stage choices
-        case 'talk_normal':
-            return say('She murmurs: bring me a flower.', 'need_flower');
-        case 'flirt_1':
-            state.affection += 5;
-            state.flirtCount += 1;
-            return say('A very faint smile touches her lips. Bring me a flower.', 'need_flower');
-        case 'give_flower_early':
-            return say('Talk to her first.');
-        case 'stare':
-            return say('She blinks slowly, but says nothing.');
-
-        // Need flower choices
-        case 'give_flower':
-            return showPatch('flower', 'flower_shown');
-        case 'flirt_2':
-            state.affection += 10;
-            state.flirtCount += 1;
-            return say('Her cheeks color slightly. The flower. Please.');
-        case 'ask_flower':
-            return say('Any flower. As long as it is from you.');
-        case 'offer_wine_early':
-            return say('She shakes her head. First the flower.');
-
-        // Flower shown choices
-        case 'give_wine':
-            return showPatch('wine', 'wine_shown');
-        case 'flirt_3':
-            state.affection += 10;
-            state.flirtCount += 1;
-            return say('Just the wine. For now.');
-        case 'flirt_4':
-            state.affection += 15;
-            state.flirtCount += 1;
-            return say('Her fingers brush yours for a moment before she takes the flower. Wine. Now.', 'flower_shown');
-        case 'normal_response':
-            return showPatch('wine', 'wine_shown');
-
-        // Need wine choices
-        case 'give_wine_2':
-            return showPatch('wine', 'wine_shown');
-        case 'flirt_5':
-            state.affection += 10;
-            state.flirtCount += 1;
-            return say('Always. There is humor in her eyes.');
-        case 'toast':
-            return say('She nods once, waiting for you to hand her the glass.');
-        case 'drink_first':
-            return say('Dont be rude.');
-
-        // Wine shown choices
-        case 'make_smile':
-            return showPatch('smile', 'smile_shown');
-        case 'flirt_6':
-            state.affection += 15;
-            state.flirtCount += 1;
-            return say('She laughs softly. Make me smile first, then we ll see about dreams.');
-        case 'tell_joke':
-            return say('She raises an eyebrow, unamused. Smile.');
-        case 'smile_back':
-            state.affection += 5;
-            return say('Cute. Now make me smile.');
-
-        // Need smile choices
-        case 'make_smile_2':
-            return showPatch('smile', 'smile_shown');
-        case 'flirt_7':
-            state.affection += 20;
-            state.flirtCount += 1;
-            return say('You already do. Just by being here. Now give me the smile.');
-        case 'lean_close':
-            state.affection += 10;
-            return say('She doesnt pull away. Smile.');
-        case 'whisper':
-            state.affection += 15;
-            return say('She shivers slightly. ...That works too. Now the smile.', 'smile_shown');
-
-        // Smile shown choices
-        case 'seduce_smile':
-            return showPatch('seducesmile', 'seducesmile_shown');
-        case 'flirt_8':
-            state.affection += 15;
-            state.flirtCount += 1;
-            return say('For both of us. Now give it to me.');
-        case 'flirt_9':
-            state.affection += 20;
-            state.flirtCount += 1;
-            return say('She smirks. You have no idea. The dangerous smile please.');
-        case 'wicked_grin':
-            state.affection += 10;
-            return showPatch('seducesmile', 'seducesmile_shown');
-
-        // Need seduce smile choices
-        case 'seduce_smile_2':
-            return showPatch('seducesmile', 'seducesmile_shown');
-        case 'flirt_10':
-            state.affection += 25;
-            state.flirtCount += 1;
-            return say('Is it working?');
-        case 'flirt_11':
-            state.affection += 20;
-            state.flirtCount += 1;
-            return say('She smiles for you first, dangerously beautiful. Then you give hers back.', 'seducesmile_shown');
-        case 'hold_gaze':
-            state.affection += 15;
-            return showPatch('seducesmile', 'seducesmile_shown');
-
-        // Seduce smile shown choices
-        case 'close_eyes':
-            return showPatch('closeeyes', 'eyes_closed');
-        case 'flirt_12':
-            state.affection += 25;
-            state.flirtCount += 1;
-            return say('They wont be closed forever. Close them now.');
-        case 'flirt_13':
-            state.affection += 30;
-            state.flirtCount += 1;
-            return say('Her breath catches. ...Thank you. Now close them.');
-        case 'brush_eyelids':
-            state.affection += 20;
-            return showPatch('closeeyes', 'eyes_closed');
-
-        // Need close eyes choices
-        case 'close_eyes_2':
-            return showPatch('closeeyes', 'eyes_closed');
-        case 'flirt_14':
-            state.affection += 35;
-            state.flirtCount += 1;
-            return say('She kisses you softly, quickly. Now close my eyes.');
-        case 'pause_close':
-            state.affection += 20;
-            return showPatch('closeeyes', 'eyes_closed');
-
-        // Eyes closed choices
-        case 'use_leech':
-            return revealLeech(true);
-        case 'flirt_15':
-            state.affection += 30;
-            state.flirtCount += 1;
-            return say('You won\'t. Trust me.');
-        case 'ask_what':
-            return say('Something wonderful. Now do it.');
-        case 'kiss_forehead':
-            state.affection += 40;
-            state.flirtCount += 1;
-            return say('She leans into your touch. Now.');
-
-        // Need leech choices
-        case 'use_leech_2':
-            return revealLeech(true);
-        case 'flirt_16':
-            state.affection += 40;
-            state.flirtCount += 1;
-            return say('It doesn\'t have to. Now please.');
-        case 'hold_hand':
-            state.affection += 30;
-            return say('She squeezes your hand. Do it.');
-        case 'tell_care':
-            state.affection += 50;
-            state.flirtCount += 1;
-            return say('I know. That\'s why this will work.');
-
-        // Done stage choices
-        case 'stay':
-            return say('You sit with her in silence. The ritual is complete.');
-        case 'kiss_cheek':
-            return say('You kiss her cheek softly. She doesn\'t wake.');
-        case 'leave':
-            return say('You leave quietly. The ritual is done.');
-        case 'restart':
-            state.stage = 'start';
-            state.affection = 0;
-            state.flirtCount = 0;
-            state.leechShown = false;
-            return say('You start over. She looks at you quietly.');
-
-        default:
-            return say('Nothing happens.');
-    }
+function menu(prompt, entries) {
+    return displayChoices(entries.map(([id, text]) => choice(id, text)), { text: prompt });
 }
 
-// Helper functions
-function say(text, nextStage = state.stage) {
-    state.stage = nextStage;
+function popup(text) {
     return displayText(text);
 }
 
-function showPatch(name, nextStage) {
+function story(text, nextStage = state.stage, options = {}) {
     state.stage = nextStage;
+    if (options.affection) state.affection += options.affection;
+    if (options.flirt) state.flirtCount += options.flirt;
+    if (options.epilogue) state.epilogue = options.epilogue;
+    return displayBottomText(text);
+}
+
+function reveal(name, nextStage) {
+    state.stage = nextStage;
+    if (name === 'leech') state.leechShown = true;
     return replaceGraphics(name);
 }
 
-function hidePatch(name, nextStage) {
-    state.stage = nextStage;
-    return originalGraphics(name);
+function restartStory() {
+    state.stage = 'intro';
+    state.affection = 0;
+    state.flirtCount = 0;
+    state.leechShown = false;
+    state.epilogue = '';
+    return changeRoom('first');
 }
 
-function revealLeech(advanceStage = false) {
-    state.leechShown = true;
-    if (advanceStage) {
-        return showPatch('leech', 'done');
+function stageAtLeast(name) {
+    return STAGES.indexOf(state.stage) >= STAGES.indexOf(name);
+}
+
+function endingText(kind) {
+    const tender = state.affection >= 7 || state.flirtCount >= 4;
+    if (kind === 'stay') {
+        return tender
+            ? 'You stay beside her until the candles gutter out. Just before dawn, her fingers close weakly around yours and her breathing steadies into something human again. The ritual takes its price, but it leaves her with enough warmth to remember your name.'
+            : 'You stay until the wax hardens and the room forgets how to breathe. She never truly wakes, yet the terrible pressure in the walls lifts, as if some old hunger has been fed at last. When morning comes, you know the ritual changed both of you.';
     }
-    return replaceGraphics('leech');
+    if (kind === 'kiss') {
+        return tender
+            ? 'You kiss her cheek and feel the faintest answer in the corner of her mouth. For one suspended second the dangerous woman is gone, replaced by someone tired, grateful, and still alive enough to lean toward you even in sleep.'
+            : 'Your kiss lands on skin cold as porcelain. The silver bowl cracks with a tiny sound somewhere behind you, and the silence that follows feels less like peace than a vow you have just been forced to keep.';
+    }
+    return tender
+        ? 'You leave only after pulling the shawl higher across her shoulders. Outside, dawn looks softer than it did before you entered. Whatever happened in that room was not mercy exactly, but it was not empty either.'
+        : 'You leave before dawn can touch the windows. The corridor behind you stays dark, and for days afterward you can still taste iron and wine when you wake. Some doors close quietly. That does not mean they are harmless.';
 }
 
-// Open dialog when clicking talk area
-if (hit && hit.name === 'talk') {
-    switch (state.stage) {
-        case 'start':
-            return displayChoices([
-                choice('talk_normal', 'Talk to her politely'),
-                choice('flirt_1', 'Smile and flirt with her'),
-                choice('give_flower_early', 'Give her the flower now'),
-                choice('stare', 'Just stare silently')
-            ], { text: 'She looks at you quietly, waiting. What do you do?' });
-
-        case 'need_flower':
-            return displayChoices([
-                choice('give_flower', 'Give her the flower'),
-                choice('flirt_2', 'You\'re very beautiful when you ask nicely'),
-                choice('ask_flower', 'What kind of flower do you like?'),
-                choice('offer_wine_early', 'Hold out the wine instead')
-            ], { text: 'Bring me a flower. she murmurs softly.' });
-
-        case 'flower_shown':
-            return displayChoices([
-                choice('give_wine', 'Give her the wine'),
-                choice('flirt_3', 'Anything else I can get you?'),
-                choice('flirt_4', 'Touch her hand as you pass it'),
-                choice('normal_response', 'You\'re welcome.')
-            ], { text: 'She takes the flower gently. Good. Now bring me wine.' });
-
-        case 'need_wine':
-            return displayChoices([
-                choice('give_wine_2', 'Hand her the wine'),
-                choice('flirt_5', 'Do you always get what you want?'),
-                choice('toast', 'Toast her silently'),
-                choice('drink_first', 'Drink some yourself first')
-            ], { text: 'She waits expectantly for the wine glass.' });
-
-        case 'wine_shown':
-        case 'wine_hidden':
-        case 'need_smile':
-            return displayChoices([
-                choice('make_smile', 'Make her smile gently'),
-                choice('flirt_6', 'I\'ve already seen you smile in my dreams'),
-                choice('tell_joke', 'Tell her a joke'),
-                choice('smile_back', 'Smile back at her')
-            ], { text: 'She takes the glass. Make me smile.' });
-
-        case 'smile_shown':
-            return displayChoices([
-                choice('seduce_smile', 'Give her the seductive smile'),
-                choice('flirt_8', 'Dangerous? For who?'),
-                choice('flirt_9', 'You already look dangerous enough'),
-                choice('wicked_grin', 'Show her your most wicked grin')
-            ], { text: 'Better. Now give me a darker smile. The dangerous one.' });
-
-        case 'need_seducesmile':
-            return displayChoices([
-                choice('seduce_smile_2', 'Give her the seductive smile'),
-                choice('flirt_10', 'Are you trying to seduce me?'),
-                choice('flirt_11', 'Only if you smile back first'),
-                choice('hold_gaze', 'Hold her gaze')
-            ], { text: 'She leans forward slightly. That dangerous smile. You know the one.' });
-
-        case 'seducesmile_shown':
-            return displayChoices([
-                choice('close_eyes', 'Gently close her eyes'),
-                choice('flirt_12', 'I\'d rather keep looking at them'),
-                choice('flirt_13', 'They\'re beautiful closed or open'),
-                choice('brush_eyelids', 'Brush your fingers against her eyelids')
-            ], { text: 'She matches your smile perfectly. Perfect. Now close my eyes.' });
-
-        case 'need_closeeyes':
-            return displayChoices([
-                choice('close_eyes_2', 'Close her eyes softly'),
-                choice('flirt_14', 'Not until you kiss me first'),
-                choice('pause_close', 'Pause, very close to her'),
-                choice('close_eyes_2', 'Do as she asks')
-            ], { text: 'She leans closer. You can feel her breath. Close my eyes.' });
-
-        case 'eyes_closed':
-            return displayChoices([
-                choice('use_leech', 'Use the leech brain'),
-                choice('flirt_15', 'I don\'t want to hurt you'),
-                choice('ask_what', 'What will happen to you?'),
-                choice('kiss_forehead', 'Kiss her forehead softly')
-            ], { text: 'Her breathing slows. Now. Use the leech brain on me.' });
-
-        case 'need_leech':
-            return displayChoices([
-                choice('use_leech_2', 'Complete the ritual'),
-                choice('flirt_16', 'I don\'t want this to end'),
-                choice('hold_hand', 'Hold her hand'),
-                choice('tell_care', 'Tell her you care')
-            ], { text: 'Do it. Her voice is barely a whisper.' });
-
-        case 'done':
-            return displayChoices([
-                choice('stay', 'Stay with her'),
-                choice('kiss_cheek', 'Kiss her cheek'),
-                choice('leave', 'Leave quietly'),
-                choice('restart', 'Start over')
-            ], { text: 'The ritual is complete. She lies still, at peace.' });
-
+function inspectSelection(name) {
+    switch (name) {
+        case 'flower':
+            if (state.stage === 'await_flower') return reveal('flower', 'flower_shown');
+            return stageAtLeast('flower_shown')
+                ? popup('The flower is already in her hand.')
+                : popup('A pale flower waits in a chipped vase.');
+        case 'wine':
+            if (state.stage === 'await_wine') return reveal('wine', 'wine_shown');
+            return stageAtLeast('wine_shown')
+                ? popup('The dark wine already glows in the glass.')
+                : popup('Dark wine rests in a thin crystal glass.');
+        case 'smile':
+            if (state.stage === 'await_smile') return reveal('smile', 'smile_shown');
+            return stageAtLeast('smile_shown')
+                ? popup('Her gentler smile is already there.')
+                : popup('A softer smile waits beneath her calm face.');
+        case 'seducesmile':
+            if (state.stage === 'await_seduce') return reveal('seducesmile', 'seduce_shown');
+            return stageAtLeast('seduce_shown')
+                ? popup('That dangerous smile already owns the room.')
+                : popup('That smile looks like a promise and a threat.');
+        case 'closeeyes':
+            if (state.stage === 'await_eyes') return reveal('closeeyes', 'eyes_closed');
+            return stageAtLeast('eyes_closed')
+                ? popup('Her lashes rest against her cheeks now.')
+                : popup('Not yet. She still wants to watch you.');
+        case 'leech':
+            if (state.stage === 'need_leech') return reveal('leech', 'ritual_done');
+            return state.leechShown
+                ? popup('The leech brain has already done its work.')
+                : popup('The preserved leech brain twitches faintly in its bowl.');
         default:
-            state.stage = 'start';
-            return displayChoices([
-                choice('restart', 'Begin again')
-            ], { text: 'She watches you in silence.' });
+            return popup('There is something here, but not for this moment.');
     }
 }
 
-// Other clicks tell user to talk
-if (hit && hit.name !== 'talk') {
-    return say('Click on her to open dialog first.');
+const choiceHandlers = {
+    intro_greet: () => story(
+        'You give her your name. She lets it hang in the air between you, then glances to the pale bloom on the table. Names are easy, she murmurs. Offer me the flower if you want the night to keep opening.',
+        'await_flower'
+    ),
+    intro_flirt: () => story(
+        'Bold already? The question should sting, but the corner of her mouth softens instead. Then prove you can be gentle too. Bring me the flower first, she says, and maybe I will answer beauty with beauty.',
+        'await_flower',
+        { affection: 2, flirt: 1 }
+    ),
+    intro_ritual: () => story(
+        'She studies you for so long that the room itself seems to lean closer. Old doors do not open to force, she says at last. They open to offerings. Start with the flower, and I will tell you what waits after it.',
+        'await_flower'
+    ),
+    intro_silent: () => popup('She waits for words, not silence.'),
+
+    flower_question: () => story(
+        'The flower carries memory better than blood, she says. Scent reaches places reason cannot. Tonight I need memory to come willingly, not screaming. Bring it to me.',
+        'await_flower'
+    ),
+    flower_flirt: () => story(
+        'You tell her the flower already belongs beside her mouth. This time the smile does not quite disappear. Careful, she whispers. Keep talking like that and I may start believing you.',
+        'await_flower',
+        { affection: 1, flirt: 1 }
+    ),
+    flower_obey: () => popup('Then place the flower in her hand.'),
+    flower_stall: () => popup('She tilts her head. The flower first.'),
+
+    after_flower_next: () => story(
+        'She lifts the flower beneath her nose and closes her eyes for a heartbeat. Better, she says. Now bring the wine. Blood remembers, but wine persuades. I need both memory and surrender before the last part begins.',
+        'await_wine'
+    ),
+    after_flower_hand: () => story(
+        'Your fingers linger against hers as she takes the bloom. She notices; of course she notices. Good, she murmurs, not pulling away. Keep that courage. Bring me the wine before it fades.',
+        'await_wine',
+        { affection: 2, flirt: 1 }
+    ),
+    after_flower_watch: () => story(
+        'You watch her breathe in the scent. The room seems to settle around that small gesture. She opens her eyes again and there is less distance in them now. Wine next, she says quietly. Dark, slow, and honest.',
+        'await_wine'
+    ),
+    after_flower_joke: () => story(
+        'You tell her that a flower should have earned you at least one smile. It earns you half of one. Half is all you get for free, she says. If you want the rest, bring the wine.',
+        'await_wine',
+        { affection: 1, flirt: 1 }
+    ),
+
+    wine_question: () => story(
+        'Wine loosens the shape of fear, she says. It lets the body agree to things the mind would spend all night refusing. Bring it here. I would rather not refuse what comes next.',
+        'await_wine'
+    ),
+    wine_toast: () => story(
+        'You promise her a private toast once the glass is in her hand. Her gaze warms by a single degree. Then make good on it, she says. Bring me the wine before the moment spoils.',
+        'await_wine',
+        { affection: 1 }
+    ),
+    wine_tease: () => story(
+        'You accuse her of liking the sound of giving orders. She almost laughs. Only when the orders are obeyed, she says. The glass is right there. Do not ruin your argument now.',
+        'await_wine',
+        { affection: 1, flirt: 1 }
+    ),
+    wine_offer: () => popup('Then hand her the wine.'),
+
+    after_wine_smile: () => story(
+        'She drinks slowly. When the glass lowers, her voice has gone velvet-soft. Now make me smile, she says. A real smile, not the careful one you wear for daylight. I want the one you only trust to darkness.',
+        'await_smile'
+    ),
+    after_wine_flirt: () => story(
+        'You tell her the wine envies her lips. This time she does laugh, low and brief and dangerous. Then earn another one, she says. Make me smile for real.',
+        'await_smile',
+        { affection: 2, flirt: 1 }
+    ),
+    after_wine_confess: () => story(
+        'You admit that you are already too deep in this to pretend otherwise. Good, she answers. Depth matters. So does trust. Start by making me smile, and we will see how far down you can follow me.',
+        'await_smile',
+        { affection: 1 }
+    ),
+    after_wine_listen: () => story(
+        'You say nothing and simply stay close enough to hear her breathe between sips. When she finally looks back at you, there is approval in it. Now the smile, she whispers. The gentle one first.',
+        'await_smile'
+    ),
+
+    smile_question: () => story(
+        'Not every smile means the same thing, she says. I want the one that chooses me, not the one that performs for the room. Show me that you understand the difference.',
+        'await_smile'
+    ),
+    smile_flirt: () => story(
+        'You tell her that the room has been waiting all evening to see her smile. A softness passes over her face that has nothing to do with the candles. Then draw it out of me, she says.',
+        'await_smile',
+        { affection: 1, flirt: 1 }
+    ),
+    smile_reach: () => popup('Then touch the gentler smile.'),
+    smile_wait: () => popup('She waits for you to coax the smile free.'),
+
+    after_smile_more: () => story(
+        'Better, she says, and the gentle smile fades before you can get used to it. But not enough. I want the smile that knows how to ruin a life and enjoy it. Give me that one next.',
+        'await_seduce'
+    ),
+    after_smile_flirt: () => story(
+        'You tell her the room changed the moment she smiled. It did, she agrees. Now change it again. Give me the darker smile, the one that would make a saint stay anyway.',
+        'await_seduce',
+        { affection: 2, flirt: 1 }
+    ),
+    after_smile_whisper: () => story(
+        'You lean close enough to whisper that she looks dangerous now. Finally, she says, sounding pleased. So show me you can match it. Give me the dangerous smile back.',
+        'await_seduce',
+        { affection: 1, flirt: 1 }
+    ),
+    after_smile_hold: () => story(
+        'You try to hold the moment still, but she is already reaching past it. Do not fall in love with the safe version of me, she says softly. Give me the darker smile.',
+        'await_seduce'
+    ),
+
+    seduce_question: () => story(
+        'Because sight keeps people honest, she says. What comes next asks for something stranger than honesty. Close my eyes when the room is ready, and maybe yours will open instead.',
+        'await_eyes'
+    ),
+    seduce_trust: () => story(
+        'You tell her to trust you. She considers that longer than any flirtation deserved, then nods once. Good. Then prove you mean it. Close my eyes for me.',
+        'await_eyes',
+        { affection: 1 }
+    ),
+    seduce_dare: () => story(
+        'You say you are not afraid of her. Her answer is almost tender. Not of me, perhaps. But fear is not done with us tonight. Close my eyes and let us find out what remains.',
+        'await_eyes',
+        { affection: 1, flirt: 1 }
+    ),
+    seduce_touch: () => popup('Then close her eyes gently.'),
+
+    eyes_next: () => story(
+        'With her eyes closed, every word sounds more intimate. In the silver bowl is the last instrument, she whispers. The leech brain remembers hunger, direction, and return. Use it, and the ritual will finally choose its shape.',
+        'need_leech'
+    ),
+    eyes_hold: () => story(
+        'You take her hand before she can ask. Her fingers tighten around yours as though she expected you to run. Stay until the end, she whispers. Then use what waits in the bowl.',
+        'need_leech',
+        { affection: 2 }
+    ),
+    eyes_kiss: () => story(
+        'You kiss her forehead and feel her lean into it, small and involuntary. There you are, she breathes. Now do the last thing. Take the leech brain and finish it before I lose my nerve.',
+        'need_leech',
+        { affection: 2, flirt: 1 }
+    ),
+    eyes_doubt: () => story(
+        'You admit that you are afraid. Good, she says immediately. Fear means you still understand the cost. Do it anyway. Take the leech brain before courage curdles into regret.',
+        'need_leech'
+    ),
+
+    leech_stay: () => story(
+        'You promise that you will stay beside her, no matter what the ritual asks back. Her grip loosens, trusting you at last. Then do it, she whispers. I would rather cross with you here than alone.',
+        'need_leech',
+        { affection: 2 }
+    ),
+    leech_goodbye: () => story(
+        'Is this goodbye? you ask. Not goodbye, she says. A threshold. The kind people only survive when someone is willing to witness them. Please. Use it now.',
+        'need_leech'
+    ),
+    leech_care: () => story(
+        'You tell her that this stopped being curiosity a long time ago. I know, she says, and the words sound relieved. That is why it might work. Finish it.',
+        'need_leech',
+        { affection: 2, flirt: 1 }
+    ),
+    leech_reach: () => popup('Then take the leech brain from the bowl.'),
+
+    end_stay: () => story(endingText('stay'), 'ritual_done', { epilogue: 'stay' }),
+    end_kiss: () => story(endingText('kiss'), 'ritual_done', { epilogue: 'kiss' }),
+    end_leave: () => story(endingText('leave'), 'ritual_done', { epilogue: 'leave' }),
+    end_restart: () => restartStory()
+};
+
+function handleTalk() {
+    switch (state.stage) {
+        case 'intro':
+            return menu('She waits for your first move.', [
+                ['intro_greet', 'Introduce yourself'],
+                ['intro_flirt', 'Tell her she is beautiful'],
+                ['intro_ritual', 'Ask about the ritual'],
+                ['intro_silent', 'Keep staring at her']
+            ]);
+        case 'await_flower':
+            return menu('She wants the flower first.', [
+                ['flower_question', 'Ask why the flower matters'],
+                ['flower_flirt', 'Say it suits her already'],
+                ['flower_obey', 'Reach for the flower'],
+                ['flower_stall', 'Ask for more time']
+            ]);
+        case 'flower_shown':
+            return menu('She turns the flower slowly.', [
+                ['after_flower_next', 'Ask what comes next'],
+                ['after_flower_hand', 'Let your fingers linger'],
+                ['after_flower_watch', 'Watch her smell the petals'],
+                ['after_flower_joke', 'Say she owes you a smile']
+            ]);
+        case 'await_wine':
+            return menu('The dark wine waits nearby.', [
+                ['wine_question', 'Ask why the wine matters'],
+                ['wine_toast', 'Promise her a private toast'],
+                ['wine_tease', 'Say she likes ordering you'],
+                ['wine_offer', 'Reach for the glass']
+            ]);
+        case 'wine_shown':
+            return menu('The wine deepens her voice.', [
+                ['after_wine_smile', 'Ask what she wants now'],
+                ['after_wine_flirt', 'Say the wine envies her lips'],
+                ['after_wine_confess', 'Admit you are in too deep'],
+                ['after_wine_listen', 'Just listen to her breathe']
+            ]);
+        case 'await_smile':
+            return menu('She wants a real smile now.', [
+                ['smile_question', 'Ask what smile she means'],
+                ['smile_flirt', 'Tell her the room is waiting'],
+                ['smile_reach', 'Reach toward her mouth'],
+                ['smile_wait', 'Let the silence gather']
+            ]);
+        case 'smile_shown':
+            return menu('Her gentler smile appears.', [
+                ['after_smile_more', 'Ask for the darker one'],
+                ['after_smile_flirt', 'Say the room changed with it'],
+                ['after_smile_whisper', 'Call her dangerous'],
+                ['after_smile_hold', 'Try to hold the moment']
+            ]);
+        case 'await_seduce':
+            return menu('She wants the dangerous smile.', [
+                ['seduce_question', 'Ask why she wants it'],
+                ['seduce_trust', 'Tell her to trust you'],
+                ['seduce_dare', 'Say you are not afraid'],
+                ['seduce_touch', 'Lift a hand toward her face']
+            ]);
+        case 'seduce_shown':
+            return menu('Now she looks almost cruel.', [
+                ['seduce_question', 'Ask why her eyes must close'],
+                ['seduce_trust', 'Promise you will be gentle'],
+                ['seduce_dare', 'Say you still want her'],
+                ['seduce_touch', 'Close her eyes for her']
+            ]);
+        case 'await_eyes':
+            return menu('Her eyes are still on you.', [
+                ['seduce_trust', 'Tell her to trust you'],
+                ['seduce_dare', 'Say you are ready'],
+                ['seduce_touch', 'Reach toward her lashes'],
+                ['seduce_question', 'Ask what comes after']
+            ]);
+        case 'eyes_closed':
+            return menu('Her eyes are closed. She listens.', [
+                ['eyes_next', 'Ask what happens now'],
+                ['eyes_hold', 'Take her hand'],
+                ['eyes_kiss', 'Kiss her forehead'],
+                ['eyes_doubt', 'Admit you are afraid']
+            ]);
+        case 'need_leech':
+            return menu('The silver bowl waits by her hand.', [
+                ['leech_stay', 'Promise you will stay'],
+                ['leech_goodbye', 'Ask if this is goodbye'],
+                ['leech_care', 'Tell her you care'],
+                ['leech_reach', 'Reach for the bowl']
+            ]);
+        case 'ritual_done':
+            return menu('The ritual is finished. And now?', [
+                ['end_stay', 'Stay with her'],
+                ['end_kiss', 'Kiss her cheek'],
+                ['end_leave', 'Leave quietly'],
+                ['end_restart', 'Start over']
+            ]);
+        default:
+            state.stage = 'intro';
+            return handleTalk();
+    }
+}
+
+if (clickedChoice) {
+    if (choiceHandlers[clickedChoice]) {
+        return choiceHandlers[clickedChoice]();
+    }
+    return popup('That choice no longer belongs to this moment.');
+}
+
+if (hit) {
+    if (hit.name === 'talk') {
+        return handleTalk();
+    }
+    return inspectSelection(hit.name);
 }
 
 return null;
