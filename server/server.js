@@ -578,7 +578,6 @@ const demoImagePayload = buildDemoImagePayload();
 const roomClickState = new Map();
 const roomPopupState = new Map();
 const roomTransientBottomTextState = new Map();
-const ATARI_VISIBLE_MAX_CLICK_Y = 183;
 
 function validateVbxePayload(buffer, options = {}) {
   const minPixels = Math.max(1, clampInteger(options.minPixels, 64));
@@ -1382,11 +1381,9 @@ function buildRoomPreviewBuffer(buffer, width, height, lastClick) {
 }
 
 function calibrateAtariClickY(rawY) {
-  const y = Math.max(0, Math.min(IMAGE_HEIGHT - 1, clampInteger(rawY, 0)));
-  return Math.min(
-    IMAGE_HEIGHT - 1,
-    Math.round((y * (IMAGE_HEIGHT - 1)) / ATARI_VISIBLE_MAX_CLICK_Y)
-  );
+  // The Atari client already sends the same 0..199 cursor Y value it uses for
+  // hover hit-testing, so clicks must use that raw coordinate too.
+  return Math.max(0, Math.min(IMAGE_HEIGHT - 1, clampInteger(rawY, 0)));
 }
 
 function parseHexByte(value) {
@@ -2172,7 +2169,7 @@ const server = http.createServer(async (req, res) => {
         const transientAdvance = advanceRoomTransientBottomTextAction(clickRoomName);
         sendText(res, 200, 'OK\n');
         console.log(
-          `[EVENT] click ${clickRoomName} logical=(${logicalX},${rawY}) calibratedY=${y} pixel=(${logicalX * 2},${y})` +
+          `[EVENT] click ${clickRoomName} logical=(${logicalX},${rawY}) y=${y} pixel=(${logicalX * 2},${y})` +
           ` action=${transientAdvance?.cleared ? 'clearBottomText' : 'displayBottomTextPage'}`
         );
         return;
@@ -2182,7 +2179,7 @@ const server = http.createServer(async (req, res) => {
         const clickAction = resetGameAndBuildReloadAction('first');
         sendText(res, 200, encodeClickActionText(clickAction));
         console.log(
-          `[EVENT] click ${clickRoomName} logical=(${logicalX},${rawY}) calibratedY=${y} pixel=(${logicalX * 2},${y})` +
+          `[EVENT] click ${clickRoomName} logical=(${logicalX},${rawY}) y=${y} pixel=(${logicalX * 2},${y})` +
           ` selection=${hitSelection.name} action=resetgame reload=${clickAction.room}`
         );
         return;
@@ -2202,7 +2199,7 @@ const server = http.createServer(async (req, res) => {
 
       sendText(res, 200, encodeClickActionText(clickAction));
       console.log(
-        `[EVENT] click ${clickRoomName} logical=(${logicalX},${rawY}) calibratedY=${y} pixel=(${logicalX * 2},${y})` +
+        `[EVENT] click ${clickRoomName} logical=(${logicalX},${rawY}) y=${y} pixel=(${logicalX * 2},${y})` +
         (hitSelection ? ` selection=${hitSelection.name}` : '') +
         (clickAction ? ` action=${clickAction.type}` : '')
       );

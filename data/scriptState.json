@@ -1,7 +1,7 @@
 {
-  "stage": "await_smile",
-  "affection": 3,
-  "flirtCount": 2,
+  "stage": "intro",
+  "affection": 0,
+  "flirtCount": 0,
   "leechShown": false,
   "epilogue": ""
 }
